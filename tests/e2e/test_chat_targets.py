@@ -172,3 +172,62 @@ def test_figure_navigation_does_not_limit_sent_instruction_to_step(gui, page):
     page.wait_for_function("document.querySelector('.chat-send').disabled === false")
     assert captured[0]['items'] == [{'key': 'fig:test/box', 'label': '図 box', 'text': '図全体の色を変えて'}]
     assert not page.errors
+
+
+def test_fixed_page_keeps_instruction_while_browsing(gui, page):
+    ws, srv = gui
+    figures.new_figure(ws, 'box', ws.shelf_dir('test'))
+    write_atomic(ws.qmd('talk'), ws.qmd('talk').read_text().replace(
+        'まとめの段落。', 'まとめの段落。\n\n{{< fig test/box height=200 >}}'))
+    open_deck(page, srv, raw=False)
+    page.wait_for_selector('.chat-input:not([disabled])')
+    go_slide(page, 2)
+    page.fill('.chat-input', '一枚目への指示')
+    page.get_by_role('button', name='指示先のページを固定', exact=True).click()
+    go_slide(page, 4)
+    expect(page.locator('.chat-tlabel')).to_have_text('p3 一枚目')
+    expect(page.locator('.chat-input')).to_have_value('一枚目への指示')
+    page.frame_locator('#slideBox iframe:not(.loading)').locator('[data-slide-studio="p4/1"]').first.click()
+    expect(page.locator('.chat-tlabel')).to_have_text('p3 一枚目')
+    page.fill('.chat-input', 'まとめを参考に一枚目を修正')
+    captured = []
+
+    def capture(route):
+        captured.append(route.request.post_data_json)
+        route.fulfill(status=400, json={'error': '送信内容を検証'})
+
+    page.route('**/chat/tabs/*/send', capture)
+    page.locator('.chat-send').click()
+    page.wait_for_function("document.querySelector('.chat-send').disabled === false")
+    assert captured[0]['items'] == [{'key': 'one', 'label': 'p3 一枚目', 'text': 'まとめを参考に一枚目を修正'}]
+    expect(page.locator('[data-act=fix-page]')).to_have_attribute('aria-pressed', 'true')
+    page.get_by_role('button', name='固定を解除（表示中のページへ）', exact=True).click()
+    expect(page.locator('.chat-tlabel')).to_have_text('p5 まとめ')
+    expect(page.locator('.chat-input')).to_have_value('')
+    go_slide(page, 2)
+    expect(page.locator('.chat-input')).to_have_value('まとめを参考に一枚目を修正')
+    assert not page.errors
+
+
+def test_fixed_page_is_per_conversation_and_explicit_target_clears_it(gui, page):
+    _, srv = gui
+    open_deck(page, srv, raw=False)
+    page.wait_for_selector('.chat-input:not([disabled])')
+    go_slide(page, 2)
+    original = page.locator('.chat-tab [role=tab][aria-selected=true]').get_attribute('data-tab')
+    page.locator('[data-act=fix-page]').click()
+    page.fill('.chat-input', '一枚目への指示')  # 何も始めていないタブは［＋］で使い回されるので、書きかけを作る
+    page.locator('.chat-tabs [data-act=add]').click()
+    page.wait_for_function(f"document.querySelector('.chat-tab [role=tab][aria-selected=true]')?.dataset.tab !== '{original}'")
+    go_slide(page, 4)
+    expect(page.locator('.chat-tlabel')).to_have_text('p5 まとめ')
+    expect(page.locator('[data-act=fix-page]')).to_have_attribute('aria-pressed', 'false')
+    page.locator(f'.chat-tab [data-tab="{original}"][role=tab]').click()
+    expect(page.locator('.chat-tlabel')).to_have_text('p3 一枚目')
+    expect(page.locator('[data-act=fix-page]')).to_have_attribute('aria-pressed', 'true')
+    page.locator('[data-act=whole]').click()
+    expect(page.locator('.chat-tlabel')).to_have_text('発表全体')
+    page.locator('[data-act=whole]').click()
+    expect(page.locator('.chat-tlabel')).to_have_text('p5 まとめ')
+    expect(page.locator('[data-act=fix-page]')).to_have_attribute('aria-pressed', 'false')
+    assert not page.errors

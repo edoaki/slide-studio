@@ -50,6 +50,8 @@ export function makeChat(ctx) {
   const tabIds = { slides: store('tab'), memo: store('tab.memo'), theme: store('tab.theme') };
   let tabId = tabIds.slides;
   const pins = store('pins') || {};
+  const fixedPages = new Map(); // 閲覧中のページとは別に、会話ごとの指示先を保持する
+  const fixedPage = () => fixedPages.get(tabId);
   const talks = store('talk') || {}; // タブごとの「話し合い」（スライドのタブだけ。AI はファイルを変えない）
   const timers = {}, patches = {}, rolePatches = {}, roleSeq = {};
 
@@ -142,7 +144,7 @@ export function makeChat(ctx) {
   const runningKeys = id => roundsOf(id).filter(r => ACTIVE.has(r.state)).flatMap(r => r.items.map(i => i.key));
   const draftText = value => typeof value === 'string' ? value : value?.text || '';
   const draftValue = (key, text, before) => key.startsWith('@') && typeof before !== 'string' && pageByKey(key)
-    ? { text, page_title: before?.page_title ?? pageByKey(key).title } : text;
+    ? { text, page_title: before?.page_title ?? (fixedPage()?.key === key ? fixedPage().title : pageByKey(key).title) } : text;
   const uncertain = (t, key) => key.startsWith('@') && (typeof t.drafts[key]?.page_title !== 'string' || t.drafts[key].page_title !== pageByKey(key)?.title);
   const draftsOf = t => Object.entries(t?.drafts || {}).map(([k, v]) => [k, draftText(v)]).filter(([, v]) => v.trim())
     .sort(([a], [b]) => (a === 'deck' ? -1 : pageByKey(a)?.index ?? 1e9) - (b === 'deck' ? -1 : pageByKey(b)?.index ?? 1e9));
@@ -150,7 +152,7 @@ export function makeChat(ctx) {
   // 対象は表示中のページ。スライドで図を選んでいればその図（［ページ］でページにする）。［全体］を押したタブだけ発表全体
   let pageOnly = false, lastFig = null, figurePage = null, figureBlock = null;
   const pinOf = () => (tab() && pins[tab().id] === 'deck' && 'deck') || null;
-  const curKey = () => plain() ? mode : pinOf() || (!pageOnly && selFig()) || viewKey();
+  const curKey = () => plain() ? mode : fixedPage()?.key || pinOf() || (!pageOnly && selFig()) || viewKey();
   const isPage = key => key !== 'deck' && !isFig(key);
 
   function chooseDraftTarget(t, key) {
@@ -197,8 +199,19 @@ export function makeChat(ctx) {
   }
   function setPin(v) {
     const t = tab(); if (!t) return;
+    fixedPages.delete(t.id);
     if (v) pins[t.id] = v; else delete pins[t.id];
     store('pins', pins); render();
+  }
+  function toggleFixedPage() {
+    if (!tab() || plain()) return;
+    if (fixedPage()) fixedPages.delete(tabId);
+    else {
+      const key = curKey(), p = pageByKey(key);
+      if (!p || !isPage(key)) return;
+      fixedPages.set(tabId, { key, title: p.title });
+    }
+    pageOnly = true; stepOnly = false; render();
   }
   // 対象を図・ページ・発表全体にする（⌥1・⌥2・⌥3）。図は選んでいるときだけ
   function setTarget(to) {
@@ -960,6 +973,7 @@ export function makeChat(ctx) {
     const to = { fig: [T.toFig, '⌥ 1'], page: [T.toPage, '⌥ 2'], deck: [T.toDeck, '⌥ 3'] };
     return (isFig(cur) && visibleFigureStep(cur) ? one('step', T.stepOnly, stepOnly, [T.toStep, '']) : '')
       + (fig ? one('page', T.page, isPage(cur), isPage(cur) ? to.fig : to.page) : '')
+      + (isPage(cur) ? one('fix-page', fixedPage() ? T.pageFixed : T.fixPage, !!fixedPage(), [fixedPage() ? T.unfixPage : T.fixPageTip, '']) : '')
       + one('whole', T.whole, cur === 'deck', cur === 'deck' ? to[back] : to.deck);
   }
   function renderSide() {
@@ -1072,6 +1086,7 @@ export function makeChat(ctx) {
       input.focus();
     } else if (act === 'rm' && t) { const d = { ...t.drafts }; delete d[el.dataset.key]; erase(t, d); }
     else if (act === 'clear' && t) erase(t, {});
+    else if (act === 'fix-page') toggleFixedPage();
     else if (act === 'whole') toggle('deck');
     else if (act === 'page') toggle('page');
     else if (act === 'step') { stepOnly = !stepOnly; render(); }
@@ -1177,6 +1192,7 @@ export function makeChat(ctx) {
     },
     // スライドで別の図を選んだら、その図への指示にする（［全体］を押していても）
     blockSelected() {
+      if (fixedPage()) return;
       const ref = ctx.blocks?.figure;
       if (!ref) return;
       const f = 'fig:' + ref;

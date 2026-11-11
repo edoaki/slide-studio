@@ -368,6 +368,7 @@ export const S = {
     drafts: n => `未送信の指示 · ${n}件`, clearDrafts: 'すべて消す',
     typing: '入力中', openDraft: label => `${label} の指示を開いて続きを書く`, removeDraft: 'この指示を消す',
     target: '対象',
+    fixPage: '固定', pageFixed: '固定中', fixPageTip: '指示先のページを固定', unfixPage: '固定を解除（表示中のページへ）',
     targetChanged: 'ページの並びや見出しが変わったか、古い指示に見出しが残っていないため、対象を確認できません。指示を残すページを選び直してください。',
     chooseDraftTarget: '未送信の指示の対象を選び直す',
     useDraftTarget: label => `${label} への指示にする`,
