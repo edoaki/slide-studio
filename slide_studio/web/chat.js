@@ -108,15 +108,6 @@ export function makeChat(ctx) {
   const isFig = key => key.startsWith('fig:');
   // 編集用のブロック選択が外れても、同じページでは図への指示を維持する。
   const selFig = () => figurePage === viewKey() ? lastFig : null;
-  let stepOnly = false;
-  const figureStep = key => stepOnly ? visibleFigureStep(key) : null;
-  function visibleFigureStep(key) {
-    if (key !== selFig()) return null;
-    const block = ctx.preview.win?.document.querySelector(`.slide.active [data-slide-studio="${CSS.escape(figureBlock)}"]`);
-    const frame = block?.querySelector('iframe');
-    const a = frame?.contentWindow?.animation;
-    return a && a.stepNames?.length > 1 ? { index: a.step, count: a.stepNames.length, title: a.stepNames[a.step] } : null;
-  }
   function shortOf(key) {
     if (key === 'deck') return T.wholeShort;
     if (isFig(key)) return key.slice(4).split('/').pop();
@@ -125,7 +116,7 @@ export function makeChat(ctx) {
     const i = ctx.preview.slideOfPage(p.index);
     return 'p' + ((i >= 0 ? i : p.index) + 1);
   }
-  const labelOf = (key, step = figureStep(key)) => key === 'theme' ? S.tabTheme : key === 'memo' ? T.memoLabel : key === 'deck' ? T.wholeDeck : isFig(key) ? `${T.figure} ${shortOf(key)}${step ? T.figureStep(step) : ''}` : `${shortOf(key)} ${pageByKey(key)?.title || ''}`.trim();
+  const labelOf = key => key === 'theme' ? S.tabTheme : key === 'memo' ? T.memoLabel : key === 'deck' ? T.wholeDeck : isFig(key) ? `${T.figure} ${shortOf(key)}` : `${shortOf(key)} ${pageByKey(key)?.title || ''}`.trim();
   const modeOf = t => t.mode || 'slides';
   const plain = () => mode !== 'slides';
   const plainText = key => T[`${mode === 'theme' ? 'theme' : 'memo'}${key}`];
@@ -203,20 +194,23 @@ export function makeChat(ctx) {
     if (v) pins[t.id] = v; else delete pins[t.id];
     store('pins', pins); render();
   }
+  // 指示先（ページ・図）を固定する。固定中はほかのページへ移っても、図を選んでも変えない
   function toggleFixedPage() {
     if (!tab() || plain()) return;
-    if (fixedPage()) fixedPages.delete(tabId);
+    if (fixedPage()) { fixedPages.delete(tabId); render(); return; }
+    const key = curKey();
+    if (isFig(key)) fixedPages.set(tabId, { key });
     else {
-      const key = curKey(), p = pageByKey(key);
+      const p = pageByKey(key);
       if (!p || !isPage(key)) return;
       fixedPages.set(tabId, { key, title: p.title });
+      pageOnly = true;
     }
-    pageOnly = true; stepOnly = false; render();
+    render();
   }
   // 対象を図・ページ・発表全体にする（⌥1・⌥2・⌥3）。図は選んでいるときだけ
   function setTarget(to) {
     if (!tab() || plain() || (to === 'fig' && !selFig())) return;
-    stepOnly = false;
     pageOnly = to === 'page';
     setPin(to === 'deck' ? 'deck' : null);
   }
@@ -486,12 +480,11 @@ export function makeChat(ctx) {
   async function send() {
     const t = tab();
     if (!t || settingSaves || sending || busy(t.id) || !draftsOf(t).length || !aiOf(t).ok) return;
-    const figure = selFig(), step = figure ? figureStep(figure) : null;
     const sendMode = modeOf(t), talk = talkOf(t);
     submission = { tab: t.id, rounds: new Set(roundsOf(t.id).map(r => r.id)),
-      items: draftsOf(t).map(([key, text]) => ({ key, label: labelOf(key, key === figure ? step : null), text: text.trim(),
+      items: draftsOf(t).map(([key, text]) => ({ key, label: labelOf(key), text: text.trim(),
         ...(key.startsWith('@') ? { page_title: t.drafts[key].page_title } : {}),
-        ...(key === figure && step ? { step: step.index } : {}) })),
+      })),
       attach: [...(t.attach || [])], pending: [...pendingOf(t)] };
     sending = true; shownKey = null; render();
     $('.chat-log').scrollTop = $('.chat-log').scrollHeight;
@@ -966,14 +959,13 @@ export function makeChat(ctx) {
     const why = settingSaves ? T.savingSettings : sending ? T.sending : running ? T.sendBusy : !ai ? T.sendLoading : !a.ok ? T.sendNoAi(a.p?.name || 'AI') : n ? ready : none;
     tip(b, why, n && a.ok && !running ? '⌘ Enter' : '');
   }
-  // ［ページ］は図を選んでいるときだけ出す。説明（tip.js）には、押したときの行き先とそのキーを出す
+  // ［ページ］は図を選んでいるとき、［固定］はページ・図が対象のときだけ出す。説明（tip.js）には、押したときの行き先とそのキーを出す
   function toggles(cur) {
     const fig = selFig(), back = !pageOnly && fig ? 'fig' : 'page';
     const one = (act, label, on, [tipText, keys]) => `<button class="chat-toggle" data-act="${act}" aria-pressed="${on}" aria-label="${esc(tipText)}" data-tip="${esc(tipText)}" data-keys="${keys}">${label}</button>`;
     const to = { fig: [T.toFig, '⌥ 1'], page: [T.toPage, '⌥ 2'], deck: [T.toDeck, '⌥ 3'] };
-    return (isFig(cur) && visibleFigureStep(cur) ? one('step', T.stepOnly, stepOnly, [T.toStep, '']) : '')
-      + (fig ? one('page', T.page, isPage(cur), isPage(cur) ? to.fig : to.page) : '')
-      + (isPage(cur) ? one('fix-page', fixedPage() ? T.pageFixed : T.fixPage, !!fixedPage(), [fixedPage() ? T.unfixPage : T.fixPageTip, '']) : '')
+    return (fig ? one('page', T.page, isPage(cur), isPage(cur) ? to.fig : to.page) : '')
+      + (cur !== 'deck' ? one('fix-page', fixedPage() ? T.pageFixed : T.fixPage, !!fixedPage(), [fixedPage() ? T.unfixPage : T.fixPageTip, '']) : '')
       + one('whole', T.whole, cur === 'deck', cur === 'deck' ? to[back] : to.deck);
   }
   function renderSide() {
@@ -1089,7 +1081,6 @@ export function makeChat(ctx) {
     else if (act === 'fix-page') toggleFixedPage();
     else if (act === 'whole') toggle('deck');
     else if (act === 'page') toggle('page');
-    else if (act === 'step') { stepOnly = !stepOnly; render(); }
     else if (act === 'send') send();
     else if (act === 'attach') $('.chat-file').click();
     else if (act === 'talk') { const t = tab(); if (t) { if (talks[t.id]) delete talks[t.id]; else talks[t.id] = true; store('talk', talks); renderCompose(); } }
@@ -1186,7 +1177,7 @@ export function makeChat(ctx) {
     slideChanged() {
       if (figurePage !== viewKey()) {
         lastFig = null; figurePage = null; figureBlock = null;
-        pageOnly = false; stepOnly = false;
+        pageOnly = false;
       }
       render();
     },
@@ -1199,7 +1190,7 @@ export function makeChat(ctx) {
       const same = f === selFig() && figureBlock === ctx.blocks.selected;
       figurePage = viewKey(); figureBlock = ctx.blocks.selected;
       if (same) return;
-      lastFig = f; pageOnly = false; stepOnly = false;
+      lastFig = f; pageOnly = false;
       if (f && tab() && pinOf()) { delete pins[tab().id]; store('pins', pins); }
       render();
     },

@@ -113,7 +113,7 @@ def test_legacy_anonymous_draft_kept_until_reselected(gui, page):
     assert not page.errors
 
 
-def test_selected_figure_step_is_sent_and_drafts_stay_per_figure(gui, page):
+def test_fixed_figure_keeps_instruction_while_browsing(gui, page):
     ws, srv = gui
     figures.new_figure(ws, 'box', ws.shelf_dir('test'))
     write_atomic(ws.qmd('talk'), ws.qmd('talk').read_text().replace('まとめの段落。', 'まとめの段落。\n\n{{< fig test/box height=200 >}}'))
@@ -121,33 +121,26 @@ def test_selected_figure_step_is_sent_and_drafts_stay_per_figure(gui, page):
     page.wait_for_selector('.chat-input:not([disabled])')
     go_slide(page, 4)
     page.frame_locator('#slideBox iframe:not(.loading)').locator('[data-slide-studio="p4/1"]').first.click()
-    assert page.locator('.chat-tlabel').inner_text() == '図 box'
+    expect(page.locator('.chat-tlabel')).to_have_text('図 box')
+    page.locator('#stepNext').click()
+    assert page.locator('[data-act=step]').count() == 0
     page.fill('.chat-input', '色を変えて')
-    page.locator('#stepNext').click()
-    assert page.locator('.chat-tlabel').inner_text() == '図 box'
-    page.locator('[data-act=step]').click()
-    page.wait_for_function("document.querySelector('.chat-tlabel').textContent.includes('step 2/3「処理を表示」')")
-    page.locator('[data-act=step]').click()
-    assert page.locator('.chat-tlabel').inner_text() == '図 box'
-    page.locator('[data-act=step]').click()
-    assert page.input_value('.chat-input') == '色を変えて'
-    assert page.locator('.chat-draft').count() == 1
-    page.locator('#viewport').click(position={'x': 12, 'y': 12})
-    expect(page.locator('.chat-tlabel')).to_contain_text('図 box · step 2/3')
-    page.locator('#stepPrev').click()
-    page.wait_for_function("document.querySelector('.chat-tlabel').textContent.includes('step 1/3「入力を表示」')")
-    page.locator('#stepNext').click()
+    page.get_by_role('button', name='指示先を固定', exact=True).click()
+    go_slide(page, 2)
+    expect(page.locator('.chat-tlabel')).to_have_text('図 box')
+    expect(page.locator('.chat-input')).to_have_value('色を変えて')
+    captured = []
+
+    def capture(route):
+        captured.append(route.request.post_data_json)
+        route.fulfill(status=400, json={'error': '送信内容を検証'})
+
+    page.route('**/chat/tabs/*/send', capture)
     page.locator('.chat-send').click()
-    page.wait_for_selector('.chat-round')
-    page.locator('#stepNext').click()
-    page.wait_for_function("document.querySelector('.chat-tlabel').textContent.includes('step 3/3「結果を表示」')")
-    state = page.request.get(f'{srv.url}/api/deck/talk/chat').json()
-    item = state['rounds'][0]['items'][0]
-    assert item['key'] == 'fig:test/box'
-    assert item['step'] == {'index': 1, 'count': 3, 'title': '処理を表示'}
-    assert item['label'] == '図 box · step 2/3「処理を表示」'
-    assert 'step 2/3「処理を表示」' in page.locator('.chat-round .chat-sent .chat-chip').get_attribute('data-tip')
-    page.wait_for_selector('.chat-round .chat-files', timeout=30000)
+    page.wait_for_function("document.querySelector('.chat-send').disabled === false")
+    assert captured[0]['items'] == [{'key': 'fig:test/box', 'label': '図 box', 'text': '色を変えて'}]
+    page.get_by_role('button', name='固定を解除', exact=True).click()
+    expect(page.locator('.chat-tlabel')).to_have_text('p3 一枚目')
     assert not page.errors
 
 
@@ -183,7 +176,7 @@ def test_fixed_page_keeps_instruction_while_browsing(gui, page):
     page.wait_for_selector('.chat-input:not([disabled])')
     go_slide(page, 2)
     page.fill('.chat-input', '一枚目への指示')
-    page.get_by_role('button', name='指示先のページを固定', exact=True).click()
+    page.get_by_role('button', name='指示先を固定', exact=True).click()
     go_slide(page, 4)
     expect(page.locator('.chat-tlabel')).to_have_text('p3 一枚目')
     expect(page.locator('.chat-input')).to_have_value('一枚目への指示')
@@ -201,7 +194,7 @@ def test_fixed_page_keeps_instruction_while_browsing(gui, page):
     page.wait_for_function("document.querySelector('.chat-send').disabled === false")
     assert captured[0]['items'] == [{'key': 'one', 'label': 'p3 一枚目', 'text': 'まとめを参考に一枚目を修正'}]
     expect(page.locator('[data-act=fix-page]')).to_have_attribute('aria-pressed', 'true')
-    page.get_by_role('button', name='固定を解除（表示中のページへ）', exact=True).click()
+    page.get_by_role('button', name='固定を解除', exact=True).click()
     expect(page.locator('.chat-tlabel')).to_have_text('p5 まとめ')
     expect(page.locator('.chat-input')).to_have_value('')
     go_slide(page, 2)
