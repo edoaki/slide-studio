@@ -1,0 +1,235 @@
+---
+pagetitle: "機械学習を使った組み合わせ最適化"
+lang: ja
+title-slide: false
+---
+
+## 機械学習を使った組み合わせ最適化 {#cover .cover}
+
+::: {.cover-title}
+機械学習を使った組み合わせ最適化<br>ニューラル組み合わせ最適化の紹介
+:::
+
+# 研究背景
+
+## 研究背景 {#background}
+
+配送の順番や作業の順番など、社会には組合せを考えて決める問題が多くある。
+
+```{=html}
+<iframe src="../../html/social-problems/index.html" class="model-animation" title="配送経路とスケジューリング"></iframe>
+```
+
+制約を満たす組合せから、目的関数が最もよいものを選ぶ問題を**組合せ最適化**と呼ぶ。[@dantzig1954; @jobshop]
+
+
+## 問題の例：巡回セールスマン問題 {#tsp .figure-compact}
+
+全都市を1回ずつ訪問して出発点へ戻る経路を、なるべく短くする問題。\
+都市がN個のとき経路の順列は(N−1)!通りあり、都市が増えるほど膨大になる。
+
+```{=html}
+<iframe src="../../html/search-space/index.html" class="model-animation" title="都市数と経路の候補数"></iframe>
+```
+
+単純に列挙すると候補は階乗のペースで増え、NP困難^※^な問題として知られる。
+
+::: {.footnote-small}
+※ NP困難：NPに属するどの問題も多項式時間で帰着できる問題。多項式時間で解く方法は知られていない。
+:::
+
+
+## 解き方1：数理最適化ソルバー {#solver .method-slide}
+
+問題を数式（変数・制約・目的関数）で表し、分枝限定法などで最適解を探す。代表的なソルバーにGurobi、CPLEXがある。[@dantzig1954; @gurobi]
+
+:::: {.columns}
+::: {.column}
+```{=html}
+<iframe src="../../html/solver-bnb/index.html" class="model-animation" title="4都市の辺の選択と最短経路の探索"></iframe>
+```
+:::
+::: {.column}
+**利点**
+
+- 探索が完了すれば、許容誤差の範囲で最適性を証明できる
+- 制約を式で追加しやすい
+
+**欠点**
+
+- 問題によっては探索に長い計算時間がかかる
+- 問題ごとに定式化の工夫が必要
+:::
+::::
+
+
+
+## 解き方2：ヒューリスティクス {#heuristic .method-slide}
+
+問題の性質に合わせた手順で、1つの解を素早く作る。\
+例えば最近傍法では、今いる都市から最も近い未訪問の都市へ順に進む。[@lin1973]
+
+:::: {.columns}
+::: {.column}
+```{=html}
+<iframe src="../../html/heuristic-nn/index.html" class="model-animation" title="最近傍法による経路の構成"></iframe>
+```
+:::
+::: {.column}
+**利点**
+
+- 計算が速く、大規模でも解を作れる
+- 手順が単純で分かりやすい
+
+**欠点**
+
+- 解の良さの保証がない
+- 良いやり方を人が考える必要がある
+:::
+::::
+
+
+## 解き方3：メタヒューリスティクス {#metaheuristic .method-slide}
+
+解を少しずつ変えて良くしていく探索の枠組み。ここでは**焼きなまし法**を例に、悪くなる変更もある程度受け入れ、局所的に良い解から抜け出す様子を示す。
+
+:::: {.columns}
+::: {.column}
+```{=html}
+<iframe src="../../html/metaheuristic-2opt/index.html" class="model-animation" title="つなぎ替えによる経路の改善"></iframe>
+```
+:::
+::: {.column}
+**利点**
+
+- 多くの問題に使え、良い解が得られやすい
+- 時間をかけるほど改善できる
+
+**欠点**
+
+- 問題ごとに変更の仕方（近傍）を設計する必要がある
+- 問題を解くたびに一から探索する
+:::
+::::
+
+
+## 組合せ最適化の解き方 {#methods}
+
+| 解き方 | 例 | 速さ | 解の良さ |
+|---|---|:-:|:-:|
+| 数理最適化ソルバー | Gurobi、CPLEX | △ | ◎ |
+| ヒューリスティクス | 最近傍法、貪欲法 | ◎ | △ |
+| メタヒューリスティクス | 焼きなまし法、遺伝的アルゴリズム | ○ | ○ |
+| **NCO**（学習ベース） | Attention Model [@kool2019] | ◎ | ○ |
+
+これらと異なる解き方として、学習ベースの**NCO**（Neural Combinatorial Optimization）がある。
+
+
+# ニューラル組み合わせ最適化
+
+## NCO：解き方を学習する {#nco}
+
+同じ種類の問題を大量に解かせて、解の作り方をモデルに学習させる。\
+学習済みのモデルは、新しい問題に対して探索をやり直さずに解を構成する。
+
+```{=html}
+<iframe src="../../html/nco-learning/index.html" class="model-animation" title="学習と推論"></iframe>
+```
+
+
+# 先行研究
+
+## Attention Model：概要 {#am-overview .figure-compact}
+
+構成型NCOの代表的なモデルであるAttention Model [@kool2019] を説明する。
+
+::: {.lead}
+問題インスタンス $x$ から、行動 $y_t$ を1つずつ選んで解 $y$ を構成する。
+:::
+
+```{=html}
+<iframe src="../../html/nco-overview/index.html" class="model-animation" title="構成型NCOの処理"></iframe>
+```
+
+
+## Attention Model：エンコーダー {#am-encoder}
+
+::: {.lead}
+Attention Modelはエンコーダーとデコーダーの構成。\
+エンコーダーでは各都市を1つのトークンとし、Transformer3層で埋め込みを作る。
+:::
+
+```{=html}
+<iframe src="../../html/nco-encoder/index.html" class="model-animation" title="Attention Modelのエンコーダー"></iframe>
+```
+
+
+## Attention Model：デコーダー {#am-decoder}
+
+::: {.lead}
+現在の状態と埋め込みから文脈ベクトルを作り、埋め込みとの内積で次の都市を選ぶ。
+:::
+
+```{=html}
+<iframe src="../../html/nco-decoder/index.html" class="model-animation" title="Attention Modelのデコーダー"></iframe>
+```
+
+
+## 学習の仕方　 {#pomo .figure-short}
+
+::: {.lead}
+TSPは、座標を回転・反転しても、出発点や巡回方向を変えても同じ最適解になる。POMOはこの対称性を利用して複数の経路を作る [@kwon2020pomo]。
+:::
+
+```{=html}
+<iframe src="../../html/pomo/index.html" class="model-animation" title="POMOの学習と推論"></iframe>
+```
+
+学習時は複数経路の平均経路長を基準に更新する。
+推論時は出発点を変えて複数の経路を作り、最も良かったものを採用する。回転・反転による8通りの入力拡張も用いる。
+
+
+# 実験結果
+
+## 先行研究の実験結果：TSP100 {#result-tsp .compact-table}
+
+最近のモデルは、TSPでは精度もかなり良くなっている。[@bopo2025]
+
+| 手法 | 平均経路長 | ギャップ | 合計求解時間 |
+|---|---:|---:|---:|
+| Concorde | 7.75 | 0.00% | 1時間 |
+| LKH3 | 7.75 | 0.00% | 25分 |
+| POMO（入力拡張あり） | 7.77 | [0.14%]{.highlight data-highlight-step="1"} | [18.1秒]{.highlight data-highlight-step="2"} |
+| BOPO（入力拡張あり） | 7.75 | [0.04%]{.highlight data-highlight-step="1"} | [18.1秒]{.highlight data-highlight-step="2"} |
+
+::: {.result-note}
+BOPO：同じ問題で作った複数の候補解の優劣を使って学習する手法。
+
+一様分布から生成した100都市の問題1,000問（BOPO論文 Table 2）。時間は学習を除く合計。NCOは8通りの入力拡張を使用。TITAN Xp GPU・Xeon E5-2680 CPUを使用し、手法間で並列化条件も異なる。
+:::
+
+## まとめ：NCOのメリット・デメリット {#summary}
+
+:::: {.columns .summary-columns}
+::: {.column .summary-benefits}
+### メリット
+
+- 学習済みモデルで**短時間に候補解**を作れる
+- 複数の候補を作り、その中からよい解を選べる
+- **質のよい初期解**として、局所探索や他の解法と組み合わせる使い方も考えられる [@kool2019; @kwon2020pomo]
+:::
+
+::: {.column .summary-limitations}
+### デメリット
+
+- **学習が大変**：大量の問題例・計算資源・学習設定の調整が必要
+- 規模や分布が変わると、解の質が落ちることがある
+- 最適性の保証はなく、制約を守る仕組みも設計する必要がある [@kool2019; @bopo2025]
+:::
+::::
+
+::: {.summary-takeaway}
+日々似た問題を繰り返し解く場面で使えると考えている。
+:::
+
+## 参考文献 {#references}

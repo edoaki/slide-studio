@@ -1,0 +1,13 @@
+---
+title: "同期の回帰"
+topic: test
+theme: default
+---
+
+## 参照リンク {#a}
+
+[説明のリンク][doc] を含む段落。
+
+[doc]: https://example.com/doc
+
+後の段落。

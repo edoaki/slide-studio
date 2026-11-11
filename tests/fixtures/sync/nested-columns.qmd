@@ -1,0 +1,28 @@
+---
+title: "同期の回帰"
+topic: test
+theme: default
+---
+
+## 列の入れ子 {#a}
+
+:::: {.columns}
+::: {.column width="40%"}
+左の列。
+
+- 項目1
+- 項目2
+:::
+
+::: {.column width="60%"}
+右の列の段落。
+
+::: {.row style="border: 1px solid #ccc;"}
+箱の中の段落。
+
+箱の中の2段落目。
+:::
+:::
+::::
+
+列の後の段落。

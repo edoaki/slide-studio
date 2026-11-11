@@ -1,0 +1,9 @@
+---
+title: "同期の回帰"
+topic: test
+theme: default
+---
+
+## 引用 {#a}
+
+二つの文献を引く [@alpha; @beta]。文中の引用 @alpha も。

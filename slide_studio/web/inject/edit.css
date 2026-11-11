@@ -1,0 +1,65 @@
+/* プレビューに注入する編集用の CSS（書き出しには入らない）。 */
+body { background: #fff; }
+.slide > h1, .slide > h2 { cursor: text; }
+.slide > :is(h1, h2).slide-studio-editing { --slide-studio-c: #3FA0C6; caret-color: currentColor; }
+#toolbar, #overview { display: none !important; }
+/* 枠の色は原稿のブロック表示の線と同じ層の色（shared.css の --s-l1〜3 と同じ値） */
+[data-slide-studio] { --slide-studio-c: #3FA0C6; cursor: pointer; border-radius: 3px; }
+[data-slide-studio-layer="2"] { --slide-studio-c: #DD8A45; }
+[data-slide-studio-layer="3"] { --slide-studio-c: #86B03C; }
+/* 図・生の HTML と画像は層によらず別の色（shared.css の --s-html・--s-image） */
+[data-slide-studio-layer="html"] { --slide-studio-c: #9A6BD6; }
+[data-slide-studio-layer="image"] { --slide-studio-c: #D35C9E; }
+/* カーソルを合わせたブロック（スライドでも原稿のブロック表示でも同じ。edit.js が付ける）：層の色で薄く塗って枠を出す（§10.4） */
+.slide-studio-hover:not(.slide-studio-selected):not(.slide-studio-editing) {
+  outline: 2px solid color-mix(in srgb, var(--slide-studio-c) 75%, transparent); outline-offset: 4px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--slide-studio-c) 14%, transparent), inset 0 0 0 100vmax color-mix(in srgb, var(--slide-studio-c) 14%, transparent);
+}
+.slide-studio-selected, .slide-studio-frame { outline: 2px solid var(--slide-studio-c); outline-offset: 4px; }
+.slide-studio-selected.slide-studio-quiet { outline: none; }
+.slide-studio-frame { outline-offset: 0; }
+/* 装飾のメニューを開いている間は選択の枠を消し、ブロックのデザインを見えるようにする（つまみの位置は変えない） */
+.slide-studio-designing :is(.slide-studio-selected, .slide-studio-frame) { outline-color: transparent; }
+.slide-studio-editing { cursor: text; outline: 2px solid var(--slide-studio-c); outline-offset: 4px; box-shadow: 0 0 0 8px color-mix(in srgb, var(--slide-studio-c) 14%, transparent); }
+/* 表のセルの編集：枠は隣のセルに重ねない */
+:is(td, th).slide-studio-editing { outline-offset: -2px; box-shadow: none; }
+.slide-studio-selected :is(td, th) { cursor: text; }
+.slide-studio-new { min-height: 1.65em; min-width: 3em; }
+.slide-studio-drag-src { opacity: .4; }
+[data-slide-studio-atom] { user-select: all; }
+/* 編集中のレイアウトの検査（inject/lint.js）。エラーも警告も同じ黄色（GUI の --warning と同じ値）。座標は 1280×720 */
+#slide-studio-lint { position: absolute; inset: 0; z-index: 50; pointer-events: none; --slide-studio-l: #F5B841; }
+#slide-studio-lint > * { position: absolute; box-sizing: border-box; }
+.slide-studio-lint-box { border: 3px solid var(--slide-studio-l); border-radius: 4px; box-shadow: 0 0 0 1px #fff; }
+.slide-studio-lint-area { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--slide-studio-l) 70%, transparent) 0 4px, transparent 4px 11px); }
+.slide-studio-lint-tab { padding: 6px 14px; background: var(--slide-studio-l); color: #3B2A00; font: 700 22px/1.2 system-ui, sans-serif; white-space: nowrap; }
+.slide-studio-lint-tab[data-side="bottom"] { bottom: 0; transform: translateX(-50%); border-radius: 8px 8px 0 0; }
+.slide-studio-lint-tab[data-side="top"] { top: 0; transform: translateX(-50%); border-radius: 0 0 8px 8px; }
+.slide-studio-lint-tab[data-side="right"] { right: 0; transform: translateY(-50%); border-radius: 8px 0 0 8px; }
+.slide-studio-lint-tab[data-side="left"] { left: 0; transform: translateY(-50%); border-radius: 0 8px 8px 0; }
+
+/* 後から出る本文も、編集時だけ薄く表示して選べるようにする。 */
+[data-step].pending { visibility: visible; opacity: .28; }
+.incremental[data-step].pending { opacity: 1; }
+/* 段階表示のメニューで選ぼうとしている段に出るもの */
+:root { --step: #1F63D6; --on-step: #fff; } /* 固定色：../app.css の .step-badge と共通 */
+.slide-studio-step-mark { outline: 3px dashed var(--step); outline-offset: 6px; }
+[data-step].pending.slide-studio-step-mark { opacity: .75; }
+/* 段階表示の印（inject/step-badges.js）。段を付けたものの中身の右に段の数。まだ出ていない段は白抜き。座標は 1280×720 */
+#slide-studio-steps { position: absolute; inset: 0; z-index: 40; pointer-events: none; }
+.slide-studio-step-badge {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  height: 1.75em; min-width: 1.75em; padding: 0 .5em; border: .12em solid var(--step); border-radius: 999px;
+  background: var(--step); color: var(--on-step); font: 700 24px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer;
+  position: absolute; pointer-events: auto; box-shadow: 0 2px 5px rgba(30, 36, 60, .25);
+}
+.slide-studio-step-badge.pending { background: var(--on-step); color: var(--step); border-style: dashed; }
+/* 印は data-slide-studio を持つので、本文のブロックの角（base.css の #stage :where([data-slide-studio])）に負けないようにする */
+#slide-studio-steps .slide-studio-step-badge { border-radius: 999px; }
+.slide-studio-step-badge:not([data-range="true"]) { width: 1.75em; padding: 0; }
+.slide-studio-step-badge:hover { filter: brightness(.92); }
+
+.cover-authors { cursor:grab; }
+.cover-authors-selected { outline:2px solid #399dc2; outline-offset:3px; }
+.cover-authors-selected:active { cursor:grabbing; }

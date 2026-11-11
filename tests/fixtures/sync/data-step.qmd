@@ -1,0 +1,15 @@
+---
+title: "同期の回帰"
+topic: test
+theme: default
+---
+
+## 段階表示 {#a}
+
+最初から見える段落。
+
+::: {data-step="1"}
+step 1 から見える段落。
+:::
+
+[強調する語]{.highlight data-highlight-step="2"} を含む段落。

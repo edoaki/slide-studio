@@ -1,0 +1,20 @@
+---
+title: "同期の回帰"
+topic: test
+theme: default
+---
+
+## 数式 {#a}
+
+分数 $\frac{a}{b}$ を含む段落。
+
+$$
+\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}
+$$
+
+$$
+\begin{aligned}
+f(x) &= x^2 + 1 \\
+g(x) &= \frac{1}{x}
+\end{aligned}
+$$

@@ -1,0 +1,11 @@
+---
+title: "同期の回帰"
+topic: test
+theme: default
+---
+
+## 字間 {#a}
+
+[字間を広げた見出し]{style="letter-spacing: 0.2em;"}
+
+普通の段落。

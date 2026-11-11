@@ -1,0 +1,18 @@
+/* nco-intro 固有の図高・表・文献レイアウト（旧 default.css から移動）。 */
+.reveal .figure-compact .animation{height:400px}
+.reveal .figure-tall .animation{height:490px}
+.reveal .method-slide .columns{gap:24px;align-items:flex-start}
+.reveal .method-slide .column p{margin:6px 0 2px}
+.reveal .method-slide .column ul{font-size:.82em;line-height:1.55;margin-top:4px}
+.reveal .method-slide .column li{margin-bottom:6px}
+.reveal .method-slide .animation{height:430px}
+.reveal .figure-short .animation{height:330px}
+.reveal .dense-table table{font-size:.6em}
+.reveal .dense-table table td,.reveal .dense-table table th{padding:9px 10px}
+.reveal #refs{font-size:18px;line-height:1.45;column-count:2;column-gap:36px}
+.reveal #refs .csl-entry{margin-bottom:14px;break-inside:avoid}
+.reveal .figure-medium .animation{height:360px}
+.reveal .compact-table table td,.reveal .compact-table table th{padding:9px 20px}
+.reveal #am-encoder .animation{height:500px}
+.reveal #am-decoder .animation{height:510px}
+#stage .compact-table table td,#stage .compact-table table th{padding:9px 20px}

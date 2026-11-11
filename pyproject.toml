@@ -1,0 +1,42 @@
+[project]
+name = "slide-studio"
+version = "0.1.0"
+description = "Slide Studio: Quarto 記法のスライドを GUI と AI で作る研究用ツール"
+readme = "README.md"
+license = "PolyForm-Noncommercial-1.0.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.13"
+dependencies = [
+  "starlette>=0.40",
+  "uvicorn>=0.30",
+  "watchfiles>=0.24",
+  "beautifulsoup4>=4.13",
+  "playwright>=1.55",
+  "pypdf>=6",
+  "pyyaml>=6",
+  "pypandoc_binary>=1.15",
+]
+
+[project.scripts]
+slide-studio = "slide_studio.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "fonttools>=4.50",
+    "httpx>=0.27",
+    "pytest-xdist>=3.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["slide_studio"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# 並べて流す（数は tests/conftest.py の pytest_xdist_auto_num_workers。-n0 で並べない）。
+# 同じファイルのテストは同じワーカーで流す（e2e の Chromium の使い回しが途切れない）
+addopts = "-n auto --dist loadfile"

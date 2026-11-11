@@ -1,0 +1,41 @@
+/* nco-intro 固有の図高・表・文献レイアウト（旧 default.css から移動）。 */
+.reveal .figure-compact .animation{height:400px}
+.reveal .figure-tall .animation{height:490px}
+.reveal .method-slide .columns{gap:24px;align-items:flex-start}
+.reveal .method-slide .column p{margin:6px 0 2px}
+.reveal .method-slide .column ul{font-size:.82em;line-height:1.55;margin-top:4px}
+.reveal .method-slide .column li{margin-bottom:6px}
+.reveal .method-slide .animation{height:430px}
+.reveal .figure-short .animation{height:290px}
+.reveal .dense-table table{font-size:.6em}
+.reveal .dense-table table td,.reveal .dense-table table th{padding:9px 10px}
+.reveal #refs{font-size:18px;line-height:1.45;column-count:2;column-gap:36px}
+.reveal #refs .csl-entry{margin-bottom:14px;break-inside:avoid}
+.reveal .figure-medium .animation{height:360px}
+.reveal .compact-table table td,.reveal .compact-table table th{padding:9px 20px}
+.reveal #am-encoder .animation{height:500px}
+.reveal #am-decoder .animation{height:510px}
+#stage .compact-table table td,#stage .compact-table table th{padding:9px 20px}
+
+/* TSP results: short method note below the table. */
+#stage #result-tsp table{table-layout:fixed}
+#stage #result-tsp col:first-child{width:40%!important}
+#stage #result-tsp col:not(:first-child){width:20%!important}
+#stage #result-tsp th,#stage #result-tsp td{white-space:nowrap}
+#stage #result-tsp .result-note{margin-top:24px;font-size:18px;line-height:1.55;color:var(--muted)}
+#stage #result-tsp .result-note p{font-size:inherit;line-height:inherit;margin:10px 0}
+
+/* Closing comparison, followed by one shared takeaway. */
+#stage #summary .summary-columns{gap:24px;margin-top:28px;align-items:stretch}
+#stage #summary .column{padding:23px 26px;border-radius:10px;font-size:23px;line-height:1.6;min-width:0}
+#stage #summary .summary-benefits{background:var(--summary-paper,#edf6fa);border-top:4px solid #2b8da3}
+#stage #summary .summary-limitations{background:var(--summary-paper,#f3f2f8);border-top:4px solid #7d739e}
+#stage #summary h3{font-size:28px;margin:0 0 16px;color:var(--summary-ink,#174b78)}
+#stage #summary .summary-limitations h3,#stage #summary .summary-limitations strong{color:var(--summary-ink,#655982)}
+#stage #summary .column p{font-size:21px;line-height:1.6;margin:0 0 16px}
+#stage #summary li{font-size:23px;line-height:1.65;margin-bottom:10px}
+#stage #summary .summary-takeaway{margin-top:24px;padding:15px 22px;border-left:4px solid #2b8da3;background:var(--summary-paper,#edf6fa)}
+#stage #summary .summary-takeaway p{margin:0;font-size:26px;font-weight:650;color:var(--summary-ink,#174b78)}
+
+/* Background: keep the closing paragraph above the two-line citation footer. */
+#stage #background .animation{height:370px}

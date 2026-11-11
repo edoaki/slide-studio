@@ -1,0 +1,11 @@
+---
+title: "同期の回帰"
+topic: test
+theme: default
+---
+
+## 書式 {#a}
+
+**太字** と *斜体* と `コード`。
+
+[色付き]{style="color: #c00;"} の文字。

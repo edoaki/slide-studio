@@ -1,0 +1,168 @@
+/* terracotta：暖色の三色帯。表紙は濃色反転、章扉は右帯、通常ページは左帯。
+   通常ページは細い帯と24pxの余白で本文を広く取り、脚注・ページ番号も本文領域内に収める。 */
+:root {
+  --ink: #3e362b;
+  --link: #2d5f9e;
+  --accent: #a6543c;
+  --header: #432e26;
+  --muted: #72675a;
+  --warn: #b03a12;
+  --good: #366841;
+  --mark: #f3dfa5;
+  --mark-ink: #523a13;
+  --mark-line: #aa8335;
+  --paper: #f8f4ea;
+  --rule: #cbbfa9;
+  --header-ink: #fff8ed;
+  --gold: #c3a078;
+  --band-soft: #b99077;
+  --band-width: 64px;
+  --font-head: "Hiragino Mincho ProN","Yu Mincho",serif;
+  --font-body: "Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+}
+:root{--theme-ink:var(--ink);--theme-muted:var(--muted);--theme-accent:var(--accent);--theme-header:var(--header);--theme-rule:var(--rule);--theme-paper:var(--paper);--theme-border:var(--rule)}
+
+.reveal{font-family:var(--font-body);color:var(--ink);font-size:29px;line-height:1.3}
+#stage a{color:var(--link)}
+#stage :is(h1,h2,h3,.cover-title){font-family:var(--font-head)}
+#stage h3{font-size:1em;font-weight:600;color:var(--header)}
+
+/* ## 通常ページ：左帯と、帯から離した見出し・本文。 */
+#stage .slide{
+  --safe-left:calc(var(--band-width) + 44px);
+  --safe-right:56px;
+  padding:28px var(--safe-right) 64px var(--safe-left);
+  box-sizing:border-box;
+  background:var(--paper);
+  box-shadow:none;
+}
+#stage .slide:not(.cover):not(.section-slide){
+  --band-width:20px;
+  --safe-left:calc(var(--band-width) + 24px);
+  --safe-right:32px;
+  padding-top:8px; /* 図の多いページでも本文が下の脚注・引用に届かないように */
+}
+#stage .slide::before{
+  content:'';position:absolute;left:0;right:auto;top:0;bottom:0;
+  width:var(--band-width);pointer-events:none;
+  background:linear-gradient(to bottom,var(--header) 0 18%,var(--gold) 18% 24%,var(--band-soft) 24% 100%);
+  border:0;
+}
+#stage .slide::after{content:none;border:0}
+#stage .slide > h2{
+  position:relative;margin:0 0 18px;padding:12px var(--text-pad) 20px;
+  width:auto;max-width:none;font-size:1.25em;line-height:1.35;
+  font-weight:600;letter-spacing:.04em;color:var(--header);
+  border:0;border-radius:0;background:none;box-shadow:none;
+}
+#stage .slide > h2::after{
+  content:'';position:absolute;left:var(--text-pad);right:var(--text-pad);bottom:0;
+  width:auto;height:4px;border:0;
+  background:linear-gradient(to right,var(--accent) 0 48%,var(--gold) 48% 70%,var(--band-soft) 70%);
+}
+
+/* # 章扉：帯を右へ移し、章題は左寄せで中央付近に。 */
+#stage .slide.section-slide{
+  --safe-left:72px;--safe-right:calc(var(--band-width) + 44px);
+  padding-top:236px;
+}
+#stage .section-slide::before{left:auto;right:0;background:linear-gradient(to bottom,var(--accent) 0 18%,var(--gold) 18% 24%,var(--header) 24% 100%)}
+#stage .section-slide h1{
+  display:block;margin:0;padding:0 var(--text-pad);
+  font-size:69.6px;font-weight:600;line-height:1.4;letter-spacing:.08em;
+  text-align:left;color:var(--header);
+}
+#stage .section-slide h1::before{content:none}
+#stage .section-slide h1::after{
+  content:'';display:block;width:240px;height:8px;margin:36px 0 0;border:0;
+  background:linear-gradient(to right,var(--header) 0 28%,var(--gold) 28% 42%,var(--band-soft) 42%);
+}
+
+/* 表紙：濃いブラウンにアイボリー。明るい左帯と三色の飾り線。 */
+#stage .slide.cover{
+  --safe-left:calc(var(--band-width) + 44px);--safe-right:56px;
+  padding-top:144px;text-align:left;background:var(--header);color:var(--header-ink);
+}
+#stage .cover::before{background:linear-gradient(to bottom,var(--gold) 0 18%,var(--accent) 18% 24%,var(--band-soft) 24% 100%)}
+#stage .cover .cover-title{
+  margin:0;font-size:80px;font-weight:600;line-height:1.55;
+  letter-spacing:.035em;color:var(--header-ink);
+}
+#stage .slide.cover{--cover-inset:var(--text-pad)}
+#stage .slide.cover div.cover-title{padding:24px var(--text-pad) 40px}
+#stage .slide.cover div.cover-subtitle{margin-top:20px}
+#stage .slide.cover .cover-title::before{content:none}
+#stage .slide.cover .cover-title::after{
+  content:'';position:absolute;left:var(--text-pad);right:auto;bottom:8px;
+  width:280px;height:8px;margin:0;border:0;
+  background:linear-gradient(to right,var(--header-ink) 0 28%,var(--gold) 28% 42%,var(--band-soft) 42%);
+}
+#stage .cover p{color:var(--header-ink);font-size:.8em;letter-spacing:.06em}
+#stage .cover .cover-title p{color:inherit;font-size:inherit;letter-spacing:inherit}
+#stage .cover .cover-authors{margin-top:36px}
+#stage .cover :is(a,strong,h3,.page-number){color:var(--header-ink)}
+
+/* 絶対配置される注記も、左右の帯を避ける。 */
+#stage .slide :is(.citations,.slide-citations,.footnote-small){left:var(--safe-left);right:calc(var(--safe-right) + 100px)}
+#stage .page-number{
+  left:auto;right:var(--safe-right);bottom:18px;
+  font-family:var(--font-body);font-size:15px;line-height:1.2;
+  font-variant-numeric:tabular-nums;letter-spacing:.08em;color:var(--muted);
+}
+
+#stage table{font-size:.85em;width:auto;max-width:100%;line-height:1.6;margin:0;border-collapse:collapse;border-top:2px solid var(--header);border-bottom:2px solid var(--header)}
+#stage table th{background:color-mix(in srgb,var(--gold) 16%,var(--paper));color:var(--header);font-family:var(--font-head);font-weight:600;border-bottom:1px solid var(--gold)}
+#stage table td{border-bottom:0}
+#toolbar button{background:var(--paper);border:1px solid var(--rule);color:var(--ink)}
+#overview,.thumb{background:var(--paper);color:var(--ink)}
+.thumb{border-top-color:var(--accent)}
+.thumb[aria-current=true]{outline:2px solid var(--accent);background:var(--paper)}
+:root{--summary-paper:var(--paper);--summary-ink:var(--header)}
+@media print{#stage .slide,#stage .slide *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* block palette v4: 整理・結論・補足・引用・定義・メモ */
+:root {
+  --block-border:3.5px solid #888277ff;
+  --block-background:#f8f4eaff;
+  --block-plain-ink:#3e362bff;
+  --block-plain-radius:10px;
+  --block-plain-shadow:0.18;
+  --block-top-line:8px solid #a6543cff;
+  --block-top-fill:#e8dad6ff;
+  --block-top-ink:#3e362bff;
+  --block-top-radius:10px;
+  --block-top-shadow:0.18;
+  --block-left-line:10px solid #366841ff;
+  --block-left-fill:#d3e1d6ff;
+  --block-left-ink:#3e362bff;
+  --block-left-radius:10px;
+  --block-left-shadow:0.18;
+  --block-quote-line:3.5px solid #72675aff;
+  --block-quote-fill:#e1ddd8ff;
+  --block-quote-ink:#3e362bff;
+  --block-quote-radius:10px;
+  --block-quote-shadow:0.18;
+  --block-quote-accent:#72675aff;
+  --block-quote-width:3.5px;
+  --block-bracket-line:3.5px solid #7c6f46ff;
+  --block-bracket-fill:#e0ddd4ff;
+  --block-bracket-ink:#3e362bff;
+  --block-bracket-radius:0px;
+  --block-bracket-shadow:0.18;
+  --block-bracket-accent:#7c6f46ff;
+  --block-bracket-width:3.5px;
+  --block-fold-line:3.5px solid #9a7730ff;
+  --block-fold-fill:#e4dccbff;
+  --block-fold-ink:#3e362bff;
+  --block-fold-radius:10px;
+  --block-fold-shadow:0.18;
+  --block-fold-accent:#9a7730ff;
+  --block-fold-width:3.5px;
+  --block-unframed-radius:0px; --block-unframed-shadow:0.18;
+}
+
+/* 表紙の既定位置（タイトルの上余白・発表者までの間隔） */
+#stage .slide.cover { --cover-title-top:0px; --cover-authors-gap:36px; }
+#stage .slide.cover .cover-title { margin-top:var(--cover-title-top); left:0; top:0; }
+#stage .slide.cover .cover-subtitle { left:0; top:0; }
+#stage .slide.cover .cover-authors { margin-top:var(--cover-authors-gap); left:0; top:0; }

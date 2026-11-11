@@ -1,0 +1,13 @@
+---
+title: "同期の回帰"
+topic: test
+theme: default
+---
+
+## 1枚目 {#same}
+
+本文1。
+
+## 2枚目 {#same}
+
+本文2。
