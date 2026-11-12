@@ -19,6 +19,7 @@ import {
   validateSnapshot,
   validateThemeName,
 } from './protocol.js';
+import { createFrameSelection } from './frame-selection.js';
 
 const MAX_SNAPSHOT_STAGES = 4096;
 
@@ -95,6 +96,25 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     ? computedStyle.bind(win)
     : () => ({ backgroundColor: '' });
   const elementRect = win.Element?.prototype?.getBoundingClientRect;
+  const elementFromPoint = typeof doc.elementFromPoint === 'function'
+    ? doc.elementFromPoint.bind(doc)
+    : null;
+  const createTreeWalker = typeof doc.createTreeWalker === 'function'
+    ? doc.createTreeWalker.bind(doc)
+    : null;
+  const createRange = typeof doc.createRange === 'function'
+    ? doc.createRange.bind(doc)
+    : null;
+  const NodeFilterCtor = win.NodeFilter || null;
+  const requestAnimationFrameFn = bind(win.requestAnimationFrame || globalThis.requestAnimationFrame, fn => {
+    setTimeoutFn(fn, 16);
+    return 0;
+  });
+  const cancelAnimationFrameFn = bind(win.cancelAnimationFrame || globalThis.cancelAnimationFrame, () => {});
+  const ResizeObserverCtor = win.ResizeObserver || null;
+  const MutationObserverCtor = win.MutationObserver || null;
+  let textMeasure = null;
+  try { textMeasure = doc.createElement('canvas').getContext('2d'); } catch { textMeasure = null; }
   const replaceState = typeof win.history?.replaceState === 'function'
     ? win.history.replaceState.bind(win.history)
     : () => {};
@@ -104,6 +124,25 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   const clearTimeoutFn = bind(win.clearTimeout || globalThis.clearTimeout, () => {});
   const encode = bind(win.encodeURIComponent || globalThis.encodeURIComponent, value => String(value));
   if (typeof MessageChannelCtor !== 'function') return null;
+
+  // Captured before authored scripts run. frame-selection starts after
+  // deckReady but uses these first-head intrinsics for hit testing/measuring.
+  const selectionDom = Object.freeze({
+    querySelectorAll,
+    getComputedStyle,
+    elementRect,
+    elementFromPoint,
+    createTreeWalker,
+    createRange,
+    NodeFilter: NodeFilterCtor,
+    requestAnimationFrame: requestAnimationFrameFn,
+    cancelAnimationFrame: cancelAnimationFrameFn,
+    ResizeObserver: ResizeObserverCtor,
+    MutationObserver: MutationObserverCtor,
+    textMeasure,
+    addWindowListener,
+    removeWindowListener,
+  });
 
   // Remove only the nonce. The legacy "#page/step" fragment survives for the
   // authored deck scripts that run immediately after this first head script.
@@ -134,6 +173,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   let lastSentKey = '';
   let liveSourceVersion = identity.version;
   let inflightTheme = null;
+  let selection = null;
   let cachedSlides = null;
   let cachedStageNumbers = null;
   let slidesDirty = true;
@@ -420,6 +460,13 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     pollStop = 0;
     removeWindowListener('deckready', markReady);
     installReadyListeners();
+    if (!presenting) {
+      selection = createFrameSelection(win, doc, {
+        getSourceVersion: () => liveSourceVersion,
+        sendEvent,
+        dom: selectionDom,
+      });
+    }
     lastSentKey = snapshotKey(snapshot);
     sendEvent('ready', snapshot);
   }
@@ -452,6 +499,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         return Promise.resolve(invokeDeck('go', safeInteger(readProperty(target, 'index'), 0, 0), params.stage));
       }
       case 'resize':
+        selection?.schedule();
         return Promise.resolve(invokeDeck('resize'));
       case 'setFilter':
         return Promise.resolve(invokeDeck('setFilter', params.indices));
@@ -475,6 +523,35 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       }
       case 'theme.swap':
         return swapTheme(params.name, params.version, params.sourceVersion);
+      case 'edit.configure': {
+        if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
+        // Only the frame's actual committed source revision is accepted.
+        // Sending a newer sourceVersion to configure never advances it.
+        if (params.sourceVersion !== liveSourceVersion) {
+          throw errorWithCode('stale-source', 'configure sourceVersion does not match the frame');
+        }
+        selection.configure(params);
+        return Promise.resolve({ configured: true });
+      }
+      case 'edit.select':
+        if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
+        if (!selection.select(params.key, params.frameKey)) {
+          throw errorWithCode('unknown-key', 'selection key is not configured');
+        }
+        return Promise.resolve({ selected: params.key });
+      case 'edit.hover':
+        if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
+        if (!selection.hover(params.key)) {
+          throw errorWithCode('unknown-key', 'hover key is not configured');
+        }
+        return Promise.resolve({ hovered: params.key });
+      case 'edit.designing':
+        if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
+        selection.designing(params.active);
+        return Promise.resolve({ active: params.active });
+      case 'edit.measure':
+        if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
+        return Promise.resolve(selection.measure());
       case 'finish':
         return Promise.resolve(null);
       default:
@@ -505,6 +582,9 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         }
         if (committed) {
           try { win.slideStudioRefreshSpacing?.(); } catch { /* optional runtime hook */ }
+          // The revision changed, so the current geometry/layout event must
+          // carry the new sourceVersion. The parent reconfigures explicitly.
+          selection?.schedule();
         }
         resolve(result);
       };
@@ -569,6 +649,10 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         // the parent's cached backdrop without turning the ack into a snapshot.
         publish('deckchange', true);
         send(makeResponse(identity, message.id, true, result ?? null));
+      } else if (message.method.startsWith('edit.')) {
+        // Edit acks are direct results (selection already published an
+        // edit.layout event). They must not be replaced by a deck snapshot.
+        send(makeResponse(identity, message.id, true, result ?? null));
       } else {
         const snapshot = readSnapshot();
         if (snapshot) lastSentKey = snapshotKey(snapshot);
@@ -615,6 +699,8 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       port.onmessage = null;
       try { stageObserver?.disconnect(); } catch { /* already gone */ }
       stageObserver = null;
+      try { selection?.destroy(); } catch { /* already gone */ }
+      selection = null;
       inflightTheme?.cancel();
       inflightTheme = null;
       try { closePort(); } catch { /* already closed */ }

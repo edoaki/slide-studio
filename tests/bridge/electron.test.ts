@@ -95,6 +95,25 @@ interface StaleResponse extends Record<string, unknown> {
   error?: { code: string; message: string };
 }
 
+interface EditRect { left: number; top: number; right: number; bottom: number }
+interface EditLayout {
+  sourceVersion: string;
+  sequence: number;
+  scale: number;
+  blocks: Array<{ key: string; rects: EditRect[]; align: "left" | "center" | "right" }>;
+  selection: EditRect | null;
+}
+interface EditIntent extends Record<string, unknown> {
+  sourceVersion: string;
+  sequence: number;
+  kind: string;
+  key?: string | null;
+  trusted?: boolean;
+  type?: string;
+  code?: string;
+  mods?: { shift: boolean; alt: boolean; ctrl: boolean; meta: boolean };
+}
+
 function repoRoot(): string {
   let current = dirname(fileURLToPath(import.meta.url));
   for (;;) {
@@ -182,13 +201,14 @@ async function startServers(): Promise<{
   const fixtures = join(root, "tests/bridge/fixtures");
   const [
     adminHtml, harnessSource, protocolSource, agentClientSource, deckTemplate,
-    forgedTemplate, apiSource, externalLinksSource, stringsSource,
+    selectionDeckTemplate, forgedTemplate, apiSource, externalLinksSource, stringsSource,
   ] = await Promise.all([
     readFile(join(fixtures, "admin.html"), "utf8"),
     readFile(join(fixtures, "admin-harness.js"), "utf8"),
     readFile(join(root, "packages/web/bridge/protocol.js"), "utf8"),
     readFile(join(root, "packages/web/bridge/agent-client.js"), "utf8"),
     readFile(join(fixtures, "deck.html"), "utf8"),
+    readFile(join(fixtures, "selection-deck.html"), "utf8"),
     readFile(join(fixtures, "forged-hello.html"), "utf8"),
     readFile(join(root, "packages/web/api.js"), "utf8"),
     readFile(join(root, "packages/web/external-links.js"), "utf8"),
@@ -277,6 +297,12 @@ async function startServers(): Promise<{
         const generation = url.searchParams.get("generation") || "test-generation";
         send(response, 200, "text/html; charset=utf-8",
           fillDeck(deckTemplate, adminOrigin, contentOrigin, generation));
+        return;
+      }
+      if (url.pathname === "/selection.html") {
+        const generation = url.searchParams.get("generation") || "test-generation";
+        send(response, 200, "text/html; charset=utf-8",
+          fillDeck(selectionDeckTemplate, adminOrigin, contentOrigin, generation));
         return;
       }
       if (url.pathname === "/bridge/frame-agent.classic.js") {
@@ -676,4 +702,252 @@ test("stage 1 bridge keeps a real cross-origin frame private and navigable", {
   const failures = await harnessCall<BridgeFailure[]>(page, "failures", main.generation);
   assert.ok(failures.some(failure => failure.code === "navigation"),
     "navigation must invalidate the old client and be reported as a failure");
+});
+
+test("stage 2 selection stays trusted, keyed and revision-scoped across origins", {
+  timeout: TEST_TIMEOUT_MS,
+  skip: !E2E,
+}, async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "slide-studio-selection-e2e-"));
+  let adminServer: Server | undefined;
+  let contentServer: Server | undefined;
+  let electronApp: ElectronApplication | undefined;
+  let page: Page | undefined;
+
+  t.after(async () => {
+    if (page) {
+      let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        page.evaluate(() => (window as any).__bridgeHarness?.destroyAll?.()).catch(() => {}),
+        new Promise<void>(resolve => { cleanupTimer = setTimeout(resolve, 2_000); }),
+      ]);
+      if (cleanupTimer) clearTimeout(cleanupTimer);
+    }
+    if (electronApp) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        electronApp.close().catch(() => {}),
+        new Promise<void>(resolve => { timer = setTimeout(resolve, 5_000); }),
+      ]);
+      if (timer) clearTimeout(timer);
+      try { electronApp.process().kill("SIGKILL"); } catch { /* already gone */ }
+    }
+    await closeServer(contentServer);
+    await closeServer(adminServer);
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+
+  const servers = await startServers();
+  adminServer = servers.admin;
+  contentServer = servers.content;
+  const { adminOrigin, contentOrigin } = servers;
+
+  const mainPath = join(root, "main.cjs");
+  await copyFile(fixturePath("main.cjs"), mainPath);
+  const electronPath = createRequire(import.meta.url)("electron") as string;
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) if (value !== undefined) env[key] = value;
+  delete env.ELECTRON_RUN_AS_NODE;
+  env.BRIDGE_E2E_ADMIN_URL = `${adminOrigin}/`;
+  env.TMPDIR = root;
+  env.TMP = root;
+  env.TEMP = root;
+
+  electronApp = await electron.launch({
+    executablePath: electronPath,
+    args: [mainPath],
+    env,
+    timeout: LAUNCH_TIMEOUT_MS,
+  });
+  page = await electronApp.firstWindow({ timeout: LAUNCH_TIMEOUT_MS });
+  await page.waitForFunction(() => Boolean((window as any).__bridgeHarness), undefined, {
+    timeout: WAIT_TIMEOUT_MS,
+    polling: 100,
+  });
+
+  const generation = "gen-selection";
+  await harnessCall<CreatedClient>(page, "create", {
+    generation,
+    nonce: "nonce-selection",
+    url: `${contentOrigin}/selection.html`,
+    contentOrigin,
+    readyTimeoutMs: 10_000,
+  });
+  const initial = await harnessCall<Snapshot>(page, "ready", generation);
+  assert.equal(initial.sourceVersion, "v1");
+  const frame = page.frames().find(item => item.url().includes(`generation=${generation}`));
+  if (!frame) throw new Error("selection content frame was not found");
+
+  const keys = [
+    "p1/0", "p1/0.0", "p1/0.0.0", "p1/0.0.1",
+    "p1/0.1", "p1/0.1.0", "p1/0.1.1",
+  ];
+  const layers: Record<string, "1" | "2" | "3"> = {
+    "p1/0": "1", "p1/0.0": "2", "p1/0.0.0": "3", "p1/0.0.1": "3",
+    "p1/0.1": "2", "p1/0.1.0": "3", "p1/0.1.1": "3",
+  };
+  const keymap = ["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "KeyR", "KeyF", "Escape"]
+    .map(code => ({ code, shift: false, alt: false, ctrl: false, meta: false, preventDefault: true }));
+  const configure = {
+    sourceVersion: initial.sourceVersion,
+    keys,
+    layers,
+    keymap,
+    enabled: true,
+  };
+
+  const configured = await harnessCall<{ sourceVersion: string; layout: EditLayout | null }>(
+    page, "editConfigure", generation, configure,
+  );
+  assert.equal(configured.sourceVersion, "v1");
+  await waitForCondition(() => true, "configure ack");
+  await page.waitForFunction(({ generation }) => {
+    const harness = (window as any).__bridgeHarness;
+    return harness.events(generation, "edit.layout").length > 0;
+  }, { generation }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+  let layouts = await harnessCall<Array<{ generation: string; name: string; data: EditLayout }>>(
+    page, "events", generation, "edit.layout",
+  );
+  const firstLayout = layouts.at(-1)?.data;
+  assert.ok(firstLayout, "configure must publish an edit.layout event");
+  assert.equal(firstLayout.sourceVersion, "v1");
+  assert.deepEqual(firstLayout.blocks.map(block => block.key).sort(), [...keys].sort());
+  assert.equal(firstLayout.selection, null);
+  for (const block of firstLayout.blocks) {
+    for (const rect of block.rects) {
+      for (const value of [rect.left, rect.top, rect.right, rect.bottom]) {
+        assert.equal(Number.isFinite(value), true);
+      }
+    }
+  }
+
+  const first = frame.locator('[data-slide-studio="p1/0.0.0"]');
+  // Parent qmd hover reaches the frame through edit.hover.
+  await harnessCall(page, "editHover", generation, "p1/0.1.0");
+  await frame.waitForFunction(() => document.querySelector('[data-slide-studio="p1/0.1.0"]')
+    ?.classList.contains("slide-studio-hover"), undefined, { timeout: WAIT_TIMEOUT_MS });
+  const parentHoverIntents = await harnessCall<EditIntent[]>(page, "intents", generation, "hover");
+  assert.equal(parentHoverIntents.length, 0, "edit.hover is a command, not a frame-originated intent");
+
+  // Frame hover reaches the parent only through a trusted pointer event.
+  await frame.locator('[data-slide-studio="p1/0.1.0"]').hover();
+  await page.waitForFunction(({ generation }) => {
+    const harness = (window as any).__bridgeHarness;
+    return harness.intents(generation, "hover").some((intent: EditIntent) => intent.key === "p1/0.1.0");
+  }, { generation }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+  const hoverIntents = await harnessCall<EditIntent[]>(page, "intents", generation, "hover");
+  assert.ok(hoverIntents.some(intent => intent.key === "p1/0.1.0"));
+  assert.equal(await page.locator("#qmd-hover").getAttribute("data-key"), "p1/0.1.0");
+
+  // A trusted click emits a selection intent; the parent then applies it.
+  await first.click();
+  await page.waitForFunction(({ generation }) => {
+    const harness = (window as any).__bridgeHarness;
+    return harness.intents(generation, "select").length > 0;
+  }, { generation }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+  const selects = await harnessCall<EditIntent[]>(page, "intents", generation, "select");
+  const selected = selects.at(-1);
+  assert.equal(selected?.key, "p1/0.0.0");
+  assert.equal(selected?.trusted, true);
+  assert.ok(selected?.point && typeof selected.point === "object");
+  await harnessCall(page, "editSelect", generation, "p1/0.0.0", null);
+  await frame.waitForFunction(() => document.querySelector('[data-slide-studio="p1/0.0.0"]')
+    ?.classList.contains("slide-studio-selected"), undefined, { timeout: WAIT_TIMEOUT_MS });
+  const toolbar = await harnessCall<{ left: number; top: number } | null>(page, "placeToolbar", generation, "p1/0.0.0");
+  assert.ok(toolbar && toolbar.left > 0 && toolbar.top > 0, "the parent toolbar must use frame geometry plus iframe offset");
+
+  // Geometry updates after a real frame resize.
+  const measured = await harnessCall<EditLayout>(page, "editMeasure", generation);
+  const beforeLeft = measured.blocks.find(block => block.key === "p1/0.0.0")?.rects[0]?.left;
+  await page.evaluate((name: string) => {
+    const el = document.querySelector(`iframe[data-bridge-generation="${name}"]`) as HTMLIFrameElement | null;
+    if (el) el.style.width = "560px";
+  }, generation);
+  await page.waitForFunction(({ generation, sequence }) => {
+    const harness = (window as any).__bridgeHarness;
+    return harness.events(generation, "edit.layout").some((event: { data: EditLayout }) =>
+      event.data.sequence > sequence && event.data.sourceVersion === "v1");
+  }, { generation, sequence: measured.sequence }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+  layouts = await harnessCall<Array<{ generation: string; name: string; data: EditLayout }>>(
+    page, "events", generation, "edit.layout",
+  );
+  const resized = layouts.at(-1)?.data;
+  const afterLeft = resized?.blocks.find(block => block.key === "p1/0.0.0")?.rects[0]?.left;
+  assert.equal(typeof beforeLeft, "number");
+  assert.equal(typeof afterLeft, "number");
+  assert.notEqual(afterLeft, beforeLeft, "frame geometry must be republished after resize");
+
+  // A theme swap commits a new source revision. The old configure revision is
+  // rejected, and selection is not re-enabled until the parent reconfigures.
+  const themed = await harnessCall<{ result: { swapped?: boolean }; snapshot: Snapshot }>(
+    page, "themeSwap", generation, "accent", "v2", "rev-selection-2",
+  );
+  assert.equal(themed.result.swapped, true);
+  assert.equal(themed.snapshot.sourceVersion, "rev-selection-2");
+  await assert.rejects(
+    harnessCall(page, "editConfigure", generation, configure),
+    /sourceVersion does not match/,
+    "configure must never advance or override the frame revision",
+  );
+  await harnessCall(page, "editConfigure", generation, { ...configure, sourceVersion: "rev-selection-2" });
+  await page.waitForFunction(({ generation }) => {
+    const harness = (window as any).__bridgeHarness;
+    return harness.events(generation, "edit.layout").some((event: { data: EditLayout }) =>
+      event.data.sourceVersion === "rev-selection-2");
+  }, { generation }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+
+  // WASD/QE key intents are decided synchronously by the pushed keymap.
+  await first.click();
+  for (const [key, code] of [
+    ["d", "KeyD"], ["q", "KeyQ"], ["e", "KeyE"], ["w", "KeyW"], ["a", "KeyA"], ["s", "KeyS"],
+  ] as const) {
+    await first.press(key);
+    await page.waitForFunction(({ generation, code }) => {
+      const harness = (window as any).__bridgeHarness;
+      return harness.intents(generation, "key").some((intent: EditIntent) =>
+        intent.type === "keydown" && intent.code === code && intent.trusted === true);
+    }, { generation, code }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+  }
+
+  // R/F hold and keyup are observable, and blur clears the parent pad state.
+  await first.click();
+  await page.evaluate((name: string) => {
+    const el = document.querySelector(`iframe[data-bridge-generation="${name}"]`) as HTMLIFrameElement | null;
+    el?.focus();
+  }, generation);
+  await page.keyboard.down("r");
+  await page.waitForFunction(({ generation }) => {
+    const harness = (window as any).__bridgeHarness;
+    return harness.intents(generation, "key").some((intent: EditIntent) =>
+      intent.type === "keydown" && intent.code === "KeyR");
+  }, { generation }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+  assert.equal(await page.locator("#parent-toolbar").getAttribute("data-pad"), "inner");
+  await page.keyboard.up("r");
+  await page.waitForFunction(() => document.getElementById("parent-toolbar")?.hasAttribute("data-pad") === false,
+    undefined, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+  await page.keyboard.down("f");
+  await page.waitForFunction(({ generation }) => {
+    const harness = (window as any).__bridgeHarness;
+    return harness.intents(generation, "key").some((intent: EditIntent) =>
+      intent.type === "keydown" && intent.code === "KeyF");
+  }, { generation }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+  assert.equal(await page.locator("#parent-toolbar").getAttribute("data-pad"), "outer");
+  await frame.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await page.waitForFunction(() => document.getElementById("parent-toolbar")?.hasAttribute("data-pad") === false,
+    undefined, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+  await page.keyboard.up("f").catch(() => {});
+
+  // Synthetic selection clicks are ignored even when they target a real block.
+  const beforeSynthetic = (await harnessCall<EditIntent[]>(page, "intents", generation, "select")).length;
+  await frame.evaluate(() => {
+    const el = document.querySelector('[data-slide-studio="p1/0.1.0"]');
+    el?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+  });
+  await new Promise(resolve => setTimeout(resolve, 200));
+  const afterSynthetic = (await harnessCall<EditIntent[]>(page, "intents", generation, "select")).length;
+  assert.equal(afterSynthetic, beforeSynthetic, "synthetic clicks must not select");
+
+  // Unknown keys are rejected by the frame, not silently coerced.
+  await assert.rejects(harnessCall(page, "editSelect", generation, "unknown/key"), /not configured/);
+  await assert.rejects(harnessCall(page, "editSelect", generation, "p1/0.0.0", "unknown/frame"), /not configured/);
 });

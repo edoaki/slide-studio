@@ -176,16 +176,21 @@ export function makeQmdBlocks(ctx) {
     return b;
   }
   function updateStepBadges() {
-    const w = ctx.preview.win;
+    // Step-badge figure inspection is a later-stage direct-DOM site. Keep the
+    // original path for same-origin use but never let it break Stage 2 when
+    // the frame is cross-origin.
+    let w = null;
+    try { w = ctx.preview.win; } catch { w = null; }
     for (const b of pagesEl.querySelectorAll('.step-badge')) {
-      const elements = w?.slideStudioEdit?.elements(b.dataset.key) || [];
+      let elements = [];
+      try { elements = w?.slideStudioEdit?.elements(b.dataset.key) || []; } catch { elements = []; }
       const k = b.dataset.figure ? Number(elements[0]?.closest('[data-step]')?.dataset.step || b.dataset.step) : +b.dataset.step;
       const n = figureSteps(elements);
       b.hidden = !k && !n;
       const i = ctx.preview.slideOfPage(+b.closest('.page').dataset.page);
-      const first = w?.deck?.stageNumber(k, i) ?? k + 1;
-      const last = n ? first + n : w?.deck?.stageNumber(+b.dataset.last, i) ?? +b.dataset.last + 1;
-      const pending = !!b.closest('.page.cur') && k > (w?.deck?.stageAt() ?? 0);
+      const first = ctx.preview.api?.stageNumber(k, i) ?? k + 1;
+      const last = n ? first + n : ctx.preview.api?.stageNumber(+b.dataset.last, i) ?? +b.dataset.last + 1;
+      const pending = !!b.closest('.page.cur') && k > (ctx.preview.api?.stageAt() ?? 0);
       b.dataset.range = String(last > first);
       b.textContent = stepLabel(first, last);
       b.classList.toggle('pending', pending);
@@ -380,7 +385,9 @@ export function makeQmdBlocks(ctx) {
   function setHover(key) {
     if (key === hover) return;
     hover = key; chrome();
-    ctx.preview.win?.slideStudioEdit?.hover?.(key);
+    // Stage 2 sends only the key. The frame validates it against the keys
+    // pushed by edit.configure; no DOM element or selector crosses the port.
+    if (ctx.preview.edit) ctx.preview.edit.hover(key ?? null).catch(() => {});
   }
 
   // ------------------------------------------------------------ 入力

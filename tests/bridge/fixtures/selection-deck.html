@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script
+  data-studio-admin-origin="__ADMIN_ORIGIN__"
+  data-studio-deck="deck-test"
+  data-studio-version="v1"
+  data-studio-generation="__GENERATION__"
+  src="__CONTENT_ORIGIN__/bridge/frame-agent.classic.js"></script>
+<link id="slide-studio-theme" rel="stylesheet" href="/theme/base.css">
+<style>
+  html, body { margin: 0; padding: 0; }
+  #stage { position: relative; width: 100%; height: 720px; overflow: hidden; }
+  #stage > .slide { display: none; position: absolute; inset: 0; background: rgb(250, 251, 252); }
+  #stage > .slide.active { display: block; }
+  .columns { position: absolute; left: 10%; top: 100px; width: 70%; height: 240px; display: flex; }
+  .column { flex: 1 1 0; padding: 12px; }
+  .column p { margin: 16px; padding: 8px; background: #fff; }
+  /* The same edit marks as packages/web/inject/edit.css. */
+  [data-slide-studio] { --slide-studio-c: #3FA0C6; cursor: pointer; border-radius: 3px; }
+  [data-slide-studio-layer="2"] { --slide-studio-c: #DD8A45; }
+  [data-slide-studio-layer="3"] { --slide-studio-c: #86B03C; }
+  [data-slide-studio-layer="html"] { --slide-studio-c: #9A6BD6; }
+  [data-slide-studio-layer="image"] { --slide-studio-c: #D35C9E; }
+  .slide-studio-hover:not(.slide-studio-selected):not(.slide-studio-editing) {
+    outline: 2px solid color-mix(in srgb, var(--slide-studio-c) 75%, transparent); outline-offset: 4px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--slide-studio-c) 14%, transparent), inset 0 0 0 100vmax color-mix(in srgb, var(--slide-studio-c) 14%, transparent);
+  }
+  .slide-studio-selected, .slide-studio-frame { outline: 2px solid var(--slide-studio-c); outline-offset: 4px; }
+  .slide-studio-selected.slide-studio-quiet { outline: none; }
+  .slide-studio-frame { outline-offset: 0; }
+  .slide-studio-designing :is(.slide-studio-selected, .slide-studio-frame) { outline-color: transparent; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <section class="slide active" id="slide-1" data-page="0">
+    <h1>Selection fixture</h1>
+    <div class="columns" data-slide-studio="p1/0">
+      <div class="column" data-slide-studio="p1/0.0">
+        <p data-slide-studio="p1/0.0.0">Alpha block</p>
+        <p data-slide-studio="p1/0.0.1">Alpha second</p>
+      </div>
+      <div class="column" data-slide-studio="p1/0.1">
+        <p data-slide-studio="p1/0.1.0">Beta block</p>
+        <p data-slide-studio="p1/0.1.1">Beta second</p>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+(() => {
+  'use strict';
+  const generation = __GENERATION_JSON__;
+  const adminOrigin = __ADMIN_ORIGIN_JSON__;
+  let index = 0;
+  let step = 0;
+  const slides = Array.from(document.querySelectorAll('#stage > .slide'));
+  const post = message => parent.postMessage({ fixtureGeneration: generation, ...message }, adminOrigin);
+  function render() {
+    slides.forEach((slide, at) => slide.classList.toggle('active', at === index));
+  }
+  window.deck = {
+    get index() { return index; },
+    get step() { return step; },
+    go(nextIndex, nextStep = 0) { index = nextIndex; step = nextStep; render(); dispatchEvent(new CustomEvent('deckchange', { detail: { index, step } })); return Promise.resolve(true); },
+    move(delta) { step += delta; render(); dispatchEvent(new CustomEvent('deckchange', { detail: { index, step } })); return Promise.resolve(true); },
+    jump() { return Promise.resolve(true); },
+    resize() { post({ type: 'selection-resize' }); return Promise.resolve(true); },
+    maxStep() { return 0; },
+    pdfMarks() { return [0]; },
+    stageAt() { return step; },
+    stageNumber(at) { return (Number.isInteger(at) ? at : 0) + 1; },
+    setFilter() { return Promise.resolve(null); },
+  };
+  render();
+  window.deckReady = true;
+  dispatchEvent(new Event('deckready'));
+})();
+</script>
+</body>
+</html>

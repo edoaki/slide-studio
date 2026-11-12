@@ -6,6 +6,8 @@ import {
   createIdentity,
   isFiniteNumber,
   makeRequest,
+  parseEditIntent,
+  parseEditLayout,
   parsePreviewCapability,
   parseSnapshot,
   validateEvent,
@@ -139,6 +141,8 @@ export class AgentClient {
     onSnapshot = null,
     onEvent = null,
     onFailure = null,
+    onEditLayout = null,
+    onEditIntent = null,
   }) {
     if (!frame) throw new TypeError('frame is required');
     this.frame = frame;
@@ -155,6 +159,8 @@ export class AgentClient {
     this.onSnapshot = onSnapshot;
     this.onEvent = onEvent;
     this.onFailure = onFailure;
+    this.onEditLayout = onEditLayout;
+    this.onEditIntent = onEditIntent;
 
     this.port = null;
     this._portPostMessage = null;
@@ -169,6 +175,13 @@ export class AgentClient {
     this._readySettled = false;
     this._readyTimer = 0;
     this._lastSnapshotKey = '';
+    // Stage 2 edit state is deliberately separate from the navigation snapshot.
+    // sourceVersion comes from the frame, never from a configure request.
+    this._frameSourceVersion = this.identity.version;
+    this._lastEditSequence = 0;
+    this.editLayout = null;
+    this._editKeys = null;
+    this._editKeymap = [];
 
     this.api = this._makeApi();
 
@@ -228,6 +241,15 @@ export class AgentClient {
       }),
       'theme.swap': (name, version, sourceVersion) => client.themeSwap(name, version, sourceVersion),
       pageWheel(event) { return client.pageWheel(event); },
+      edit: Object.freeze({
+        get layout() { return client.editLayout; },
+        get sourceVersion() { return client._frameSourceVersion; },
+        configure(params) { return client.editConfigure(params); },
+        select(key, frameKey = null) { return client.editSelect(key, frameKey); },
+        hover(key) { return client.editHover(key); },
+        designing(active) { return client.editDesigning(active); },
+        measure() { return client.editMeasure(); },
+      }),
     };
     return Object.freeze(api);
   }
@@ -299,7 +321,18 @@ export class AgentClient {
       this.pending.delete(data.id);
       clearTimeout(pending.timer);
       if (!data.ok) {
+        if (pending.method === 'edit.configure') {
+          // A rejected configure must not leave the client claiming keys that
+          // the frame did not actually accept.
+          this._editKeys = null;
+          this._editKeymap = [];
+        }
         pending.reject(bridgeError(data.error.code, data.error.message));
+        return;
+      }
+      if (pending.method.startsWith('edit.')) {
+        const layout = pending.method === 'edit.measure' ? parseEditLayout(data.result) : null;
+        pending.resolve(layout || data.result);
         return;
       }
       const snapshot = parseSnapshot(data.result, this.identity);
@@ -308,6 +341,16 @@ export class AgentClient {
       return;
     }
     if (!validateEvent(data, this.identity)) return;
+    if (data.event === 'edit.layout') {
+      const layout = parseEditLayout(data.data);
+      if (layout) this._acceptEditLayout(layout);
+      return;
+    }
+    if (data.event === 'edit.intent') {
+      const intent = parseEditIntent(data.data);
+      if (intent) this._acceptEditIntent(intent);
+      return;
+    }
     if (data.event === 'ready' || data.event === 'deckchange') {
       const snapshot = parseSnapshot(data.data, this.identity);
       if (!snapshot) return;
@@ -327,6 +370,9 @@ export class AgentClient {
   }
 
   _updateSnapshot(snapshot, event) {
+    // This is the committed frame revision. A later configure request cannot
+    // advance it; only a frame snapshot/theme ack can.
+    this._frameSourceVersion = snapshot.sourceVersion ?? this.identity.version;
     const key = `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}`;
     if (key === this._lastSnapshotKey) return;
     this._lastSnapshotKey = key;
@@ -383,6 +429,93 @@ export class AgentClient {
     });
   }
 
+  _knownEditKey(key) {
+    return key == null || (!!this._editKeys && this._editKeys.has(key));
+  }
+
+  _acceptEditLayout(layout) {
+    if (layout.sourceVersion !== this._frameSourceVersion) return false;
+    if (layout.sequence <= this._lastEditSequence) return false;
+    if (this._editKeys && !layout.blocks.every(block => this._editKeys.has(block.key))) return false;
+    this._lastEditSequence = layout.sequence;
+    this.editLayout = layout;
+    if (this.onEditLayout) {
+      try { this.onEditLayout(layout); } catch { /* observer failure is isolated */ }
+    }
+    this._emit('edit.layout', layout);
+    return true;
+  }
+
+  _acceptEditIntent(intent) {
+    if (intent.sourceVersion !== this._frameSourceVersion) return false;
+    if (intent.sequence <= this._lastEditSequence) return false;
+    if (!this._editKeys) return false;
+    if (intent.kind === 'select' || intent.kind === 'stepMenu' || intent.kind === 'hover') {
+      if (!this._knownEditKey(intent.key)) return false;
+    }
+    if ((intent.kind === 'select' || intent.kind === 'stepMenu' || intent.kind === 'key')
+      && intent.trusted !== true) return false;
+    if (intent.kind === 'key') {
+      const rule = this._editKeymap.find(item => item.code === intent.code
+        && item.shift === intent.mods.shift && item.alt === intent.mods.alt
+        && item.ctrl === intent.mods.ctrl && item.meta === intent.mods.meta);
+      if (!rule) return false;
+    }
+    this._lastEditSequence = intent.sequence;
+    if (this.onEditIntent) {
+      try { this.onEditIntent(intent); } catch { /* observer failure is isolated */ }
+    }
+    this._emit('edit.intent', intent);
+    return true;
+  }
+
+  editConfigure(params) {
+    const clean = {
+      sourceVersion: params?.sourceVersion,
+      keys: Array.isArray(params?.keys) ? params.keys.slice() : params?.keys,
+      layers: params?.layers && typeof params.layers === 'object' ? { ...params.layers } : params?.layers,
+      keymap: Array.isArray(params?.keymap)
+        ? params.keymap.map(rule => ({
+          code: rule.code, shift: rule.shift, alt: rule.alt,
+          ctrl: rule.ctrl, meta: rule.meta, preventDefault: rule.preventDefault,
+        }))
+        : params?.keymap,
+      enabled: params?.enabled,
+    };
+    try {
+      // Validate before changing the optimistic key set used to accept the
+      // layout event that can arrive before the configure response.
+      makeRequest(this.identity, 1, 'edit.configure', clean);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const previousKeys = this._editKeys;
+    const previousKeymap = this._editKeymap;
+    this._editKeys = new Set(clean.keys);
+    this._editKeymap = clean.keymap.slice();
+    return this.request('edit.configure', clean).catch(error => {
+      this._editKeys = previousKeys;
+      this._editKeymap = previousKeymap;
+      throw error;
+    });
+  }
+
+  editSelect(key, frameKey = null) {
+    return this.request('edit.select', { key: key ?? null, frameKey: frameKey ?? null });
+  }
+
+  editHover(key) {
+    return this.request('edit.hover', { key: key ?? null });
+  }
+
+  editDesigning(active) {
+    return this.request('edit.designing', { active: active === true });
+  }
+
+  editMeasure() {
+    return this.request('edit.measure', {});
+  }
+
   _fail(error) {
     if (this.destroyed) return;
     const failure = this.onFailure;
@@ -418,6 +551,9 @@ export class AgentClient {
       reject(error);
     }
     this.pending.clear();
+    this.editLayout = null;
+    this._editKeys = null;
+    this._editKeymap = [];
     if (!this._readySettled) {
       this._readySettled = true;
       this._rejectReady(error);

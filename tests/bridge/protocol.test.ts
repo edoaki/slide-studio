@@ -20,8 +20,26 @@ interface ProtocolModule {
   validateEvent(value: unknown, expected: Identity): boolean;
   validateSnapshot(value: unknown, expected: Identity): boolean;
   parseSnapshot(value: unknown, expected: Identity): Snapshot | null;
+  validateEditLayout(value: unknown): boolean;
+  parseEditLayout(value: unknown): EditLayout | null;
+  validateEditIntent(value: unknown): boolean;
+  parseEditIntent(value: unknown): SelectionIntent | null;
   validateThemeName(name: string): boolean;
   parsePreviewCapability(value: unknown): { url: string; origin: string; version: string };
+}
+
+interface EditRect { left: number; top: number; right: number; bottom: number }
+interface EditLayout {
+  sourceVersion: string;
+  sequence: number;
+  scale: number;
+  blocks: Array<{ key: string; rects: EditRect[]; align: "left" | "center" | "right" }>;
+  selection: EditRect | null;
+}
+interface SelectionIntent extends Record<string, unknown> {
+  sourceVersion: string;
+  sequence: number;
+  kind: string;
 }
 
 interface Identity { deck: string; version: string; generation: string }
@@ -131,6 +149,99 @@ test("events only accept known types and safe link targets", () => {
   assert.equal(p.validateEvent(p.makeEvent(identity, "key", { ...key, key: "f" }), identity), true);
   assert.equal(p.validateEvent(p.makeEvent(identity, "key", { ...key, key: "F" }), identity), false);
   assert.equal(p.validateEvent(p.makeEvent(identity, "key", { key: "Escape" }), identity), false);
+});
+
+test("selection commands validate source keys, layers and keymaps", () => {
+  const configure = {
+    sourceVersion: "v1",
+    keys: ["p1/0", "p1/0.0"],
+    layers: { "p1/0": "1", "p1/0.0": "3" },
+    keymap: [
+      { code: "KeyW", shift: false, alt: false, ctrl: false, meta: false, preventDefault: true },
+    ],
+    enabled: true,
+  };
+  const request = p.makeRequest(identity, 2, "edit.configure", configure);
+  assert.equal(p.validateRequest(request, identity), true);
+  assert.equal(p.validateRequest(p.makeRequest(identity, 3, "edit.select", { key: "p1/0", frameKey: null }), identity), true);
+  assert.equal(p.validateRequest(p.makeRequest(identity, 4, "edit.hover", { key: null }), identity), true);
+  assert.equal(p.validateRequest(p.makeRequest(identity, 5, "edit.designing", { active: true }), identity), true);
+  assert.equal(p.validateRequest(p.makeRequest(identity, 6, "edit.measure", {}), identity), true);
+  assert.equal(p.validateRequest({ ...request, params: { ...configure, sourceVersion: "" } }, identity), false);
+  assert.equal(p.validateRequest({ ...request, params: { ...configure, keys: [`bad${String.fromCharCode(0)}key`] } }, identity), false);
+  assert.equal(p.validateRequest({ ...request, params: { ...configure, layers: { "p1/0": "4" } } }, identity), false);
+  assert.equal(p.validateRequest({ ...request, params: { ...configure, keymap: [{ code: "KeyW" }] } }, identity), false);
+  assert.equal(p.validateRequest({ ...request, params: { ...configure, enabled: "yes" } }, identity), false);
+  assert.equal(p.validateRequest({ ...request, params: { ...configure, keys: new Array(10001).fill("p") } }, identity), false);
+  assert.throws(() => p.makeRequest(identity, 7, "edit.select", { key: "", frameKey: null }), /invalid bridge request/);
+  assert.throws(() => p.makeRequest(identity, 8, "edit.measure", { extra: 1 }), /invalid bridge request/);
+});
+
+test("edit layouts are finite, bounded, uniquely keyed and revision checked", () => {
+  const layout: EditLayout = {
+    sourceVersion: "rev-1",
+    sequence: 4,
+    scale: 0.5,
+    blocks: [
+      { key: "p1/0", align: "left", rects: [{ left: 1, top: 2, right: 3, bottom: 4 }] },
+      { key: "p1/0.0", align: "center", rects: [] },
+    ],
+    selection: { left: 1, top: 2, right: 3, bottom: 4 },
+  };
+  assert.equal(p.validateEditLayout(layout), true);
+  assert.deepEqual(p.parseEditLayout(layout), layout);
+  assert.equal(p.validateEditLayout({ ...layout, sourceVersion: "" }), false);
+  assert.equal(p.validateEditLayout({ ...layout, sequence: -1 }), false);
+  assert.equal(p.validateEditLayout({ ...layout, scale: Number.NaN }), false);
+  assert.equal(p.validateEditLayout({ ...layout, blocks: [layout.blocks[0], layout.blocks[0]] }), false);
+  assert.equal(p.validateEditLayout({ ...layout, blocks: [{ key: "k", align: "middle", rects: [] }] }), false);
+  assert.equal(p.validateEditLayout({ ...layout, blocks: [{ key: "k", align: "left", rects: [{ left: 0, top: 0, right: Number.POSITIVE_INFINITY, bottom: 1 }] }] }), false);
+  assert.equal(p.validateEditLayout({ ...layout, selection: { left: 0, top: 0, right: 1 } }), false);
+  assert.equal(p.validateEditLayout({ ...layout, blocks: new Array(10001).fill({ key: "k", align: "left", rects: [] }) }), false);
+});
+
+test("selection intents reject malformed, untrusted and unknown payloads", () => {
+  const select = {
+    sourceVersion: "rev-1", sequence: 1, kind: "select", key: "p1/0",
+    again: false, text: true, point: { x: 10, y: 20, lineEnd: false }, trusted: true,
+  };
+  assert.equal(p.validateEditIntent(select), true);
+  assert.equal(p.parseEditIntent(select)?.sequence, 1);
+  assert.equal(p.validateEditIntent({ ...select, trusted: "yes" }), false);
+  assert.equal(p.validateEditIntent({ ...select, key: "" }), false);
+  assert.equal(p.validateEditIntent({ ...select, point: { x: Number.NaN, y: 0, lineEnd: false } }), false);
+  assert.equal(p.validateEditIntent({ ...select, kind: "eval" }), false);
+  assert.equal(p.validateEditIntent({ sourceVersion: "rev-1", sequence: 2, kind: "hover", key: null }), true);
+  assert.equal(p.validateEditIntent({ sourceVersion: "rev-1", sequence: 2, kind: "hover", key: 4 }), false);
+  assert.equal(p.validateEditIntent({ sourceVersion: "rev-1", sequence: 3, kind: "stepMenu", key: "p1/0", trusted: true }), true);
+  assert.equal(p.validateEditIntent({ sourceVersion: "rev-1", sequence: 3, kind: "stepMenu", key: "p1/0" }), false);
+  assert.equal(p.validateEditIntent({ sourceVersion: "rev-1", sequence: 4, kind: "blur" }), true);
+  const key = {
+    sourceVersion: "rev-1", sequence: 5, kind: "key", type: "keydown", key: "w", code: "KeyW",
+    repeat: false, isComposing: false, trusted: true,
+    mods: { shift: false, alt: false, ctrl: false, meta: false },
+  };
+  assert.equal(p.validateEditIntent(key), true);
+  assert.equal(p.validateEditIntent({ ...key, type: "press" }), false);
+  assert.equal(p.validateEditIntent({ ...key, code: "" }), false);
+  assert.equal(p.validateEditIntent({ ...key, trusted: false }), false);
+  assert.equal(p.validateEditIntent({ ...key, mods: { shift: false } }), false);
+  assert.deepEqual(p.parseEditIntent(key)?.mods, key.mods);
+});
+
+test("edit events are identity checked and validated before caching", () => {
+  const layout: EditLayout = {
+    sourceVersion: "v1", sequence: 1, scale: 1,
+    blocks: [{ key: "p1/0", align: "left", rects: [] }], selection: null,
+  };
+  assert.equal(p.validateEvent(p.makeEvent(identity, "edit.layout", layout), identity), true);
+  assert.equal(p.validateEvent(p.makeEvent(identity, "edit.layout", { ...layout, scale: Number.NaN }), identity), false);
+  assert.equal(p.validateEvent({ ...p.makeEvent(identity, "edit.layout", layout), version: "v2" }, identity), false);
+  const intent = {
+    sourceVersion: "v1", sequence: 1, kind: "hover", key: "p1/0",
+  };
+  assert.equal(p.validateEvent(p.makeEvent(identity, "edit.intent", intent), identity), true);
+  assert.equal(p.validateEvent(p.makeEvent(identity, "edit.intent", { ...intent, kind: "eval" }), identity), false);
 });
 
 test("preview capability requires a matching absolute http(s) origin", () => {

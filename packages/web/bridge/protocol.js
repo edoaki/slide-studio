@@ -6,6 +6,7 @@ export const PROTOCOL = 'slide-studio-edit/1';
 
 export const EVENT_TYPES = Object.freeze([
   'ready', 'deckchange', 'layout', 'key', 'link.open', 'failure',
+  'edit.layout', 'edit.intent',
 ]);
 
 // Stage 1 only forwards presentation keys. Keep this an allowlist; do not
@@ -16,6 +17,7 @@ export const KEY_ALLOWLIST = Object.freeze(['Escape', 'f']);
 // HTML, JavaScript, selectors, filesystem paths or an arbitrary remote URL.
 export const COMMAND_METHODS = Object.freeze([
   'go', 'move', 'jump', 'goStage', 'resize', 'setFilter', 'theme.swap', 'finish', 'pageWheel',
+  'edit.configure', 'edit.select', 'edit.hover', 'edit.designing', 'edit.measure',
 ]);
 
 const MAX_SLIDES = 10000;
@@ -23,6 +25,15 @@ const MAX_STEPS = 100000;
 const MAX_INDICES = 100000;
 const MAX_DELTA = 100000;
 const MAX_PAGE = 1000000;
+// Stage 2 edit traffic is deliberately bounded: every layout/event is cloned,
+// clipped and size-checked before it can reach the parent cache.
+const MAX_EDIT_KEYS = 10000;
+const MAX_EDIT_RECTS = 256;
+const MAX_EDIT_RULES = 256;
+const MAX_EDIT_COORD = 100000000;
+const MAX_SEQUENCE = Number.MAX_SAFE_INTEGER;
+const EDIT_LAYER_VALUES = Object.freeze(['1', '2', '3']);
+const EDIT_ALIGN_VALUES = Object.freeze(['left', 'center', 'right']);
 
 export function isRecord(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -180,6 +191,170 @@ export function validateThemeName(name) {
   return true;
 }
 
+export function isEditKey(value) {
+  if (!isSafeString(value, { max: 4096 })) return false;
+  // Source keys are opaque to the bridge, but never contain control bytes.
+  return !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function validNullableKey(value) {
+  return value === null || isEditKey(value);
+}
+
+function validEditLayer(value) {
+  return EDIT_LAYER_VALUES.includes(value);
+}
+
+export function validateEditRect(value) {
+  if (!isRecord(value)) return false;
+  for (const name of ['left', 'top', 'right', 'bottom']) {
+    if (!isFiniteNumber(value[name])) return false;
+    if (Math.abs(value[name]) > MAX_EDIT_COORD) return false;
+  }
+  return true;
+}
+
+function validEditGeometry(value) {
+  if (!isRecord(value)) return false;
+  if (!isEditKey(value.key)) return false;
+  if (!EDIT_ALIGN_VALUES.includes(value.align)) return false;
+  if (!Array.isArray(value.rects) || value.rects.length > MAX_EDIT_RECTS) return false;
+  return value.rects.every(validateEditRect);
+}
+
+export function validateEditLayout(value) {
+  if (!isRecord(value)) return false;
+  if (!isSafeString(value.sourceVersion, { max: 4096 })) return false;
+  if (!isFiniteInteger(value.sequence, 0, MAX_SEQUENCE)) return false;
+  if (!isFiniteNumber(value.scale) || value.scale < 0 || value.scale > 1000) return false;
+  if (!Array.isArray(value.blocks) || value.blocks.length > MAX_EDIT_KEYS) return false;
+  const seen = new Set();
+  for (const block of value.blocks) {
+    if (!validEditGeometry(block)) return false;
+    if (seen.has(block.key)) return false;
+    seen.add(block.key);
+  }
+  if (!(value.selection === null || validateEditRect(value.selection))) return false;
+  return true;
+}
+
+export function parseEditLayout(value) {
+  if (!validateEditLayout(value)) return null;
+  return {
+    sourceVersion: value.sourceVersion,
+    sequence: value.sequence,
+    scale: value.scale,
+    blocks: value.blocks.map(block => ({
+      key: block.key,
+      align: block.align,
+      rects: block.rects.map(rect => ({
+        left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+      })),
+    })),
+    selection: value.selection === null ? null : {
+      left: value.selection.left, top: value.selection.top,
+      right: value.selection.right, bottom: value.selection.bottom,
+    },
+  };
+}
+
+function validMods(value) {
+  return isRecord(value)
+    && isBoolean(value.shift) && isBoolean(value.alt)
+    && isBoolean(value.ctrl) && isBoolean(value.meta);
+}
+
+function validPoint(value) {
+  if (value === null) return true;
+  if (!isRecord(value)) return false;
+  return isFiniteNumber(value.x) && isFiniteNumber(value.y)
+    && Math.abs(value.x) <= MAX_EDIT_COORD && Math.abs(value.y) <= MAX_EDIT_COORD
+    && isBoolean(value.lineEnd);
+}
+
+export function validateEditIntent(value) {
+  if (!isRecord(value)) return false;
+  if (!isSafeString(value.sourceVersion, { max: 4096 })) return false;
+  if (!isFiniteInteger(value.sequence, 0, MAX_SEQUENCE)) return false;
+  switch (value.kind) {
+    case 'select':
+      return validNullableKey(value.key)
+        && isBoolean(value.again) && isBoolean(value.text)
+        && validPoint(value.point) && value.trusted === true;
+    case 'hover':
+      return validNullableKey(value.key);
+    case 'stepMenu':
+      return isEditKey(value.key) && value.trusted === true;
+    case 'blur':
+      return true;
+    case 'key': {
+      if (value.type !== 'keydown' && value.type !== 'keyup') return false;
+      if (!isSafeString(value.key, { allowEmpty: true, max: 64 })) return false;
+      if (!isSafeString(value.code, { max: 64 })) return false;
+      if (!isBoolean(value.repeat) || !isBoolean(value.isComposing) || value.trusted !== true) return false;
+      return validMods(value.mods);
+    }
+    default:
+      return false;
+  }
+}
+
+export function parseEditIntent(value) {
+  if (!validateEditIntent(value)) return null;
+  const out = {
+    sourceVersion: value.sourceVersion,
+    sequence: value.sequence,
+    kind: value.kind,
+  };
+  if (value.kind === 'select') {
+    out.key = value.key;
+    out.again = value.again;
+    out.text = value.text;
+    out.point = value.point === null ? null : {
+      x: value.point.x, y: value.point.y, lineEnd: value.point.lineEnd,
+    };
+    out.trusted = value.trusted;
+  } else if (value.kind === 'hover') {
+    out.key = value.key;
+  } else if (value.kind === 'stepMenu') {
+    out.key = value.key;
+    out.trusted = value.trusted;
+  } else if (value.kind === 'key') {
+    out.type = value.type;
+    out.key = value.key;
+    out.code = value.code;
+    out.repeat = value.repeat;
+    out.isComposing = value.isComposing;
+    out.trusted = value.trusted;
+    out.mods = {
+      shift: value.mods.shift, alt: value.mods.alt,
+      ctrl: value.mods.ctrl, meta: value.mods.meta,
+    };
+  }
+  return out;
+}
+
+function validateEditConfigure(params) {
+  if (!isSafeString(params.sourceVersion, { max: 4096 })) return false;
+  if (!Array.isArray(params.keys) || params.keys.length > MAX_EDIT_KEYS) return false;
+  if (!params.keys.every(isEditKey)) return false;
+  if (!isRecord(params.layers)) return false;
+  const layerKeys = Object.keys(params.layers);
+  if (layerKeys.length > MAX_EDIT_KEYS) return false;
+  if (!layerKeys.every(key => isEditKey(key) && validEditLayer(params.layers[key]))) return false;
+  if (!Array.isArray(params.keymap) || params.keymap.length > MAX_EDIT_RULES) return false;
+  if (!params.keymap.every(rule => isRecord(rule)
+    && isSafeString(rule.code, { max: 64 })
+    && isBoolean(rule.shift) && isBoolean(rule.alt)
+    && isBoolean(rule.ctrl) && isBoolean(rule.meta)
+    && isBoolean(rule.preventDefault))) return false;
+  return isBoolean(params.enabled);
+}
+
+function validateEditSelect(params) {
+  return validNullableKey(params.key) && validNullableKey(params.frameKey);
+}
+
 export function validateParams(method, params) {
   if (!isRecord(params)) params = {};
   switch (method) {
@@ -210,6 +385,16 @@ export function validateParams(method, params) {
         && isFiniteInteger(params.deltaMode, 0, 2)
         && isBoolean(params.shiftKey) && isBoolean(params.altKey)
         && isBoolean(params.ctrlKey) && isBoolean(params.metaKey);
+    case 'edit.configure':
+      return validateEditConfigure(params);
+    case 'edit.select':
+      return validateEditSelect(params);
+    case 'edit.hover':
+      return validNullableKey(params.key);
+    case 'edit.designing':
+      return isBoolean(params.active);
+    case 'edit.measure':
+      return Object.keys(params).length === 0;
     default:
       return false;
   }
@@ -294,6 +479,8 @@ export function validateEvent(value, expected) {
     return isBoolean(data.mods.shift) && isBoolean(data.mods.alt)
       && isBoolean(data.mods.ctrl) && isBoolean(data.mods.meta);
   }
+  if (value.event === 'edit.layout') return validateEditLayout(value.data);
+  if (value.event === 'edit.intent') return validateEditIntent(value.data);
   // layout data is intentionally opaque in stage 1; it is still identity
   // checked and cloned before it reaches a caller.
   return value.data === undefined || isRecord(value.data) || Array.isArray(value.data);

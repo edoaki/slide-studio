@@ -12,6 +12,7 @@ import { installExternalLinks } from '/external-links.js';
 const entries = new Map();
 const fixtureMessages = [];
 const bridgeEvents = [];
+const bridgeIntents = [];
 const bridgeSnapshots = [];
 const bridgeFailures = [];
 const siblings = new Set();
@@ -73,6 +74,28 @@ function create(options) {
     },
     onEvent: (name, data) => {
       bridgeEvents.push({ generation, name, data });
+    },
+    onEditIntent: intent => {
+      bridgeIntents.push({ generation, ...intent });
+      // Minimal parent chrome used only to observe the Stage 2 contract.
+      const toolbar = document.getElementById('parent-toolbar');
+      if (!toolbar) return;
+      if (intent.kind === 'select') toolbar.dataset.key = intent.key || '';
+      if (intent.kind === 'hover') {
+        toolbar.dataset.hover = intent.key || '';
+        const qmd = document.getElementById('qmd-hover');
+        if (qmd) qmd.dataset.key = intent.key || '';
+      }
+      if (intent.kind === 'key') {
+        toolbar.dataset.lastKey = intent.code;
+        if (intent.type === 'keydown' && (intent.code === 'KeyR' || intent.code === 'KeyF')) {
+          toolbar.dataset.pad = intent.code === 'KeyR' ? 'inner' : 'outer';
+        }
+        if (intent.type === 'keyup' && (intent.code === 'KeyR' || intent.code === 'KeyF')) {
+          delete toolbar.dataset.pad;
+        }
+      }
+      if (intent.kind === 'blur') delete toolbar.dataset.pad;
     },
     onFailure: error => {
       bridgeFailures.push({ generation, code: error.code, message: error.message });
@@ -290,6 +313,58 @@ function destroy(generation) {
   return true;
 }
 
+async function editConfigure(generation, params) {
+  const entry = entryFor(generation);
+  await entry.client.api.edit.configure(params);
+  return {
+    sourceVersion: entry.client.api.edit.sourceVersion,
+    layout: entry.client.api.edit.layout,
+  };
+}
+
+async function editSelect(generation, key, frameKey = null) {
+  const entry = entryFor(generation);
+  return entry.client.api.edit.select(key, frameKey);
+}
+
+async function editHover(generation, key) {
+  const entry = entryFor(generation);
+  return entry.client.api.edit.hover(key);
+}
+
+async function editDesigning(generation, active) {
+  const entry = entryFor(generation);
+  return entry.client.api.edit.designing(active);
+}
+
+async function editMeasure(generation) {
+  const entry = entryFor(generation);
+  return entry.client.api.edit.measure();
+}
+
+function editLayout(generation) {
+  return entryFor(generation).client.api.edit.layout;
+}
+
+function intents(generation, kind) {
+  return bridgeIntents.filter(intent => intent.generation === generation
+    && (kind === undefined || intent.kind === kind));
+}
+
+function placeToolbar(generation, key) {
+  const entry = entryFor(generation);
+  const layout = entry.client.api.edit.layout;
+  const block = layout?.blocks.find(item => item.key === key);
+  const rect = block?.rects[0];
+  const frameRect = entry.frame.getBoundingClientRect();
+  const toolbar = document.getElementById('parent-toolbar');
+  if (!rect || !toolbar) return null;
+  toolbar.style.left = `${rect.left + frameRect.left}px`;
+  toolbar.style.top = `${rect.top + frameRect.top - 32}px`;
+  toolbar.dataset.key = key;
+  return { layout, frameRect, left: rect.left + frameRect.left, top: rect.top + frameRect.top - 32 };
+}
+
 function destroyAll() {
   for (const entry of entries.values()) {
     entry.client.destroy();
@@ -320,6 +395,14 @@ window.__bridgeHarness = {
   hasMarker,
   messages,
   events,
+  intents,
+  editConfigure,
+  editSelect,
+  editHover,
+  editDesigning,
+  editMeasure,
+  editLayout,
+  placeToolbar,
   failures,
   destroy,
   destroyAll,

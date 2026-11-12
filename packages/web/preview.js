@@ -32,6 +32,8 @@ export class Preview {
     this.failureReloadAt = 0;
     this.failureTimer = 0;
     this.fitFrame = 0;
+    this.editLayoutListeners = new Set();
+    this.editIntentListeners = new Set();
     // 枠の大きさが変わったら、同じフレームのうちに中の縮尺も合わせる。
     // iframe の中の ResizeObserver だけだと1フレーム遅れ、広げた分が一瞬むき出しになる。
     // The bridge call is asynchronous now; coalesce to one resize per frame.
@@ -50,6 +52,35 @@ export class Preview {
   get win() { return this.frame?.contentWindow; }
   // 移行済みの呼び出し元には、検証済みスナップショットのキャッシュだけを返す。
   get api() { return this.client?.api; }
+  // Stage 2 edit API. All reads are parent-side caches validated by AgentClient.
+  get edit() { return this.client?.api.edit ?? null; }
+  get editLayout() { return this.client?.api.edit?.layout ?? null; }
+  get sourceVersion() {
+    return this.client?.api.edit?.sourceVersion
+      ?? this.client?.snapshot?.sourceVersion
+      ?? this.client?.identity?.version
+      ?? this.version;
+  }
+  onEditLayout(listener) {
+    if (typeof listener !== 'function') throw new TypeError('listener is required');
+    this.editLayoutListeners.add(listener);
+    return () => this.editLayoutListeners.delete(listener);
+  }
+  onEditIntent(listener) {
+    if (typeof listener !== 'function') throw new TypeError('listener is required');
+    this.editIntentListeners.add(listener);
+    return () => this.editIntentListeners.delete(listener);
+  }
+  _emitEditLayout(layout) {
+    for (const listener of this.editLayoutListeners) {
+      try { listener(layout); } catch { /* an observer cannot break the bridge */ }
+    }
+  }
+  _emitEditIntent(intent) {
+    for (const listener of this.editIntentListeners) {
+      try { listener(intent); } catch { /* an observer cannot break the bridge */ }
+    }
+  }
 
   async load(version) {
     if (this.destroyed) return;
@@ -114,6 +145,8 @@ export class Preview {
         }
       },
         onFailure: error => this._handleFailure(client, error),
+        onEditLayout: layout => this._emitEditLayout(layout),
+        onEditIntent: intent => this._emitEditIntent(intent),
       });
     } catch (error) {
       if (token === this.loadSeq) this.error = error;

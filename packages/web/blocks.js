@@ -24,6 +24,13 @@ const RUN = 1500; // この間隔で続けた並べ替えは ⌘Z の1回分に�
 const DIRS = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right' };
 const HOLD = { KeyR: 'inner', KeyF: 'outer' };
 const PAD_ICON = { inner: 'padInner', outer: 'padOuter', gap: 'padGap' };
+// Stage 2 pushes this explicit keymap into the frame. Only plain navigation /
+// padding keys are consumed synchronously; modified keys (source writes) stay
+// in the parent and are not part of this lease.
+const BRIDGE_KEYMAP = Object.freeze(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyF', 'Escape']
+  .map(code => Object.freeze({
+    code, shift: false, alt: false, ctrl: false, meta: false, preventDefault: true,
+  })));
 
 export function makeBlocks(ctx) {
   const viewport = ctx.root.querySelector('#viewport'), stage = ctx.root.querySelector('#stage'), msg = ctx.root.querySelector('#hintMsg');
@@ -46,30 +53,164 @@ export function makeBlocks(ctx) {
     if (!r || !fr) return null;
     return { left: Math.min(fr.left + r.left, b.left), top: Math.min(fr.top + r.top, b.top), right: Math.max(fr.left + r.right, b.right), bottom: Math.max(fr.top + r.bottom, b.bottom) };
   }, changed: () => designing() };
-  const designing = () => ctx.preview.win?.slideStudioEdit?.designing?.(!!decorationState.open && !editing && !!selected);
+  const designing = () => bridgeDesigning(!!decorationState.open && !editing && !!selected);
   const memory = new Map(); // 外側のキー → 前に選んでいた子（E）
   const synced = new WeakSet(); // ⌘の状態を合わせるリスナーを付けたスライドの window
   const current = () => data?.structure.pages[ctx.preview.pageOfSlide(ctx.preview.index)] ?? st?.pages[ctx.preview.pageOfSlide(ctx.preview.index)];
   const fresh = () => !!st && st.text === ctx.text;
   const found = () => fresh() ? op.find(st, selected) : null;
+
+  // ------------------------------------------------------------ bridge (Stage 2)
+  const bridgeEdit = () => ctx.preview.edit || null;
+  const legacyEdit = () => {
+    try { return ctx.preview.win?.slideStudioEdit || null; } catch { return null; }
+  };
+  const frameSourceVersion = () => ctx.preview.edit?.sourceVersion ?? ctx.preview.sourceVersion ?? null;
+  const knownKey = key => key == null ? null : (fresh() && op.find(st, key) ? key : null);
+  let bridgeLayout = null;
+  const bridgeGeometry = key => {
+    if (key == null || !bridgeLayout || bridgeLayout.sourceVersion !== frameSourceVersion()) return null;
+    return bridgeLayout.blocks.find(block => block.key === key) || null;
+  };
+  function bridgeUnion(key) {
+    const geometry = bridgeGeometry(key);
+    if (!geometry || !geometry.rects.length) return null;
+    return {
+      left: Math.min(...geometry.rects.map(r => r.left)),
+      top: Math.min(...geometry.rects.map(r => r.top)),
+      right: Math.max(...geometry.rects.map(r => r.right)),
+      bottom: Math.max(...geometry.rects.map(r => r.bottom)),
+    };
+  }
+  function bridgeSelectionRect() {
+    if (!bridgeLayout || bridgeLayout.sourceVersion !== frameSourceVersion()) return null;
+    return bridgeLayout.selection;
+  }
+  function layerMap() {
+    const map = {};
+    if (!fresh()) return map;
+    for (const p of st.pages) for (const c of walk(p.chunks)) {
+      const tone = nav.toneOf(st, op.inner(c).key).replace(/^l/, '');
+      // The frozen SelectionCommand allows only the three numbered source
+      // layers. html/image tones keep a stable source-layer colour until a
+      // later contract revision exposes their own values.
+      map[c.key] = tone === '1' || tone === '2' || tone === '3' ? tone : '3';
+    }
+    return map;
+  }
+  function bridgeConfiguration() {
+    const edit = bridgeEdit();
+    const sourceVersion = frameSourceVersion();
+    if (!edit || sourceVersion == null) return null;
+    const layers = layerMap();
+    return {
+      sourceVersion,
+      keys: Object.keys(layers),
+      layers,
+      keymap: BRIDGE_KEYMAP,
+      enabled: !readOnly && !editing && fresh(),
+    };
+  }
+  function configureFrame() {
+    const edit = bridgeEdit();
+    const params = bridgeConfiguration();
+    if (!edit || !params) return;
+    edit.configure(params).catch(() => { /* stale configure is rejected by the frame */ });
+  }
+  function bridgeSelect() {
+    const edit = bridgeEdit();
+    if (!edit) return;
+    edit.select(knownKey(selected), knownKey(frameKey())).catch(() => {});
+  }
+  function bridgeHover(key) {
+    const edit = bridgeEdit();
+    if (!edit) return;
+    edit.hover(knownKey(key)).catch(() => {});
+  }
+  function bridgeDesigning(active) {
+    const edit = bridgeEdit();
+    if (!edit) return;
+    edit.designing(active).catch(() => {});
+  }
+  function handleBridgeLayout(layout) {
+    if (!layout || layout.sourceVersion !== frameSourceVersion()) return;
+    bridgeLayout = layout;
+    if (!editing && selected) place();
+  }
+  function handleBridgeIntent(intent) {
+    if (dead || !intent || intent.sourceVersion !== frameSourceVersion()) return;
+    switch (intent.kind) {
+      case 'select': {
+        if (readOnly || editing) return;
+        if (intent.key != null && !knownKey(intent.key)) return;
+        select(intent.key, {
+          again: !!intent.again,
+          text: !!intent.text,
+          point: intent.point,
+        });
+        return;
+      }
+      case 'hover':
+        if (intent.key != null && !knownKey(intent.key)) return;
+        ctx.qmdBlocks?.hover(intent.key);
+        return;
+      case 'stepMenu':
+        if (!intent.trusted || !knownKey(intent.key)) return;
+        openStepMenu(intent.key);
+        return;
+      case 'blur':
+        onBlur();
+        return;
+      case 'key':
+        handleBridgeKey(intent);
+        return;
+      default:
+        return;
+    }
+  }
+  function handleBridgeKey(intent) {
+    if (!intent.trusted || intent.isComposing) return;
+    // The Stage 2 keymap only contains unmodified navigation/padding keys.
+    // Any future forwarding that can write must additionally check live(),
+    // the current source revision and parent user activation before writing.
+    if (intent.mods.meta || intent.mods.ctrl || intent.mods.alt || intent.mods.shift) return;
+    if (intent.type === 'keyup') {
+      holdKey({ code: intent.code, type: 'keyup' });
+      return;
+    }
+    if (!selected || editing || readOnly) return;
+    if (intent.code === 'Escape') { select(null); return; }
+    if (HOLD[intent.code]) { holdKey({ code: intent.code, type: 'keydown' }); return; }
+    const dir = DIRS[intent.code];
+    if (dir) { moveSelection(dir); return; }
+    if (intent.code === 'KeyQ') {
+      const key = fresh() && nav.upKey(st, selected);
+      if (key) select(key);
+      return;
+    }
+    if (intent.code === 'KeyE') {
+      const key = fresh() && nav.downKey(st, selected, memory);
+      if (key) select(key);
+    }
+  }
+  ctx.preview.onEditLayout?.(handleBridgeLayout);
+  ctx.preview.onEditIntent?.(handleBridgeIntent);
+
   // 枠・つまみの色：原稿のブロック表示の線と同じ層の色（スライドの地は白なので --s-l1〜3）
   const layerColor = key => getComputedStyle(document.documentElement).getPropertyValue(`--s-${fresh() && key ? nav.toneOf(st, key) : 'l1'}`).trim();
   function paintLayers() {
-    const w = ctx.preview.win; if (!w?.slideStudioEdit?.layers || !fresh()) return;
-    const map = {};
-    for (const p of st.pages) for (const c of walk(p.chunks)) map[c.key] = nav.toneOf(st, op.inner(c).key).replace(/^l/, '');
-    w.slideStudioEdit.layers(map);
+    if (!fresh()) return;
+    configureFrame();
   }
   // 揃えを書いていないときの揃え：包み（無ければ段落）の外側の要素の揃え
   const alignBaseOf = c => {
-    const w = ctx.preview.win, o = c && op.outer(c), el = o && w?.slideStudioEdit?.elements(o.key)?.[0]?.parentElement;
-    const a = el ? w.getComputedStyle(el).textAlign : 'left';
-    return a === 'center' || a === '-webkit-center' ? 'center' : a === 'right' || a === 'end' ? 'right' : 'left';
+    const o = c && op.outer(c);
+    return (o && bridgeGeometry(o.key)?.align) || 'left';
   };
   // 余白の包みの中の段落は、包みに枠を出す
   const frameKey = () => { const c = found()?.chunk, o = c && op.outer(c); return o && o !== c ? o.key : null; };
   let readOnly = false;
-  const live = () => !readOnly && data && data.version === ctx.preview.win?.__slideStudioVersion && data.version === ctx.version && ctx.text === ctx.saved && !ctx.dirty && !ctx.conflict && !ctx.locked && ctx.renderOk;
+  const live = () => !readOnly && data && data.version === frameSourceVersion() && data.version === ctx.version && ctx.text === ctx.saved && !ctx.dirty && !ctx.conflict && !ctx.locked && ctx.renderOk;
   const handles = makeHandles(viewport);
   const format = makeTextFormat(() => ctx.preview.win, value => {
     const s = session, el = ctx.preview.win?.document.querySelector('.slide-studio-editing');
@@ -135,18 +276,22 @@ export function makeBlocks(ctx) {
   }
   // 新しい表示を読み込んだらすぐにクリックを受け付ける（ブロックの情報は後から届いた時点で反映する）
   function attach() {
-    const edit = ctx.preview.win?.slideStudioEdit;
-    if (!edit) return;
-    // スライドの中で押したキーも、ほかの機能（チャットの対象の切り替えなど）に渡す
-    edit.configure({ select, openStepMenu, edit: start, cell: moveCell, input, finished, heading: startHeading, keydown: e => ctx.plugins.some(p => p.keydown?.(e)), keyup: holdKey, colorClasses: COLOR_CLASSES, selection: () => format.update(), pointer: () => format.close(), hover: key => ctx.qmdBlocks?.hover(key) });
-    edit.select(selected, frameKey()); designing();
-    paintLayers();
+    configureFrame();
+    bridgeSelect();
+    designing();
     // 押したままほかの画面へ移ると、離したのが伝わらない
-    if (!synced.has(ctx.preview.win)) { synced.add(ctx.preview.win); ctx.preview.win.addEventListener('blur', onBlur); }
-    drag.attach(ctx.preview.win);
-    coverAuthors.attach(ctx.preview.win);
+    const win = ctx.preview.win;
+    if (win && !synced.has(win)) {
+      synced.add(win);
+      try { win.addEventListener('blur', onBlur); } catch { /* cross-origin events are still available */ }
+    }
+    // Stage 3/4 still use their legacy direct frame code. Keep the call sites
+    // intact until those stages are migrated; a cross-origin document throws,
+    // which must not take Stage 2 selection down.
+    try { drag.attach(win); } catch { /* Stage 3 remains direct-DOM */ }
+    try { coverAuthors.attach(win); } catch { /* Stage 4 remains direct-DOM */ }
     // ready：表示とブロックの情報が同じ版になった（つまみ・持って動かすが使える）
-    if (data && data.version === ctx.preview.win.__slideStudioVersion) stage.dataset.blocks = 'ready'; else delete stage.dataset.blocks;
+    if (data && data.version === frameSourceVersion()) stage.dataset.blocks = 'ready'; else delete stage.dataset.blocks;
   }
   // text：文字の上をクリック。again：選択済みの段落を再クリック。クリック位置から編集する
   // keep：書いたあとに同じブロックを選び直すとき（［すべてに］を残す）
@@ -170,12 +315,12 @@ export function makeBlocks(ctx) {
     if (key && fresh()) for (let k = key, p = nav.upKey(st, k); p; k = p, p = nav.upKey(st, p)) memory.set(p, k);
     const c2 = found()?.chunk;
     ctx.editor.mark = c2 ? { start: c2.start, end: c2.end } : null;
-    ctx.editor.highlight(); ctx.qmdBlocks?.mark(); ctx.preview.win?.slideStudioEdit?.select(selected, frameKey()); draw();
+    ctx.editor.highlight(); ctx.qmdBlocks?.mark(); bridgeSelect(); draw();
     ctx.plugins.forEach(p => p.blockSelected?.());
   }
   async function openStepMenu(key) {
     if (readOnly) return;
-    if (editing) await ctx.preview.win?.slideStudioEdit?.finish();
+    if (editing) await legacyEdit()?.finish?.();
     ctx.qmdBlocks?.input?.blur();
     select(key);
     bar.querySelector('.step-tools')?.openStepMenu();
@@ -193,29 +338,31 @@ export function makeBlocks(ctx) {
   }
   function startHeading(point) {
     const p = fresh() && st.pages[ctx.preview.pageOfSlide(ctx.preview.index)];
-    if (editing || !live() || !p || p.generated) return;
+    const legacy = legacyEdit();
+    if (editing || !live() || !p || p.generated || !legacy) return;
     select(null);
     editing = true; ctx.preview.defer = true;
     session = { heading: p, text: ctx.text, last: ctx.text, html: null, sent: null, timer: 0, running: null, failed: false };
     addEventListener('pointerdown', outside, true);
-    ctx.preview.win?.slideStudioEdit?.startHeading(point); draw();
+    legacy.startHeading(point); draw();
   }
   function start(key = selected, point = null) {
     if (editing || !live()) return;
     select(key);
     if (data.chunks[key]?.cells) { startCell(key, point); return; }
     if (!data.chunks[key]?.direct) { ctx.qmdBlocks?.editCover(key); return; }
+    if (!legacyEdit()) return;
     editing = true; ctx.preview.defer = true;
     // 表紙のタイトル・副題は、太字・斜体・リンクを出さない
     const cover = !!op.coverPart(found()?.chunk);
     session = { key, base: data.version, text: ctx.text, last: ctx.text, mark: ctx.editor.mark, html: null, sent: null, timer: 0, running: null, failed: false, cover, alignBase: alignBaseOf(found()?.chunk) };
     addEventListener('pointerdown', outside, true);
     format.plain(cover); format.cell(false);
-    ctx.preview.win?.slideStudioEdit?.start(key, data.chunks[key].html, { plain: cover, point }); draw();
+    legacyEdit()?.start(key, data.chunks[key].html, { plain: cover, point }); draw();
   }
   // 表はセルごとに直す。対応するセルがない場合は表の編集画面を開く
   function startCell(key, point) {
-    const w = ctx.preview.win?.slideStudioEdit, at = point && w?.cellAt(key, point);
+    const w = legacyEdit(), at = point && w?.cellAt(key, point);
     if (!at) return;
     const info = data.chunks[key].cells[at.r]?.[at.c];
     if (!info?.direct) { const f = found(); ctx.plugins.some(p => p.enterBlock?.(f.chunk, ctx.text.slice(f.chunk.start, f.chunk.end))); return; }
@@ -237,7 +384,7 @@ export function makeBlocks(ctx) {
     return info.html;
   }
   // スライドの外（原稿・チャットなど）を押しても編集を終える
-  function outside(e) { if (!bar.contains(e.target)) ctx.preview.win?.slideStudioEdit?.finish(); }
+  function outside(e) { if (!bar.contains(e.target)) legacyEdit()?.finish?.(); }
   function input(html) {
     const s = session; if (!s || s.created) return;
     if (s.moving) { s.held = html; return; }
@@ -349,8 +496,8 @@ export function makeBlocks(ctx) {
     if (adding || editing) return;
     adding = true;
     try { if (!await whenLive()) { toast(S.blockWait); return; } } finally { adding = false; }
-    const f = found(), w = ctx.preview.win;
-    if (!f || editing || !w?.slideStudioEdit || op.coverPart(f.chunk)) return;
+    const f = found(), w = legacyEdit();
+    if (!f || editing || !w || op.coverPart(f.chunk)) return;
     const key = selected, c = f.chunk, o = op.outer(c);
     let where, anchor, make;
     if (dir === 'up' || dir === 'down') {
@@ -363,7 +510,7 @@ export function makeBlocks(ctx) {
       anchor = col ? col.key : o.key;
       make = (md, s) => op.addColumn(ctx.text, s, key, side, md);
     }
-    if (!w.slideStudioEdit.create(anchor, where)) return;
+    if (!w.create(anchor, where)) return;
     editing = true; ctx.preview.defer = true;
     session = { created: true, make };
     addEventListener('pointerdown', outside, true);
@@ -427,7 +574,12 @@ export function makeBlocks(ctx) {
     const before = padNow(); change();
     if (padNow() !== before && !handles.dragging) place();
   }
-  const onKey = e => holdKey(e), onBlur = () => { if (hold) { hold = null; place(); } };
+  const onKey = e => holdKey(e), onBlur = () => {
+    if (hold) hold = null;
+    peek = null;
+    ctx.qmdBlocks?.hover(null);
+    place();
+  };
   addEventListener('keydown', onKey, true); addEventListener('keyup', onKey, true); addEventListener('blur', onBlur);
 
   // ------------------------------------------------------------ 余白の「すべてに」
@@ -608,11 +760,17 @@ export function makeBlocks(ctx) {
     } catch (e) { toast(e.message); }
     clear(); draw();
   }
+  // Stage 2 union rectangles come only from the cached, validated frame
+  // geometry. They are content-frame CSS pixels; callers add the iframe offset.
   function union(key) {
-    const w = ctx.preview.win;
-    const rects = (key && w?.slideStudioEdit ? w.slideStudioEdit.elements(key) : []).map(el => el.getBoundingClientRect()).filter(r => r.width || r.height);
-    if (!rects.length) return null;
-    return { left: Math.min(...rects.map(r => r.left)), top: Math.min(...rects.map(r => r.top)), right: Math.max(...rects.map(r => r.right)), bottom: Math.max(...rects.map(r => r.bottom)) };
+    return bridgeUnion(key);
+  }
+  function editingRect() {
+    if (!editing) return null;
+    try {
+      const ed = ctx.preview.win?.document?.querySelector('.slide-studio-editing');
+      return ed ? ed.getBoundingClientRect() : null;
+    } catch { return null; }
   }
   // 今のつまみ：押している R・F、カーソルを合わせたボタン、押したボタンの順
   function padNow() {
@@ -621,16 +779,21 @@ export function makeBlocks(ctx) {
   }
   function drawHandles() {
     if (editing || !selected) { handles.clear(); return; }
-    handles.draw({
-      win: ctx.preview.win, frame: ctx.preview.frame, st, key: selected, kind: found()?.chunk.kind, color: layerColor(selected),
-      padMode: padNow(), ended: mode => { if (mode !== padNow()) place(); }, live: !!live() && fresh() && !busy, write: r => write(r), padded,
-    });
+    // Stage 3 handles still perform direct frame DOM work. They are not
+    // migrated in this stage; don't call them against a cross-origin frame.
+    if (!ctx.preview.edit) { handles.clear(); return; }
+    try {
+      handles.draw({
+        win: ctx.preview.win, frame: ctx.preview.frame, st, key: selected, kind: found()?.chunk.kind, color: layerColor(selected),
+        padMode: padNow(), ended: mode => { if (mode !== padNow()) place(); }, live: !!live() && fresh() && !busy, write: r => write(r), padded,
+      });
+    } catch { handles.clear(); }
   }
   // 選んだブロック（編集中はその文字）の上、入らなければ下に置く。座標はスライドの iframe の中から取る
   function place() {
     if (session?.heading) { bar.hidden = true; handles.clear(); return; }
-    const frame = ctx.preview.frame, ed = editing && ctx.preview.win?.document.querySelector('.slide-studio-editing');
-    const r = ed ? ed.getBoundingClientRect() : union(frameKey() ?? selected);
+    const frame = ctx.preview.frame;
+    const r = editingRect() ?? union(frameKey() ?? selected) ?? bridgeSelectionRect();
     if (!r || !frame) { bar.hidden = true; handles.clear(); return; }
     bar.hidden = !editing && (padMode || !!hold || handles.dragging);
     if (bar.hidden) { drawHandles(); return; }
@@ -676,12 +839,13 @@ export function makeBlocks(ctx) {
   ctx.blocks = {
     setReadOnly(value) {
       readOnly = value;
-      if (!value) return;
+      if (!value) { configureFrame(); return; }
       drag.cancel(); format.close(); coverAuthors.clear();
       follow = null; want = null; padDone = null; padMode = false;
-      const done = ctx.preview.win?.slideStudioEdit?.finish();
-      ctx.preview.win?.slideStudioEdit?.select(null);
-      ctx.preview.win?.slideStudioEdit?.hover(null);
+      const done = legacyEdit()?.finish?.();
+      configureFrame();
+      bridgeSelect();
+      bridgeHover(null);
       bar.hidden = true; handles.clear();
       select(null);
       Promise.resolve(done).then(() => { if (readOnly) select(null); });
@@ -705,13 +869,16 @@ export function makeBlocks(ctx) {
     previewLoaded() { attach(); load(); },
     // CSS だけの更新でも、読み込み後の色・線の種類で開いている装飾メニューを描き直す。
     previewThemed() {
+      // A theme swap can commit a new sourceVersion. Reconfigure explicitly
+      // after it; configure itself never advances the frame revision.
+      configureFrame();
       // 自分の保存の通知で入力欄を作り直すと、次の入力中の値・フォーカスを失う。
       if (drawnTheme !== JSON.stringify(designThemeValues())) draw();
     },
     // 別のページへ移ったら選択を外す。同じページの step の移動では選んだまま、位置だけ合わせる
     slideChanged() {
       coverAuthors.refresh();
-      if (editing) { ctx.preview.win?.slideStudioEdit?.finish(); return; }
+      if (editing) { legacyEdit()?.finish?.(); return; }
       if (found()?.page.index !== ctx.preview.pageOfSlide(ctx.preview.index)) select(null); else place();
     },
     textChanged() {
