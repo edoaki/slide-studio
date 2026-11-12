@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, copyFile, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -230,7 +230,7 @@ test("desktop slice: create, edit, preview, save, reopen, export", { skip: skipR
 
   const title = "デスクトップ試験";
   const secondTitle = "二つ目のデッキ";
-  const source = `# ${title}\n\n- 一つ目\n- 二つ目\n\n## 二枚目\n\n本文\n`;
+  const source = `---\ntitle: "${title}"\n---\n\n## 一枚目\n\n- 一つ目\n- 二つ目\n\n## 二枚目\n\n本文\n`;
   const htmlPath = join(scratch, "export.html");
   const pdfPath = join(scratch, "export.pdf");
   const artifactDirectory = process.env.SLIDE_STUDIO_TEST_ARTIFACTS;
@@ -244,6 +244,19 @@ test("desktop slice: create, edit, preview, save, reopen, export", { skip: skipR
   let applicationClosed = false;
 
   t.after(async () => {
+    if (page !== undefined) {
+      const failureShot = screenshotPath.replace(/\.png$/i, "-failure.png");
+      await page.screenshot({ path: failureShot, fullPage: true }).catch(() => {});
+    }
+    if (artifactDirectory !== undefined && artifactDirectory.length > 0) {
+      const suffix = packagedMode ? "packaged" : "dev";
+      if (existsSync(htmlPath)) {
+        await copyFile(htmlPath, join(artifactDirectory, `slide-studio-${suffix}-export.html`)).catch(() => {});
+      }
+      if (existsSync(pdfPath)) {
+        await copyFile(pdfPath, join(artifactDirectory, `slide-studio-${suffix}-export.pdf`)).catch(() => {});
+      }
+    }
     if (application !== undefined && !applicationClosed) {
       try {
         await application.evaluate(({ app }) => app.exit(0));
@@ -330,7 +343,8 @@ test("desktop slice: create, edit, preview, save, reopen, export", { skip: skipR
   const preview = await previewHandle!.contentFrame();
   assert.notEqual(preview, null);
   await preview!.locator("body").waitFor({ state: "attached", timeout: 30_000 });
-  await preview!.locator("body").filter({ hasText: title }).waitFor({ timeout: 30_000 });
+  const activeHeading = preview!.locator(".slide.active h1, .slide.active h2").filter({ hasText: title }).first();
+  await activeHeading.waitFor({ state: "visible", timeout: 30_000 });
   await waitForTestId(page, TESTIDS.previewStatus);
   await waitForTestId(page, TESTIDS.previousSlide);
   await waitForTestId(page, TESTIDS.slideSelect);
