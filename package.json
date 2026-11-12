@@ -1,0 +1,21 @@
+{
+  "name": "slide-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.6",
+  "engines": { "node": ">=24.18.0 <25" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:renderer": "tsc",
+    "test:renderer": "pnpm build:renderer && node --test dist/tests/renderer/*.test.js",
+    "render:spike": "pnpm build:renderer && electron dist/packages/renderer/src/cli.js"
+  },
+  "dependencies": { "pdf-lib": "1.17.1" },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "electron": "45.3.1",
+    "typescript": "7.0.2"
+  },
+  "pnpm": { "onlyBuiltDependencies": ["electron"] }
+}
