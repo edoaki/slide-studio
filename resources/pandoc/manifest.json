@@ -1,0 +1,14 @@
+{
+  "version": "3.9",
+  "source": "https://github.com/jgm/pandoc/releases/tag/3.9",
+  "platforms": {
+    "darwin-arm64": {
+      "url": "https://github.com/jgm/pandoc/releases/download/3.9/pandoc-3.9-arm64-macOS.zip",
+      "sha256": "7d56ac6fe6fad0a7407bcd776aa142f61ca41838f286165f79d0584fa57b24d1"
+    },
+    "darwin-x64": {
+      "url": "https://github.com/jgm/pandoc/releases/download/3.9/pandoc-3.9-x86_64-macOS.zip",
+      "sha256": "f1dfb5a433976b131818c2e69db70bb46874604367e8923412a5c2fa673f2526"
+    }
+  }
+}

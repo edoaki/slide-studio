@@ -1,0 +1,62 @@
+{
+  "source_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
+  "assets": [
+    {
+      "path": "packages/core/assets/runtime/motion.mjs",
+      "sha256": "a93182f20c1ba724ad9d6da8382417550b588993ac7708c348a8fbfc91347792"
+    },
+    {
+      "path": "packages/core/assets/runtime/figure.mjs",
+      "sha256": "0059ee4f6a68e3b1073ba9b1e7393c611aa17c6472c0f2ce74b92f7028e52051"
+    },
+    {
+      "path": "packages/core/assets/runtime/numeric.csl",
+      "sha256": "7c4df4eb2efa290447ed4c49e52eddfb6380cd415fda8015f1e557f1e5611c80"
+    },
+    {
+      "path": "packages/core/assets/runtime/figure.css",
+      "sha256": "7e98782f4a11a982638b8ae202ff17c30b004fdc1b34ed833cf2b4f7c6952120"
+    },
+    {
+      "path": "packages/core/assets/runtime/player.js",
+      "sha256": "d8fb53081be0805505f2e0ee3d0370df5bbdd2409c326e0e7b0384d164a1e33b"
+    },
+    {
+      "path": "packages/core/assets/runtime/base.css",
+      "sha256": "35da95d938cf821aed31c2a8d153c000825ce1c5e7e036459592051d0c2c3b19"
+    },
+    {
+      "path": "packages/core/assets/lua/slide-studio.lua",
+      "sha256": "b90cc119e1c394182d4a4e776e072e5dfc6fcad4ae8accfcd2f5d537e73c4292"
+    },
+    {
+      "path": "packages/core/assets/themes/terracotta.css",
+      "sha256": "f17f0bdf578d06e901de64fca7a611e421fa394e5b222ea7103881bf8d16b07c"
+    },
+    {
+      "path": "packages/core/assets/themes/_base.css",
+      "sha256": "c2e611130eb34c7b7041003b4af90e9f61a22b354f0551853e22da56c7c5fa82"
+    },
+    {
+      "path": "packages/core/assets/themes/default.css",
+      "sha256": "6029586a47628ecf36d7f0cd11ed8d727c70f881e75993bdbe661eadc887982c"
+    },
+    {
+      "path": "packages/core/assets/themes/night.css",
+      "sha256": "bb63fd2b658d9741912c27afeb3b79d12db04bec3c8fc9dfec5ece3eac2c0c6e"
+    },
+    {
+      "path": "packages/core/assets/themes/mist.css",
+      "sha256": "52eba39d2fbdcb5c95d3e832c06146aec03dadb44a8be9cda6c4e1e23cd2b464"
+    },
+    {
+      "path": "packages/core/assets/themes/solarized.css",
+      "sha256": "e0446781f5082c45ef5b3f0f38e9b70dd9c4d42b828b494d609c1985a230907f"
+    },
+    {
+      "path": "packages/core/assets/themes/graphite.css",
+      "sha256": "f43a2765133d150828c19f431e296173922a04a0d3e847b5a7f5a4dd5649587b"
+    }
+  ],
+  "lua_audit": "Only slide-studio.lua used; no io.*, os.*, pandoc.pipe or pandoc.system. Single-shot sandboxed Pandoc3.9 smoke passed."
+}
