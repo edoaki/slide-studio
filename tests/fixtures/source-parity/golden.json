@@ -1,0 +1,2077 @@
+[
+  {
+    "name": "callout.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 囲み {#a}\n\n前の段落。\n\n::: {.callout-note}\n注意の本文。\n\n2段落目。\n:::\n\n後の段落。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "囲み",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 61,
+          "end": 115,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 63,
+              "end": 68,
+              "text": "前の段落。"
+            },
+            {
+              "kind": "opaque",
+              "path": "1",
+              "start": 70,
+              "end": 107,
+              "text": "::: {.callout-note}\n注意の本文。\n\n2段落目。\n:::",
+              "attrs": {
+                "id": "",
+                "classes": [
+                  "callout-note"
+                ],
+                "kv": {}
+              },
+              "open": "::: {.callout-note}",
+              "close": ":::"
+            },
+            {
+              "kind": "text",
+              "path": "2",
+              "start": 109,
+              "end": 114,
+              "text": "後の段落。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 囲み {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n前の段落。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n::: {.callout-note}\n注意の本文。\n\n2段落目。\n:::\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/2\"}\n\n後の段落。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      null,
+      null,
+      11,
+      12,
+      13,
+      14,
+      15,
+      null,
+      null,
+      null,
+      null,
+      null,
+      17,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [
+      {
+        "page": 0,
+        "message": "Slide Studio では未対応の記法：callout"
+      }
+    ],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 囲み {#a}\n\n前の段落。\n\n::: {.callout-note}\n注意の本文。\n\n2段落目。\n:::\n\n後の段落。\n"
+  },
+  {
+    "name": "chapter.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n# 第1章 {#ch1}\n\n## 1枚目 {#one}\n\n本文1。\n\n# 第2章 {#ch2}\n## 2枚目 {#two}\n\n本文2。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 1,
+          "title": "第1章",
+          "id": "ch1",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 63,
+          "end": 65,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": []
+        },
+        {
+          "index": 1,
+          "level": 2,
+          "title": "1枚目",
+          "id": "one",
+          "classes": [],
+          "kv": {},
+          "start": 65,
+          "head_end": 78,
+          "end": 86,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 80,
+              "end": 84,
+              "text": "本文1。"
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "level": 1,
+          "title": "第2章",
+          "id": "ch2",
+          "classes": [],
+          "kv": {},
+          "start": 86,
+          "head_end": 98,
+          "end": 99,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": []
+        },
+        {
+          "index": 3,
+          "level": 2,
+          "title": "2枚目",
+          "id": "two",
+          "classes": [],
+          "kv": {},
+          "start": 99,
+          "head_end": 112,
+          "end": 119,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 114,
+              "end": 118,
+              "text": "本文2。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n# 第1章 {#ch1}\n\n## 1枚目 {#one}\n\n::: {.slide-studio-c data-slide-studio=\"p1/0\"}\n\n本文1。\n\n:::\n\n# 第2章 {#ch2}\n\n## 2枚目 {#two}\n\n::: {.slide-studio-c data-slide-studio=\"p3/0\"}\n\n本文2。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      9,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null,
+      13,
+      null,
+      14,
+      null,
+      null,
+      null,
+      16,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n# 第1章 {#ch1}\n\n## 1枚目 {#one}\n\n本文1。\n\n# 第2章 {#ch2}\n## 2枚目 {#two}\n\n本文2。\n"
+  },
+  {
+    "name": "cite-multi.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 引用 {#a}\n\n二つの文献を引く [@alpha; @beta]。文中の引用 @alpha も。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "引用",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 61,
+          "end": 104,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 63,
+              "end": 103,
+              "text": "二つの文献を引く [@alpha; @beta]。文中の引用 @alpha も。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 引用 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n二つの文献を引く [@alpha; @beta]。文中の引用 @alpha も。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 引用 {#a}\n\n二つの文献を引く [@alpha; @beta]。文中の引用 @alpha も。\n"
+  },
+  {
+    "name": "code-heading.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## コードの中の見出し {#a}\n\n説明の段落。\n\n```python\n## これは見出しではない\nx = 1\n\n# これも見出しではない\n```\n\n## 次のページ {#b}\n\n本文。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "コードの中の見出し",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 68,
+          "end": 127,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 70,
+              "end": 76,
+              "text": "説明の段落。"
+            },
+            {
+              "kind": "text",
+              "path": "1",
+              "start": 78,
+              "end": 125,
+              "text": "```python\n## これは見出しではない\nx = 1\n\n# これも見出しではない\n```"
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "level": 2,
+          "title": "次のページ",
+          "id": "b",
+          "classes": [],
+          "kv": {},
+          "start": 127,
+          "head_end": 140,
+          "end": 146,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 142,
+              "end": 145,
+              "text": "本文。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## コードの中の見出し {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n説明の段落。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n```python\n## これは見出しではない\nx = 1\n\n# これも見出しではない\n```\n\n:::\n\n## 次のページ {#b}\n\n::: {.slide-studio-c data-slide-studio=\"p1/0\"}\n\n本文。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      null,
+      null,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      null,
+      null,
+      null,
+      18,
+      null,
+      null,
+      null,
+      20,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## コードの中の見出し {#a}\n\n説明の段落。\n\n```python\n## これは見出しではない\nx = 1\n\n# これも見出しではない\n```\n\n## 次のページ {#b}\n\n本文。\n"
+  },
+  {
+    "name": "data-step.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 段階表示 {#a}\n\n最初から見える段落。\n\n::: {data-step=\"1\"}\nstep 1 から見える段落。\n:::\n\n[強調する語]{.highlight data-highlight-step=\"2\"} を含む段落。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "段階表示",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 63,
+          "end": 169,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 65,
+              "end": 75,
+              "text": "最初から見える段落。"
+            },
+            {
+              "kind": "box",
+              "path": "1",
+              "start": 77,
+              "end": 116,
+              "text": "::: {data-step=\"1\"}\nstep 1 から見える段落。\n:::",
+              "attrs": {
+                "id": "",
+                "classes": [],
+                "kv": {
+                  "data-step": "1"
+                }
+              },
+              "open": "::: {data-step=\"1\"}",
+              "close": ":::",
+              "children": [
+                {
+                  "kind": "text",
+                  "path": "1.0",
+                  "start": 97,
+                  "end": 112,
+                  "text": "step 1 から見える段落。"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "path": "2",
+              "start": 118,
+              "end": 168,
+              "text": "[強調する語]{.highlight data-highlight-step=\"2\"} を含む段落。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 段階表示 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n最初から見える段落。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n::: {data-step=\"1\"}\n\n::: {.slide-studio-c data-slide-studio=\"p0/1.0\"}\n\nstep 1 から見える段落。\n\n:::\n\n:::\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/2\"}\n\n[強調する語]{.highlight data-highlight-step=\"2\"} を含む段落。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null,
+      12,
+      null,
+      null,
+      null,
+      13,
+      null,
+      null,
+      null,
+      null,
+      null,
+      15,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 段階表示 {#a}\n\n最初から見える段落。\n\n::: {data-step=\"1\"}\nstep 1 から見える段落。\n:::\n\n[強調する語]{.highlight data-highlight-step=\"2\"} を含む段落。\n"
+  },
+  {
+    "name": "duplicate-id.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 1枚目 {#same}\n\n本文1。\n\n## 2枚目 {#same}\n\n本文2。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "1枚目",
+          "id": "same",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 65,
+          "end": 73,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 67,
+              "end": 71,
+              "text": "本文1。"
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "level": 2,
+          "title": "2枚目",
+          "id": "same",
+          "classes": [],
+          "kv": {},
+          "start": 73,
+          "head_end": 87,
+          "end": 94,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 89,
+              "end": 93,
+              "text": "本文2。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 1枚目 {#same}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n本文1。\n\n:::\n\n## 2枚目 {#same}\n\n::: {.slide-studio-c data-slide-studio=\"p1/0\"}\n\n本文2。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null,
+      13,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 1枚目 {#same}\n\n本文1。\n\n## 2枚目 {#same}\n\n本文2。\n"
+  },
+  {
+    "name": "fig-width.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 図の幅 {#a}\n\n{{< fig test/box width=800 title=\"箱の図\" >}}\n\n{{< fig test/local height=300 >}}\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "図の幅",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 62,
+          "end": 142,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "fig",
+              "path": "0",
+              "start": 64,
+              "end": 106,
+              "text": "{{< fig test/box width=800 title=\"箱の図\" >}}"
+            },
+            {
+              "kind": "fig",
+              "path": "1",
+              "start": 108,
+              "end": 141,
+              "text": "{{< fig test/local height=300 >}}"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 図の幅 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n{{< fig test/box width=800 title=\"箱の図\" >}}\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n{{< fig test/local height=300 >}}\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 図の幅 {#a}\n\n{{< fig test/box width=800 title=\"箱の図\" >}}\n\n{{< fig test/local height=300 >}}\n"
+  },
+  {
+    "name": "footnote-def.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 脚注 {#a}\n\n本文に脚注がある[^a]。\n\n[^a]: 脚注の本文。\n\n次の段落。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "脚注",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 61,
+          "end": 98,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 63,
+              "end": 76,
+              "text": "本文に脚注がある[^a]。"
+            },
+            {
+              "kind": "def",
+              "path": "1",
+              "start": 78,
+              "end": 90,
+              "text": "[^a]: 脚注の本文。"
+            },
+            {
+              "kind": "text",
+              "path": "2",
+              "start": 92,
+              "end": 97,
+              "text": "次の段落。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 脚注 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n本文に脚注がある[^a]。\n\n:::\n\n[^a]: 脚注の本文。\n\n::: {.slide-studio-c data-slide-studio=\"p0/2\"}\n\n次の段落。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null,
+      13,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 脚注 {#a}\n\n本文に脚注がある[^a]。\n\n[^a]: 脚注の本文。\n\n次の段落。\n"
+  },
+  {
+    "name": "formatting.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 書式 {#a}\n\n**太字** と *斜体* と `コード`。\n\n[色付き]{style=\"color: #c00;\"} の文字。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "書式",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 61,
+          "end": 120,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 63,
+              "end": 85,
+              "text": "**太字** と *斜体* と `コード`。"
+            },
+            {
+              "kind": "text",
+              "path": "1",
+              "start": 87,
+              "end": 119,
+              "text": "[色付き]{style=\"color: #c00;\"} の文字。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 書式 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n**太字** と *斜体* と `コード`。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n[色付き]{style=\"color: #c00;\"} の文字。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 書式 {#a}\n\n**太字** と *斜体* と `コード`。\n\n[色付き]{style=\"color: #c00;\"} の文字。\n"
+  },
+  {
+    "name": "letter-spacing.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 字間 {#a}\n\n[字間を広げた見出し]{style=\"letter-spacing: 0.2em;\"}\n\n普通の段落。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "字間",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 61,
+          "end": 115,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 63,
+              "end": 106,
+              "text": "[字間を広げた見出し]{style=\"letter-spacing: 0.2em;\"}"
+            },
+            {
+              "kind": "text",
+              "path": "1",
+              "start": 108,
+              "end": 114,
+              "text": "普通の段落。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 字間 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n[字間を広げた見出し]{style=\"letter-spacing: 0.2em;\"}\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n普通の段落。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 字間 {#a}\n\n[字間を広げた見出し]{style=\"letter-spacing: 0.2em;\"}\n\n普通の段落。\n"
+  },
+  {
+    "name": "link-def.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 参照リンク {#a}\n\n[説明のリンク][doc] を含む段落。\n\n[doc]: https://example.com/doc\n\n後の段落。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "参照リンク",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 64,
+          "end": 126,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 66,
+              "end": 86,
+              "text": "[説明のリンク][doc] を含む段落。"
+            },
+            {
+              "kind": "def",
+              "path": "1",
+              "start": 88,
+              "end": 118,
+              "text": "[doc]: https://example.com/doc"
+            },
+            {
+              "kind": "text",
+              "path": "2",
+              "start": 120,
+              "end": 125,
+              "text": "後の段落。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 参照リンク {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n[説明のリンク][doc] を含む段落。\n\n:::\n\n[doc]: https://example.com/doc\n\n::: {.slide-studio-c data-slide-studio=\"p0/2\"}\n\n後の段落。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null,
+      13,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 参照リンク {#a}\n\n[説明のリンク][doc] を含む段落。\n\n[doc]: https://example.com/doc\n\n後の段落。\n"
+  },
+  {
+    "name": "math-blank.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 空行のある数式 {#a}\n\n前の段落。\n\n$$\na + b\n\n= c\n$$\n\n後の段落。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "空行のある数式",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 66,
+          "end": 99,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 68,
+              "end": 73,
+              "text": "前の段落。"
+            },
+            {
+              "kind": "text",
+              "path": "1",
+              "start": 75,
+              "end": 91,
+              "text": "$$\na + b\n\n= c\n$$"
+            },
+            {
+              "kind": "text",
+              "path": "2",
+              "start": 93,
+              "end": 98,
+              "text": "後の段落。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 空行のある数式 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n前の段落。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n$$\n\\begin{gathered} a + b \\\\\n\n= c \\end{gathered}\n$$\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/2\"}\n\n後の段落。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      null,
+      null,
+      11,
+      12,
+      13,
+      14,
+      15,
+      null,
+      null,
+      null,
+      null,
+      null,
+      17,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 空行のある数式 {#a}\n\n前の段落。\n\n$$\na + b\n\n= c\n$$\n\n後の段落。\n"
+  },
+  {
+    "name": "math.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 数式 {#a}\n\n分数 $\\frac{a}{b}$ を含む段落。\n\n$$\n\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}\n$$\n\n$$\n\\begin{aligned}\nf(x) &= x^2 + 1 \\\\\ng(x) &= \\frac{1}{x}\n\\end{aligned}\n$$\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "数式",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 61,
+          "end": 215,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 63,
+              "end": 86,
+              "text": "分数 $\\frac{a}{b}$ を含む段落。"
+            },
+            {
+              "kind": "text",
+              "path": "1",
+              "start": 88,
+              "end": 138,
+              "text": "$$\n\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}\n$$"
+            },
+            {
+              "kind": "text",
+              "path": "2",
+              "start": 140,
+              "end": 214,
+              "text": "$$\n\\begin{aligned}\nf(x) &= x^2 + 1 \\\\\ng(x) &= \\frac{1}{x}\n\\end{aligned}\n$$"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 数式 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n分数 $\\frac{a}{b}$ を含む段落。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n$$\n\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}\n$$\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/2\"}\n\n$$\n\\begin{aligned}\nf(x) &= x^2 + 1 \\\\\ng(x) &= \\frac{1}{x}\n\\end{aligned}\n$$\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      null,
+      null,
+      11,
+      12,
+      13,
+      null,
+      null,
+      null,
+      null,
+      null,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 数式 {#a}\n\n分数 $\\frac{a}{b}$ を含む段落。\n\n$$\n\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}\n$$\n\n$$\n\\begin{aligned}\nf(x) &= x^2 + 1 \\\\\ng(x) &= \\frac{1}{x}\n\\end{aligned}\n$$\n"
+  },
+  {
+    "name": "mid-paragraph-hash.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 段落の途中 {#a}\n\nこの行のあとに\n# 見出しのような行\nが続くが、段落の途中なので見出しではない。\n\n次の段落。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "段落の途中",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 64,
+          "end": 114,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 66,
+              "end": 106,
+              "text": "この行のあとに\n# 見出しのような行\nが続くが、段落の途中なので見出しではない。"
+            },
+            {
+              "kind": "text",
+              "path": "1",
+              "start": 108,
+              "end": 113,
+              "text": "次の段落。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 段落の途中 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\nこの行のあとに\n# 見出しのような行\nが続くが、段落の途中なので見出しではない。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n次の段落。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      10,
+      11,
+      null,
+      null,
+      null,
+      null,
+      null,
+      13,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 段落の途中 {#a}\n\nこの行のあとに\n# 見出しのような行\nが続くが、段落の途中なので見出しではない。\n\n次の段落。\n"
+  },
+  {
+    "name": "nested-columns.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 列の入れ子 {#a}\n\n:::: {.columns}\n::: {.column width=\"40%\"}\n左の列。\n\n- 項目1\n- 項目2\n:::\n\n::: {.column width=\"60%\"}\n右の列の段落。\n\n::: {.row style=\"border: 1px solid #ccc;\"}\n箱の中の段落。\n\n箱の中の2段落目。\n:::\n:::\n::::\n\n列の後の段落。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "列の入れ子",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 64,
+          "end": 250,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "columns",
+              "path": "0",
+              "start": 66,
+              "end": 240,
+              "text": ":::: {.columns}\n::: {.column width=\"40%\"}\n左の列。\n\n- 項目1\n- 項目2\n:::\n\n::: {.column width=\"60%\"}\n右の列の段落。\n\n::: {.row style=\"border: 1px solid #ccc;\"}\n箱の中の段落。\n\n箱の中の2段落目。\n:::\n:::\n::::",
+              "attrs": {
+                "id": "",
+                "classes": [
+                  "columns"
+                ],
+                "kv": {}
+              },
+              "open": ":::: {.columns}",
+              "close": "::::",
+              "children": [
+                {
+                  "kind": "column",
+                  "path": "0.0",
+                  "start": 82,
+                  "end": 129,
+                  "text": "::: {.column width=\"40%\"}\n左の列。\n\n- 項目1\n- 項目2\n:::",
+                  "attrs": {
+                    "id": "",
+                    "classes": [
+                      "column"
+                    ],
+                    "kv": {
+                      "width": "40%"
+                    }
+                  },
+                  "open": "::: {.column width=\"40%\"}",
+                  "close": ":::",
+                  "children": [
+                    {
+                      "kind": "text",
+                      "path": "0.0.0",
+                      "start": 108,
+                      "end": 112,
+                      "text": "左の列。"
+                    },
+                    {
+                      "kind": "text",
+                      "path": "0.0.1",
+                      "start": 114,
+                      "end": 125,
+                      "text": "- 項目1\n- 項目2"
+                    }
+                  ]
+                },
+                {
+                  "kind": "column",
+                  "path": "0.1",
+                  "start": 131,
+                  "end": 235,
+                  "text": "::: {.column width=\"60%\"}\n右の列の段落。\n\n::: {.row style=\"border: 1px solid #ccc;\"}\n箱の中の段落。\n\n箱の中の2段落目。\n:::\n:::",
+                  "attrs": {
+                    "id": "",
+                    "classes": [
+                      "column"
+                    ],
+                    "kv": {
+                      "width": "60%"
+                    }
+                  },
+                  "open": "::: {.column width=\"60%\"}",
+                  "close": ":::",
+                  "children": [
+                    {
+                      "kind": "text",
+                      "path": "0.1.0",
+                      "start": 157,
+                      "end": 164,
+                      "text": "右の列の段落。"
+                    },
+                    {
+                      "kind": "box",
+                      "path": "0.1.1",
+                      "start": 166,
+                      "end": 231,
+                      "text": "::: {.row style=\"border: 1px solid #ccc;\"}\n箱の中の段落。\n\n箱の中の2段落目。\n:::",
+                      "attrs": {
+                        "id": "",
+                        "classes": [
+                          "row"
+                        ],
+                        "kv": {
+                          "style": "border: 1px solid #ccc;"
+                        }
+                      },
+                      "open": "::: {.row style=\"border: 1px solid #ccc;\"}",
+                      "close": ":::",
+                      "children": [
+                        {
+                          "kind": "text",
+                          "path": "0.1.1.0",
+                          "start": 209,
+                          "end": 216,
+                          "text": "箱の中の段落。"
+                        },
+                        {
+                          "kind": "text",
+                          "path": "0.1.1.1",
+                          "start": 218,
+                          "end": 227,
+                          "text": "箱の中の2段落目。"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "path": "1",
+              "start": 242,
+              "end": 249,
+              "text": "列の後の段落。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 列の入れ子 {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n:::: {.columns}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0.0\"}\n\n::: {.column width=\"40%\"}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0.0.0\"}\n\n左の列。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/0.0.1\"}\n\n- 項目1\n- 項目2\n\n:::\n\n:::\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/0.1\"}\n\n::: {.column width=\"60%\"}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0.1.0\"}\n\n右の列の段落。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/0.1.1\"}\n\n::: {.row style=\"border: 1px solid #ccc;\"}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0.1.1.0\"}\n\n箱の中の段落。\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/0.1.1.1\"}\n\n箱の中の2段落目。\n\n:::\n\n:::\n\n:::\n\n:::\n\n:::\n\n::::\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n列の後の段落。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      10,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null,
+      null,
+      null,
+      13,
+      14,
+      null,
+      null,
+      null,
+      15,
+      null,
+      null,
+      null,
+      null,
+      null,
+      17,
+      null,
+      null,
+      null,
+      18,
+      null,
+      null,
+      null,
+      null,
+      null,
+      20,
+      null,
+      null,
+      null,
+      21,
+      null,
+      null,
+      null,
+      null,
+      null,
+      23,
+      null,
+      null,
+      null,
+      24,
+      null,
+      null,
+      null,
+      25,
+      null,
+      null,
+      null,
+      26,
+      null,
+      null,
+      null,
+      null,
+      null,
+      28,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 列の入れ子 {#a}\n\n:::: {.columns}\n::: {.column width=\"40%\"}\n左の列。\n\n- 項目1\n- 項目2\n:::\n\n::: {.column width=\"60%\"}\n右の列の段落。\n\n::: {.row style=\"border: 1px solid #ccc;\"}\n箱の中の段落。\n\n箱の中の2段落目。\n:::\n:::\n::::\n\n列の後の段落。\n"
+  },
+  {
+    "name": "no-id.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## ID のないページ\n\n本文。\n\n## ID のあるページ {#b}\n\n本文。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "ID のないページ",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 63,
+          "end": 70,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 65,
+              "end": 68,
+              "text": "本文。"
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "level": 2,
+          "title": "ID のあるページ",
+          "id": "b",
+          "classes": [],
+          "kv": {},
+          "start": 70,
+          "head_end": 87,
+          "end": 93,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 89,
+              "end": 92,
+              "text": "本文。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## ID のないページ\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n本文。\n\n:::\n\n## ID のあるページ {#b}\n\n::: {.slide-studio-c data-slide-studio=\"p1/0\"}\n\n本文。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      11,
+      null,
+      null,
+      null,
+      13,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## ID のないページ\n\n本文。\n\n## ID のあるページ {#b}\n\n本文。\n"
+  },
+  {
+    "name": "raw-html.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 生の HTML {#a}\n\n<div class=\"raw-box\">\n  <p>HTML の段落</p>\n</div>\n\n普通の段落。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "生の HTML",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 66,
+          "end": 123,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "opaque",
+              "path": "0",
+              "start": 68,
+              "end": 114,
+              "text": "<div class=\"raw-box\">\n  <p>HTML の段落</p>\n</div>"
+            },
+            {
+              "kind": "text",
+              "path": "1",
+              "start": 116,
+              "end": 122,
+              "text": "普通の段落。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 生の HTML {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n<div class=\"raw-box\">\n  <p>HTML の段落</p>\n</div>\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\n普通の段落。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      10,
+      11,
+      null,
+      null,
+      null,
+      null,
+      null,
+      13,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 生の HTML {#a}\n\n<div class=\"raw-box\">\n  <p>HTML の段落</p>\n</div>\n\n普通の段落。\n"
+  },
+  {
+    "name": "two-footnotes.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 脚注が2つ {#a}\n\n一つ目[^fn-1]と二つ目[^fn-2]の脚注。\n\n[^fn-1]: 一つ目の注。\n[^fn-2]: 二つ目の注。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "脚注が2つ",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 64,
+          "end": 125,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 66,
+              "end": 91,
+              "text": "一つ目[^fn-1]と二つ目[^fn-2]の脚注。"
+            },
+            {
+              "kind": "def",
+              "path": "1",
+              "start": 93,
+              "end": 124,
+              "text": "[^fn-1]: 一つ目の注。\n[^fn-2]: 二つ目の注。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 脚注が2つ {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n一つ目[^fn-1]と二つ目[^fn-2]の脚注。\n\n:::\n\n[^fn-1]: 一つ目の注。\n[^fn-2]: 二つ目の注。\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      11,
+      12,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 脚注が2つ {#a}\n\n一つ目[^fn-1]と二つ目[^fn-2]の脚注。\n\n[^fn-1]: 一つ目の注。\n[^fn-2]: 二つ目の注。\n"
+  },
+  {
+    "name": "unclosed-div.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 前のページ {#a}\n\nここは編集できる。\n\n## 閉じ忘れのページ {#b}\n\n::: {.row}\n閉じていない囲み。\n\n## 後ろのページ {#c}\n\nここも原文のみ。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "前のページ",
+          "id": "a",
+          "classes": [],
+          "kv": {},
+          "start": 51,
+          "head_end": 64,
+          "end": 77,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 66,
+              "end": 75,
+              "text": "ここは編集できる。"
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "level": 2,
+          "title": "閉じ忘れのページ",
+          "id": "b",
+          "classes": [],
+          "kv": {},
+          "start": 77,
+          "head_end": 93,
+          "end": 117,
+          "generated": "",
+          "raw_only": true,
+          "unclosed": [
+            ":::"
+          ],
+          "chunks": []
+        },
+        {
+          "index": 2,
+          "level": 2,
+          "title": "後ろのページ",
+          "id": "c",
+          "classes": [],
+          "kv": {},
+          "start": 117,
+          "head_end": 131,
+          "end": 142,
+          "generated": "",
+          "raw_only": true,
+          "unclosed": [],
+          "chunks": []
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 前のページ {#a}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\nここは編集できる。\n\n:::\n\n## 閉じ忘れのページ {#b}\n\n\n::: {.row}\n閉じていない囲み。\n\n:::\n\n## 後ろのページ {#c}\n\n\nここも原文のみ。\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null,
+      11,
+      null,
+      12,
+      13,
+      14,
+      15,
+      null,
+      null,
+      16,
+      null,
+      17,
+      18
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 前のページ {#a}\n\nここは編集できる。\n\n## 閉じ忘れのページ {#b}\n\n::: {.row}\n閉じていない囲み。\n\n## 後ろのページ {#c}\n\nここも原文のみ。\n"
+  },
+  {
+    "name": "unknown-attrs.qmd",
+    "source": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 属性つき {#a .x data-y=\"1\"}\n\n本文。\n",
+    "doc": {
+      "front": [
+        0,
+        50
+      ],
+      "meta": {
+        "title": "同期の回帰",
+        "topic": "test",
+        "theme": "default"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "属性つき",
+          "id": "a",
+          "classes": [
+            "x"
+          ],
+          "kv": {
+            "data-y": "1"
+          },
+          "start": 51,
+          "head_end": 77,
+          "end": 83,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 79,
+              "end": 82,
+              "text": "本文。"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n\n\n## 属性つき {#a .x data-y=\"1\"}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n本文。\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      6,
+      7,
+      7,
+      null,
+      null,
+      null,
+      9,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: \"同期の回帰\"\ntopic: test\ntheme: default\n---\n\n## 属性つき {#a .x data-y=\"1\"}\n\n本文。\n"
+  },
+  {
+    "name": "unicode-astral",
+    "source": "---\ntitle: 日本語\n---\n\n## 😀 題 {#emoji}\n\n𝄞 音楽 **太字**\n",
+    "doc": {
+      "front": [
+        0,
+        19
+      ],
+      "meta": {
+        "title": "日本語"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "😀 題",
+          "id": "emoji",
+          "classes": [],
+          "kv": {},
+          "start": 20,
+          "head_end": 35,
+          "end": 49,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 37,
+              "end": 48,
+              "text": "𝄞 音楽 **太字**"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: 日本語\n---\n\n\n\n## 😀 題 {#emoji}\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n𝄞 音楽 **太字**\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      4,
+      5,
+      5,
+      null,
+      null,
+      null,
+      7,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: 日本語\n---\n\n## 😀 題 {#emoji}\n\n𝄞 音楽 **太字**\n"
+  },
+  {
+    "name": "crlf",
+    "source": "---\r\ntitle: CRLF\r\n---\r\n\r\n## 題\r\n\r\n本文\r\n",
+    "doc": {
+      "front": [
+        0,
+        0
+      ],
+      "meta": {},
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "題",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 25,
+          "head_end": 30,
+          "end": 37,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 33,
+              "end": 36,
+              "text": "本文\r"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "---\r\ntitle: CRLF\r\n---\r\n\r\n\n## 題\r\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n本文\r\n\n:::\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      5,
+      null,
+      null,
+      null,
+      7,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\r\ntitle: CRLF\r\n---\r\n\r\n## 題\r\n\r\n本文\r\n"
+  },
+  {
+    "name": "bom",
+    "source": "﻿## 題\n\n本文\n",
+    "doc": {
+      "front": [
+        0,
+        0
+      ],
+      "meta": {},
+      "meta_error": "",
+      "authors": [],
+      "pages": []
+    },
+    "wrapped": "\n",
+    "origin": [],
+    "unsupported": [],
+    "unchanged": "﻿## 題\n\n本文\n"
+  }
+]

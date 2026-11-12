@@ -16,7 +16,7 @@
     "build": "node scripts/build-renderer.mjs --clean && tsc && node scripts/build-renderer.mjs",
     "dev:desktop": "npm start",
     "setup:pandoc": "node scripts/setup-pandoc.mjs",
-    "test": "npm run build && node --test dist/tests/renderer/*.test.js dist/tests/core/*.test.js dist/tests/desktop/*.test.js",
+    "test": "npm run build && node --test dist/tests/renderer/*.test.js dist/tests/core/*.test.js dist/tests/desktop/*.test.js dist/tests/packaging/*.test.js",
     "test:desktop": "npm run build && node --test dist/tests/desktop/*.test.js",
     "test:desktop:e2e": "npm run build && node --test dist/tests/e2e/*.test.js",
     "start": "npm run build && node scripts/dev-desktop.mjs",
@@ -33,6 +33,7 @@
     "@types/node": "24.19.2",
     "electron": "45.3.1",
     "electron-builder": "26.18.0",
+    "esbuild": "0.28.2",
     "playwright-core": "1.65.0",
     "typescript": "7.0.2"
   },

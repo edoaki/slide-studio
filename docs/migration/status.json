@@ -1,6 +1,6 @@
 {
   "date": "2026-11-12",
-  "milestone": "M0 groundwork and M1 macOS rendering spike",
+  "milestone": "Full legacy UI / behavior parity migration; simplified desktop slice rejected",
   "status": "in_progress",
   "baseline_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
   "python_code_commit": "186a68df8a8c6e20bf4ce495e70dd065f3c56eb8",
@@ -29,7 +29,7 @@
     "typescript": "7.0.2",
     "pdf-lib": "1.17.1"
   },
-  "dependencies_status": "Electron/TypeScript/pdf-lib/Node/pnpm pinned with lockfile for M1 spike. electron-builder/updater remain unverified candidates.",
+  "dependencies_status": "npm package-lock; Electron 45.3.1, builder 26.18.0, native Pandoc 3.9 pinned. No Python/uv runtime in new tree.",
   "validation": [
     {
       "command": "uv run pytest tests/test_source.py tests/test_edit.py -q",
@@ -173,5 +173,12 @@
   },
   "checkout_layout": "Electron-only source tree. Legacy Python implementation and tests preserved in ../slide-studio-old and Git history; migration is not feature-complete.",
   "historical_evidence": "Python test results, manifests and old artifact paths are historical baseline evidence; source/test citations refer to the reference checkout or recorded Git commit.",
-  "electron_only_checkout": "electron-only.json"
+  "electron_only_checkout": "electron-only.json",
+  "current_scope": {
+    "reference": "legacy/python ca1f148; original uv-run application",
+    "required": "All legacy appearance, features and operations, including AI/history/direct editing/materials/bibliography/themes/presentation/CLI",
+    "simplified_ui": "Rejected by user; not a deliverable or parity evidence",
+    "packaging": "DMG and NSIS EXE generation proven for superseded slice; full parity build/install still required",
+    "source_install": "npm workflow under development; GitHub branch not yet published"
+  }
 }

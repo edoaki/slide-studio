@@ -4,20 +4,26 @@
 
 ## 開発環境
 
-Nodeは `.nvmrc`、pnpmは `package.json` の指定バージョンを使います。npmコマンドは使いません。
+Nodeは `.nvmrc`、npmは `package.json` の指定バージョンを使います。利用者の追加指示により、パッケージ管理をnpmに統一しました。
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm test:renderer
+npm ci
+npm run typecheck
+npm run test:renderer
 ```
 
-`pnpm build:renderer` はTypeScriptをコンパイルし、描画に必要な資産を `dist/` にコピーします。Python・uv・旧版の作業ツリーは必要ありません。
+`npm run build` はTypeScriptをコンパイルし、描画に必要な資産を `dist/` にコピーします。Python・uv・旧版の作業ツリーは必要ありません。
 
 ## コードの配置
 
 | 対象 | 場所 |
 |---|---|
+| デスクトップ起動・ネイティブダイアログ | `apps/desktop/` |
+| ローカルHTTP API | `apps/server/` |
+| 原稿・保存・Pandoc変換 | `packages/core/` |
+| 編集画面 | `packages/web/` |
+| 共通契約 | `packages/contracts/` |
+| インストーラー作成 | `scripts/package-desktop.mjs`、`electron-builder.json` |
 | 描画ジョブと結果の型 | `packages/renderer/src/contracts.ts` |
 | Electronの起動と終了 | `packages/renderer/src/cli.ts` |
 | 検査・画像・PDF | `packages/renderer/src/render.ts` |
@@ -34,7 +40,7 @@ pnpm test:renderer
 変更に関係するテストから実行します。実機テストはPOSIX環境で有効にできます。
 
 ```sh
-SLIDE_STUDIO_RENDERER_E2E=1 pnpm test:renderer
+SLIDE_STUDIO_RENDERER_E2E=1 npm run test:renderer
 ```
 
 既存出力の保護、タイムアウト、キャンセル、外部通信の拒否、一時領域の後片付けを検証します。通常のテストで実AIは呼びません。
@@ -44,12 +50,14 @@ SLIDE_STUDIO_RENDERER_E2E=1 pnpm test:renderer
 ## 変更するときの約束
 
 - 正本は `.qmd`。未編集の原文を勝手に正規化しない。
-- GUIは素のJavaScript（ES module）を維持する。UI文言は日本語で、UI移植時に `packages/web/strings.js` へ集約する。
+- GUIは素のJavaScript（ES module）を維持する。UI文言は日本語で、 `packages/web/strings.js` へ集約する。
 - UIの説明は端的にし、仕組みの説明は利用案内に書く。
 - ファイルの書き込みは一時ファイルからrenameする。描画処理では `atomicWriteFile` を使う。
 - 雛形のコピー、参照の書き換え、検査はコードで行う。
 - 見た目に関わる変更は利用者の確認前に「確認待ち」とする。
 - 実装担当・レビュー担当の運用は [移行計画](docs/electron-migration-plan.md) に従う。
+
+デスクトップの実機テストは `SLIDE_STUDIO_DESKTOP_E2E=1 npm run test:desktop:e2e` で実行します。`SLIDE_STUDIO_TEST_APP` にインストール済みアプリの実行ファイルを指定すると、同じテストをアプリ版に対して実行できます。
 
 ## Python版との比較
 

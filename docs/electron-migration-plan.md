@@ -1,8 +1,10 @@
 # Electron・JS／TS移行と配布の実装計画
 
-作成日：2026-11-12。状態：M0作業中、Mac向けM1描画試作を先行。対象：`edoaki/slide-studio` と紹介サイト `slide-studio-web`。
+作成日：2026-11-12。状態：M0・M1の検証を継続し、利用者の追加指示により基本編集とインストーラーを先行。対象：`edoaki/slide-studio` と紹介サイト `slide-studio-web`。
 
-作業記録・検証結果・未完了事項は [移行の進捗記録](migration/status.json) を参照。2026-11-12の利用者の方針に従い、Windowsの試験環境が未定、署名が未準備の間もMac側を進める。M0・M1の完了条件はまだ満たしておらず、全面移植は未着手。
+作業記録・検証結果・未完了事項は [移行の進捗記録](migration/status.json) を参照。2026-11-12の利用者の方針に従い、Windowsの試験環境が未定、署名が未準備の間もMac側を進める。M0・M1の完了条件はまだ満たしておらず、全面移植は未完了。
+
+2026-11-12の追加指示：macOSのDMG、WindowsのEXE、GitHubからの `git clone` → `npm install` → `npm start` を提供し、このMacへDMGから実際にインストールして確認する。比較基準は従来の `uv run slide-studio` 版であり、今回作った簡易画面ではない。**従来版の見た目・全機能・操作をすべて引き継ぐことを完了条件とする。** AI連携、履歴・復元、スライド上の直接編集、素材・文献・テーマ管理、発表モード、CLIを除外しない。旧版のHTML・CSS・JavaScriptと既存テストを基準とし、独自の簡易UIへの置き換えや、未実装機能の非表示によって完了扱いにしない。パッケージ管理はnpmへ統一する。署名・Windows実機検証の状態は別途記録し、未検証を合格としない。
 
 ## 1. 目標と確定方針
 
@@ -93,11 +95,11 @@ slide-studio/
   pnpm-lock.yaml
 ```
 
-バックエンドはTypeScript、既存画面はES moduleを維持する。React等へのUI全面移行は含めない。パッケージ管理はpnpmとし、npmコマンドは使わない。Node・pnpm・Electron・PandocはM0で対応版を確認し、バージョンとlockfileを固定する。開発時だけNode・pnpmを必要とし、利用者のPCには導入を求めない。
+バックエンドはTypeScript、既存画面はES moduleを維持する。React等へのUI全面移行は含めない。パッケージ管理はnpmとする。Node・npm・Electron・Pandocのバージョンとlockfileを固定する。開発時だけNode・npmを必要とし、利用者のPCには導入を求めない。
 
 ルートAGENTS.mdは索引のまま維持する。Python専用規約は旧版のCONTRIBUTING.mdを参照し、新版のCONTRIBUTING.mdにはElectron側の手順を記載する。atomic write、UI日本語の一元管理、変更箇所だけの原稿書き戻しは継承する。移行期間中もUI文言の管理先は1か所に保つ。
 
-予定する開発コマンドは`pnpm dev:desktop`、`pnpm dev:web`、`pnpm test`、`pnpm typecheck`、`pnpm dist`。これらはこれから実装するコマンドで、現時点では存在しない。
+開発コマンドは `npm start`、`npm test`、`npm run typecheck`、`npm run dist:mac`、`npm run dist:win` とする。独立したブラウザー起動コマンドは未実装。
 
 ## 4. 共通処理と起動モード
 
@@ -205,7 +207,7 @@ Claude Codeは未改変の公式バイナリを利用し、本人の契約で公
 |---|---|---|---|
 | M0 調査・基準固定 | 現行版をslide-studio-oldへ移動し移行用worktreeを配置、機能対応表、API／SSE契約、代表fixture、Python基準結果、性能計測、iframe通信表、AIのOS対応表、署名の準備状況、ツール版とライブラリ候補 | 入出力・移植対象・既知不具合・比較条件が再現できる | なし |
 | M1 Electron描画の試作 | 既存生成HTMLをElectronで開く、検査JS、画像、指定stepのPDF・結合、非表示動作 | 日本語・数式・SVG・iframe・分離後の直接編集・CLI応答がMac／Windowsで通る。フォント方針・容量・メモリ・出力時間を記録 | M0 |
-| M2 共通基盤 | pnpm構成、TS契約、atomic write、保存場所、プロセス、HTTP／SSE、起動モード、限定IPC | 両モードの起動・API疎通・atomic write単体試験とiframe通信契約が通り、終了時に残留プロセスがない | M1 |
+| M2 共通基盤 | npm構成、TS契約、atomic write、保存場所、プロセス、HTTP／SSE、起動モード、限定IPC | 両モードの起動・API疎通・atomic write単体試験とiframe通信契約が通り、終了時に残留プロセスがない | M1 |
 | M3 原稿・描画移植 | source/edit/render/Pandoc/bundle、素材・文献・テーマ・メモ | 未編集原文を保ち、HTML出力・直接編集・既存テーマの互換試験が通る | M2 |
 | M4 機能移植 | 検査・背景検査・PDF・履歴・復元・AI・CLI bridge | 機能対応表の必須項目が両モードで通る。実AIは専用fixtureで最小限の疎通 | M3。独立領域は並列 |
 | M5 Python依存の除去 | 全機能のJS／TS化、可搬コンパイラー、旧保存場所の移行、CLI入口 | Python・uv・Git・開発用NodeなしのPCで編集・HTML／PDF・復元が動く。別Chromium取得なし | M4 |
