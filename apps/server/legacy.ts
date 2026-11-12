@@ -65,6 +65,7 @@ import {
   set_front,
   type Workspace,
 } from "../../packages/core/src/legacy-workspace.js";
+import { handleAssets } from "./legacy-assets.js";
 import { handleMaterials } from "./legacy-materials.js";
 import { MAX_BYTES as MATERIALS_MAX_BYTES } from "../../packages/core/src/legacy-materials.js";
 import { LegacyThemes } from "./legacy-themes.js";
@@ -310,7 +311,7 @@ export const LEGACY_WEB_FILES: readonly string[] = Object.freeze([
 ]);
 
 const PENDING_FEATURES: readonly string[] = Object.freeze([
-  "assets", "library", "bibliography", "bib", "theme-shots", "ai",
+  "library", "bibliography", "bib", "theme-shots", "ai",
   "chat", "checks", "shots", "math", "setup", "home-manage",
   "export", "download", "topic", "location",
   "inject", "hooks/locks", "edit-scope",
@@ -322,7 +323,7 @@ const IMPLEMENTED_FEATURES: readonly string[] = Object.freeze([
   "home", "env", "new-deck", "new-topic", "deck-read", "deck-source",
   "memo", "style", "structure", "events", "preview", "theme-preview",
   "open-external", "chunks", "warning-issues", "merge3",
-  "block-design-migrate", "themes", "materials",
+  "block-design-migrate", "themes", "materials", "assets",
 ]);
 
 const FEATURE_ROUTES: readonly FeatureRoute[] = Object.freeze([
@@ -1223,7 +1224,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       "The caller owns the workspace lock; close() drains accepted writes and listeners but not the workspace.",
       "Chunk GET/POST includes markdown/cell/html/delete/move/image conversion with a four-version render cache keyed by raw source bytes.",
       "Deck reads migrate legacy block styles under the per-deck lock and preserve BOM/CRLF bytes; raw byte hashes remain the source revision.",
-      "Legacy assets, AI, checks, shots and export handlers remain pending integration; theme management is connected.",
+      "Legacy AI, checks, shots and export handlers remain pending integration; themes, materials and asset management are connected.",
       "Content origin authentication (Electron secret header) and non-loopback frame navigation blocking belong to desktop integration and are not enabled here.",
       "Content CSP is stricter than the legacy service: remote images/fonts/frames are blocked pending a parity decision.",
       "Desktop download handling and the full output/export bridge remain pending.",
@@ -1649,6 +1650,8 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       route: feature.name,
       ...extras,
     } as LegacyFeatureRequest & { route: string; deck?: string; op?: string };
+    const assetResult = await handleAssets(workspace as Workspace, featureRequest, path => broadcast({ type: "files", paths: [path] }));
+    if (assetResult !== null) { sendFeatureResponse(response, assetResult, contentOrigin); return; }
     const materialResult = await handleMaterials(workspace as Workspace, featureRequest, {
       openPath: options.openPath,
       changed: path => broadcast({ type: "files", paths: [path] }),

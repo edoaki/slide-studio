@@ -43,11 +43,11 @@ export function assetPreview(item, card) {
     if (item.kind === 'html') frame.sandbox = 'allow-scripts';
     frame.src = item.url; frame.title = item.name; body.append(frame);
     if (item.kind === 'figure') {
-      frame.onload = () => frame.contentWindow?.animation?.setVisible(true);
+      const command = action => frame.contentWindow?.postMessage({ channel: 'slide-studio-asset-preview', action }, new URL(item.url, location.href).origin);
+      frame.onload = () => command('visible');
       const controls = document.createElement('div'); controls.className = 'as-preview-controls';
       const step = (direction) => {
-        const a = frame.contentWindow?.animation;
-        if (a) a.setStep(direction === 'first' ? 0 : Math.max(0, Math.min(a.steps, a.step + direction)), false);
+        command(direction === 'first' ? 'first' : direction === -1 ? 'previous' : 'next');
       };
       for (const [direction, label] of [[-1, S.as.previousStep], [1, S.as.nextStep]]) {
         const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', label);

@@ -185,6 +185,18 @@ export function mount(fig) {
     svg() { return stage.innerHTML; },
     render: k => fitted(fig.renderStep(k)),
   };
+  // Only visual commands from the containing window; no DOM, files or API access.
+  const assetCommand = event => {
+    if (parent === window || event.source !== parent || event.data?.channel !== 'slide-studio-asset-preview') return;
+    switch (event.data.action) {
+      case 'visible': api.setVisible(true); break;
+      case 'first': api.setStep(0, false); break;
+      case 'previous': api.setStep(api.step - 1, false); break;
+      case 'next': api.setStep(api.step + 1, false); break;
+    }
+  };
+  window.addEventListener('message', assetCommand);
+  window.addEventListener('pagehide', () => window.removeEventListener('message', assetCommand), { once: true });
   if (embedded) document.body.classList.add('embedded');
   measureFit();
   api.settled = settle(render(0, false));

@@ -435,13 +435,13 @@ test("dispatches feature routes before the generic POST action and never fakes s
   const calls: string[] = [];
   const handler: LegacyFeatureHandler = async (req) => {
     calls.push(`${req.method} ${req.pathname}`);
-    if (req.pathname !== "/api/deck/deck-1/assets") return null;
+    if (req.pathname !== "/api/deck/deck-1/library") return null;
     return { status: 200, body: { url: "/files/deck.png", seen: req.body } };
   };
   const { host, workspace } = await launch(t, { featureHandlers: [handler] });
   workspace.new_deck("deck-1", "topic");
 
-  const handled = await adminRequest(host, "/api/deck/deck-1/assets", {
+  const handled = await adminRequest(host, "/api/deck/deck-1/library", {
     method: "POST",
     json: { op: "list" },
   });
@@ -449,7 +449,7 @@ test("dispatches feature routes before the generic POST action and never fakes s
   const body = handled.json as { url: string; seen: unknown };
   assert.equal(body.url, `${host.contentOrigin}/files/deck.png`);
   assert.deepEqual(body.seen, { op: "list" });
-  assert.deepEqual(calls, ["POST /api/deck/deck-1/assets"]);
+  assert.deepEqual(calls, ["POST /api/deck/deck-1/library"]);
 
   const pending = await adminRequest(host, "/api/deck/deck-1/checks", {
     method: "GET",
@@ -474,7 +474,7 @@ test("dispatches feature routes before the generic POST action and never fakes s
   assert.equal(check.status, 501);
   assert.equal((check.json as { feature: string }).feature, "check");
   assert.equal(host.handoff.status, "in_progress");
-  assert.ok(host.pending.includes("assets"));
+  assert.ok(host.pending.includes("library"));
   assert.ok(host.pending.includes("ai"));
 });
 
@@ -763,7 +763,7 @@ test("rejects invalid UTF-8 memo content without overwriting bytes", async (t) =
 test("rewrites only URL fields and sandboxes active feature bytes", async (t) => {
   let seenHeaders: Record<string, string | undefined> = {};
   const handler: LegacyFeatureHandler = async (req) => {
-    if (req.pathname === "/api/deck/deck-1/assets") {
+    if (req.pathname === "/api/deck/deck-1/library") {
       return {
         status: 200,
         body: {
@@ -774,7 +774,7 @@ test("rewrites only URL fields and sandboxes active feature bytes", async (t) =>
         },
       };
     }
-    if (req.pathname === "/api/deck/deck-1/assets/active") {
+    if (req.pathname === "/api/deck/deck-1/shots/priority") {
       seenHeaders = req.headers;
       return {
         status: 200,
@@ -786,7 +786,7 @@ test("rewrites only URL fields and sandboxes active feature bytes", async (t) =>
   };
   const { host } = await launch(t, { featureHandlers: [handler] });
 
-  const bodyResult = await adminRequest(host, "/api/deck/deck-1/assets", {
+  const bodyResult = await adminRequest(host, "/api/deck/deck-1/library", {
     method: "POST",
     json: { op: "list" },
   });
@@ -802,7 +802,7 @@ test("rewrites only URL fields and sandboxes active feature bytes", async (t) =>
   assert.equal(body.thumb, `${host.contentOrigin}/files/t.png`);
   assert.deepEqual(body.shots, [`${host.contentOrigin}/files/s.png`]);
 
-  const bytesResult = await adminRequest(host, "/api/deck/deck-1/assets/active", {
+  const bytesResult = await adminRequest(host, "/api/deck/deck-1/shots/priority", {
     method: "POST",
     json: {},
     headers: { cookie: "secret=1" },
@@ -870,7 +870,7 @@ test("edit preview keeps the last good render while present mode fails", async (
 
 test("accepts large uploads and a larger source PUT than the JSON limit", async (t) => {
   const handler: LegacyFeatureHandler = async (req) => {
-    if (req.pathname !== "/api/deck/deck-1/assets") return null;
+    if (req.pathname !== "/api/deck/deck-1/library") return null;
     return { status: 200, body: { received: req.bytes.byteLength } };
   };
   const { host, workspace } = await launch(t, {
@@ -879,7 +879,7 @@ test("accepts large uploads and a larger source PUT than the JSON limit", async 
   });
   workspace.new_deck("deck-1", "topic");
 
-  const upload = await adminRequest(host, "/api/deck/deck-1/assets", {
+  const upload = await adminRequest(host, "/api/deck/deck-1/library", {
     method: "POST",
     json: { data: "x".repeat(5 * 1024 * 1024) },
   });
@@ -902,7 +902,7 @@ test("matches legacy route precedence for wrong methods", async (t) => {
   const calls: string[] = [];
   const handler: LegacyFeatureHandler = async (req) => {
     calls.push(`${req.method} ${req.pathname}`);
-    if (req.pathname !== "/api/deck/deck-1/assets") return null;
+    if (req.pathname !== "/api/deck/deck-1/library") return null;
     return { status: 200, body: { ok: true } };
   };
   const { host, workspace } = await launch(t, { featureHandlers: [handler] });
@@ -921,9 +921,9 @@ test("matches legacy route precedence for wrong methods", async (t) => {
   });
   assert.equal(topicPost.status, 405);
 
-  const head = await adminRequest(host, "/api/deck/deck-1/assets", { method: "HEAD" });
+  const head = await adminRequest(host, "/api/deck/deck-1/library", { method: "HEAD" });
   assert.equal(head.status, 200);
-  assert.deepEqual(calls, ["HEAD /api/deck/deck-1/assets"]);
+  assert.deepEqual(calls, ["HEAD /api/deck/deck-1/library"]);
 });
 
 test('theme API preserves original create, edit, conflict, undo, select and delete operations', async t => {
