@@ -1,0 +1,10 @@
+{
+  "source": "tests/fixtures/nco-intro",
+  "generator_commit": "7c59623aa8b54e2c594978281b58ae6922614a40",
+  "baseline": "../../../docs/migration/python-batch-baseline.json",
+  "file": "nco-intro.html",
+  "sha256": "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9",
+  "purpose": "Frozen self-contained input for Electron tests; no Python or sibling checkout required at runtime",
+  "expected_slides": 20,
+  "expected_pdf_pages": 20
+}

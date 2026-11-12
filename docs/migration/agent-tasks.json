@@ -93,6 +93,34 @@
       },
       "commit": "b53890b",
       "validation": "25 tests passed including4real Electron runtime cases"
+    },
+    {
+      "task": "electron_only",
+      "session": "ses_e30a28ddaffeSlQSUCQW4Iaq0F",
+      "model": {
+        "id": "deepseek-flash",
+        "providerID": "deepseek",
+        "variant": "default"
+      },
+      "cost_reported": 0.011027262,
+      "tokens": {
+        "input": 22061,
+        "output": 4650,
+        "reasoning": 6666,
+        "cache": {
+          "read": 309504,
+          "write": 0
+        }
+      },
+      "outcome": "succeeded",
+      "location": {
+        "directory": "/Users/aki/code/slide-studio-electron-only"
+      },
+      "commits": [
+        "409e6fc",
+        "d5c7183"
+      ],
+      "validation": "28 tests pass including real Electron cases; full20page render from /tmp succeeds"
     }
   ],
   "currency_note": "OpenCode reported cost; not reconciled against provider billing",

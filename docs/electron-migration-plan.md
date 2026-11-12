@@ -88,7 +88,6 @@ slide-studio/
   tests/                     契約テスト・fixture・E2E・移行比較
   docs/                      設計判断・移植対応表・本計画
   .github/workflows/         CI・OS別ビルド・Release
-  slide_studio/              移行期間だけ残すPython参照実装
   package.json
   pnpm-workspace.yaml
   pnpm-lock.yaml
@@ -96,7 +95,7 @@ slide-studio/
 
 バックエンドはTypeScript、既存画面はES moduleを維持する。React等へのUI全面移行は含めない。パッケージ管理はpnpmとし、npmコマンドは使わない。Node・pnpm・Electron・PandocはM0で対応版を確認し、バージョンとlockfileを固定する。開発時だけNode・pnpmを必要とし、利用者のPCには導入を求めない。
 
-ルートAGENTS.mdは索引のまま維持する。従来のPython専用規約はCONTRIBUTING.md側で移行期と移行後を区別する。atomic write、UI日本語の一元管理、変更箇所だけの原稿書き戻しは継承する。移行期間中もUI文言の管理先は1か所に保つ。
+ルートAGENTS.mdは索引のまま維持する。Python専用規約は旧版のCONTRIBUTING.mdを参照し、新版のCONTRIBUTING.mdにはElectron側の手順を記載する。atomic write、UI日本語の一元管理、変更箇所だけの原稿書き戻しは継承する。移行期間中もUI文言の管理先は1か所に保つ。
 
 予定する開発コマンドは`pnpm dev:desktop`、`pnpm dev:web`、`pnpm test`、`pnpm typecheck`、`pnpm dist`。これらはこれから実装するコマンドで、現時点では存在しない。
 
@@ -200,7 +199,7 @@ Claude Codeは未改変の公式バイナリを利用し、本人の契約で公
 
 ## 9. マイルストーンと完了条件
 
-各段階は、変更・関連テスト・Opusレビュー・指摘への対応・文書更新までを1単位とする。完了条件を通過する前にPythonの対応実装を削除しない。
+各段階は、変更・関連テスト・Opusレビュー・指摘への対応・文書更新までを1単位とする。Pythonの対応実装は `slide-studio-old` とGit履歴に保存する。2026-11-12の利用者の追加指示により、新しい `slide-studio` はM5を待たずElectron専用に整理し、Python・uv関連ファイルを除去する。この整理は、未移植機能の完了やM5の完了を意味しない。
 
 | 段階 | 作業と成果物 | 完了条件 | 依存 |
 |---|---|---|---|

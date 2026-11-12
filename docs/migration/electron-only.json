@@ -1,0 +1,73 @@
+{
+  "date": "2026-11-12",
+  "status": "checkout_cleanup_complete",
+  "scope": "Electron-only repository layout; not a complete application migration",
+  "implementation_commit": "409e6fc",
+  "reference_checkout": {
+    "path": "../slide-studio-old",
+    "branch": "legacy/python",
+    "commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
+    "unchanged": true
+  },
+  "removed": [
+    "slide_studio/",
+    ".py source/tests/helpers",
+    "pyproject.toml",
+    "uv.lock",
+    ".python-version",
+    ".venv/",
+    "Python caches"
+  ],
+  "retained": [
+    "non-Python fixtures",
+    "historical migration evidence",
+    "frozen bundled HTML"
+  ],
+  "asset_sha256": "bbe58de67bf9249300c164674bb8b49c2573238af08e94a495f090224d69a020",
+  "validation": {
+    "tests": "28 passed, including 4 real Electron runtime tests",
+    "cwd_independent_render": {
+      "working_directory": "/tmp",
+      "input": "tests/fixtures/render/nco-intro.html",
+      "slides": 20,
+      "pdf_pages": 20,
+      "screenshots": 20,
+      "png_dimensions": [
+        1280,
+        720
+      ],
+      "errors": [],
+      "elapsed_ms": 24233,
+      "artifacts": "/Users/aki/code/slide-studio-migration-artifacts/electron-only-render"
+    },
+    "python_runtime_dependency": "No Python/uv commands or legacy source paths in runnable code; no project-owned Python files remain",
+    "clean_build": "Build removes pre-existing dist marker; asset matches source; frozen fixture SHA-256 checked",
+    "install": "pnpm install --offline --frozen-lockfile and typecheck passed"
+  },
+  "documentation_checks": [
+    {
+      "file": "README.md",
+      "verification": "yomiyasu-check: executed via=verify run=20261112T105006Z-3accc1c6 attempt=1 final=sha256:ef46d7def454 mode=rewrite checks=lint,diff meaning_risk=94 replay=skipped",
+      "disposition": "Intentional Electron-only instructions replace Python commands; old instructions preserved in reference checkout. Established terms retained."
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "verification": "yomiyasu-check: executed via=verify run=20261112T105007Z-808a51d8 attempt=1 final=sha256:350f0fe82c84 mode=rewrite checks=lint,diff meaning_risk=33 replay=skipped",
+      "disposition": "Intentional Electron-only instructions replace Python commands; old instructions preserved in reference checkout. Established terms retained."
+    },
+    {
+      "file": "AGENTS.md",
+      "verification": "yomiyasu-check: executed via=verify run=20261112T105007Z-5cec478a attempt=1 final=sha256:295d6f522cf0 mode=rewrite checks=lint,diff meaning_risk=6 replay=skipped",
+      "disposition": "Intentional Electron-only instructions replace Python commands; old instructions preserved in reference checkout. Established terms retained."
+    },
+    {
+      "file": "docs/electron-migration-plan.md",
+      "verification": "yomiyasu-check: executed via=verify run=20261112T104849Z-95c60a64 attempt=1 final=sha256:7d7467f0ecf1 mode=rewrite checks=lint,diff meaning_risk=2 replay=skipped",
+      "disposition": "Intentional Electron-only instructions replace Python commands; old instructions preserved in reference checkout. Established terms retained."
+    }
+  ],
+  "implementation_commits": [
+    "409e6fc",
+    "d5c7183"
+  ]
+}

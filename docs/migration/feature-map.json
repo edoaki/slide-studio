@@ -1,4 +1,5 @@
 {
+  "reference_checkout": {"directory": "../slide-studio-old", "branch": "legacy/python", "commit": "ca1f148dced6d207dab3f69474bc848560ff738c", "code_commit": "186a68df8a8c6e20bf4ce495e70dd065f3c56eb8", "path_scope": "Legacy source/test references resolve against this revision, not the Electron checkout"},
   "schema_version": 1,
   "generated_for": "M0 inventory (docs/electron-migration-plan.md)",
   "scope": "Current Python application as observed in the repository. English labels, Japanese product terms retained where they are literals.",
