@@ -134,12 +134,12 @@ function request(
   } else if (options.contentType !== undefined) {
     headers["content-type"] = options.contentType;
   }
-  const url = new URL(path, origin);
+  const base = new URL(origin);
   return new Promise((resolveResponse, reject) => {
     const req = httpRequest({
-      hostname: url.hostname,
-      port: url.port,
-      path: `${url.pathname}${url.search}`,
+      hostname: base.hostname,
+      port: base.port,
+      path,
       method,
       headers,
     }, (res) => {

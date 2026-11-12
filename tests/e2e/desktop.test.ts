@@ -306,7 +306,7 @@ test("desktop slice: create, edit, preview, save, reopen, export", { skip: skipR
       const visit = (items: any[]): void => {
         for (const item of items) {
           if (typeof item.role === "string") found.push(item.role);
-          if (item.submenu !== undefined) visit(item.submenu.items);
+          if (item.submenu != null) visit(item.submenu.items);
         }
       };
       visit(Menu.getApplicationMenu()?.items ?? []);
