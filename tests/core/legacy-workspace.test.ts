@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -8,6 +9,7 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -383,6 +385,40 @@ test("migrates serif to terracotta and retires themes with backups", async (t) =
   assert.equal(after.some((name) => existsSync(join(ws.state, "trash", "themes", name, "sage.css"))), true);
 });
 
+test("theme migration leaves a non-UTF-8 slides.qmd untouched", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  const serif = "/* untouched serif */\n";
+  writeFileSync(join(ws.themes, "serif.css"), serif);
+  const recordPath = join(ws.state, "bundled-themes.json");
+  const record = readJson(recordPath);
+  record["serif.css"] = sha(serif);
+  writeJson(recordPath, record);
+  ws.new_deck("legacy", "test", "serif");
+
+  const qmd = ws.qmd("legacy");
+  const bytes = Buffer.concat([
+    Buffer.from('---\ntitle: "x"\ntopic: test\ntheme: serif\n---\n\n## Keep\n'),
+    Buffer.from([0xff]),
+  ]);
+  writeFileSync(qmd, bytes);
+
+  assert.throws(() => ws.ensure(), StudioError);
+  assert.equal(readFileSync(qmd).equals(bytes), true);
+  assert.equal(readFileSync(join(ws.themes, "serif.css"), "utf8"), serif);
+});
+
+test("theme refresh refuses non-UTF-8 css without rewriting it", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  const night = join(ws.themes, "night.css");
+  const bytes = Buffer.concat([Buffer.from("/* custom */\n"), Buffer.from([0xff])]);
+  writeFileSync(night, bytes);
+
+  assert.throws(() => ws.ensure(), StudioError);
+  assert.equal(readFileSync(night).equals(bytes), true);
+});
+
 test("moves an old figures/ layout into topics and updates explicit references", async (t) => {
   const root = await scratch(t);
   const figures = join(root, "figures", "alpha", "demo");
@@ -541,6 +577,28 @@ test("bibliography migration preserves paren entries and refuses broken BibTeX",
   ws.ensure();
   assert.match(readFileSync(target, "utf8"), /@string\{publisher/u);
   assert.match(readFileSync(target, "utf8"), /@comment\{keep me\}/u);
+});
+
+test("bibliography migration reports non-UTF-8 files instead of merging mojibake", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("talk", "topic");
+  const local = join(ws.deck_dir("talk"), "reference.bib");
+  const target = ws.bib("talk");
+  const bytes = Buffer.concat([
+    Buffer.from("@article{latin, title={Caf"),
+    Buffer.from([0xe9]),
+    Buffer.from("}}\n"),
+  ]);
+  writeFileSync(local, bytes);
+
+  ws.ensure();
+  assert.equal(readFileSync(local).equals(bytes), true);
+  assert.equal(readFileSync(target, "utf8"), "");
+  assert.doesNotMatch(readFileSync(target, "utf8"), /\uFFFD/u);
+  const conflict = ws.migration_preparation().find((item) => item.name === "文献の移行");
+  assert.equal(typeof conflict?.detail, "string");
+  assert.match(String(conflict?.detail), /UTF-8/u);
 });
 
 test("agent files back up edits on version changes and forget edited obsolete files", async (t) => {
@@ -805,6 +863,233 @@ test("topic migration uses a fresh trash directory beside an existing one", asyn
   assert.equal(
     runs.some((name) => existsSync(join(existing, name, "figures", "alpha", "demo", "figure.mjs"))),
     true,
+  );
+});
+
+test("topic migration aborts on a non-UTF-8 qmd without writing a manifest", async (t) => {
+  const root = await scratch(t);
+  const figure = join(root, "figures", "alpha", "demo");
+  mkdirSync(figure, { recursive: true });
+  writeFileSync(join(figure, "figure.mjs"), "export default {};\n");
+  mkdirSync(join(root, "decks", "old"), { recursive: true });
+  const qmd = join(root, "decks", "old", "slides.qmd");
+  const qmdBytes = Buffer.concat([
+    Buffer.from("---\ntopic: alpha\ntheme: default\n---\n\n## Cover\n\n"),
+    Buffer.from([0xff]),
+    Buffer.from("\n"),
+  ]);
+  writeFileSync(qmd, qmdBytes);
+
+  assert.throws(() => Workspace.open(root), StudioError);
+  assert.equal(readFileSync(qmd).equals(qmdBytes), true);
+  assert.equal(existsSync(join(root, "figures", "alpha", "demo", "figure.mjs")), true);
+  assert.equal(
+    existsSync(join(root, ".slide-studio", "migrate", "topics-v1", "manifest.json")),
+    false,
+  );
+});
+
+test("topic migration does not read unrelated unreadable files during commit", async (t) => {
+  const root = await scratch(t);
+  const figure = join(root, "figures", "alpha", "demo");
+  mkdirSync(figure, { recursive: true });
+  writeFileSync(join(figure, "figure.mjs"), "export default {};\n");
+  const deck = join(root, "decks", "old");
+  mkdirSync(join(deck, "materials"), { recursive: true });
+  writeFileSync(
+    join(deck, "slides.qmd"),
+    "---\ntopic: alpha\ntheme: default\n---\n\n## Cover\n",
+  );
+  const locked = join(deck, "materials", "locked.bin");
+  writeFileSync(locked, "locked");
+  if (process.platform !== "win32" && process.getuid?.() !== 0) chmodSync(locked, 0o000);
+
+  const ws = Workspace.open(root);
+  assert.equal(readJson(join(ws.state, "migrate", "topics-v1", "manifest.json")).phase, "done");
+  assert.equal(existsSync(join(root, "figures")), false);
+});
+
+test("topic migration deduplicates alias decks and resumes after originals move", async (t) => {
+  const root = await scratch(t);
+  const figure = join(root, "figures", "alpha", "demo");
+  mkdirSync(figure, { recursive: true });
+  writeFileSync(join(figure, "figure.mjs"), "export default {};\n");
+  const deck = join(root, "decks", "old");
+  mkdirSync(deck, { recursive: true });
+  writeFileSync(
+    join(deck, "slides.qmd"),
+    "---\ntopic: alpha\ntheme: default\n---\n\n## Cover\n",
+  );
+  mkdirSync(join(deck, "images"), { recursive: true });
+  writeFileSync(join(deck, "images", "keep.txt"), "keep");
+  try {
+    symlinkSync(deck, join(root, "decks", "zz-alias"), "dir");
+  } catch {
+    return;
+  }
+
+  // Fail after stage -> topics so the next open resumes the prepared commit.
+  mkdirSync(join(root, ".slide-studio"), { recursive: true });
+  writeFileSync(join(root, ".slide-studio", "trash"), "not a directory");
+  assert.throws(() => Workspace.open(root), StudioError);
+  assert.equal(existsSync(join(root, "topics", "alpha", "images", "keep.txt")), true);
+  rmSync(join(root, ".slide-studio", "trash"), { force: true });
+
+  const manifestPath = join(root, ".slide-studio", "migrate", "topics-v1", "manifest.json");
+  const manifest = readJson(manifestPath) as {
+    phase: string;
+    trash: string;
+    originals: string[];
+    qmd: Record<string, { before: string; after: string }>;
+  };
+  assert.equal(manifest.phase, "prepared");
+  // The alias and the real deck share one images directory.
+  assert.equal(manifest.originals.filter((rel) => rel.endsWith("/images")).length, 1);
+
+  // Simulate an interrupted run that had already rewritten the qmd and moved
+  // the originals before it could record `done`.
+  const trash = join(root, manifest.trash);
+  for (const rel of manifest.originals) {
+    const source = join(root, rel);
+    if (!existsSync(source)) continue;
+    const destination = join(trash, rel);
+    mkdirSync(dirname(destination), { recursive: true });
+    renameSync(source, destination);
+  }
+  for (const [rel, values] of Object.entries(manifest.qmd)) {
+    writeFileSync(join(root, rel), values.after);
+  }
+
+  const ws = Workspace.open(root);
+  assert.equal(readJson(manifestPath).phase, "done");
+  assert.equal(existsSync(join(root, "figures")), false);
+  const runs = readdirSync(join(ws.state, "trash", "topics-v1"));
+  const run = runs.find((name) =>
+    existsSync(join(ws.state, "trash", "topics-v1", name, "decks"))
+  );
+  assert.equal(typeof run, "string");
+  assert.deepEqual(
+    readdirSync(join(ws.state, "trash", "topics-v1", run!, "decks")),
+    ["old"],
+  );
+});
+
+test("topic migration refuses a symlinked slides.qmd", async (t) => {
+  const root = await scratch(t);
+  const figure = join(root, "figures", "alpha", "demo");
+  mkdirSync(figure, { recursive: true });
+  writeFileSync(join(figure, "figure.mjs"), "export default {};\n");
+  const deck = join(root, "decks", "old");
+  mkdirSync(deck, { recursive: true });
+  const target = join(deck, "real.qmd");
+  const qmdBytes = Buffer.from("---\ntopic: alpha\ntheme: default\n---\n\n## Cover\n");
+  writeFileSync(target, qmdBytes);
+  try {
+    symlinkSync(target, join(deck, "slides.qmd"));
+  } catch {
+    return;
+  }
+
+  assert.throws(() => Workspace.open(root), StudioError);
+  assert.equal(lstatSync(join(deck, "slides.qmd")).isSymbolicLink(), true);
+  assert.equal(readFileSync(target).equals(qmdBytes), true);
+  assert.equal(existsSync(join(root, "figures", "alpha", "demo", "figure.mjs")), true);
+});
+
+test("topic migration validates decks/ before moving any figures", async (t) => {
+  for (const location of ["inside", "outside"] as const) {
+    const root = await scratch(t);
+    const figure = join(root, "figures", "alpha", "demo");
+    mkdirSync(figure, { recursive: true });
+    writeFileSync(join(figure, "figure.mjs"), "export default {};\n");
+    const target = location === "inside"
+      ? join(root, "real-decks")
+      : join(root, "..", `decks-outside-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    mkdirSync(target, { recursive: true });
+    if (location === "outside") {
+      t.after(() => rmSync(target, { recursive: true, force: true }));
+    }
+    mkdirSync(join(target, "old"), { recursive: true });
+    const qmd = join(target, "old", "slides.qmd");
+    const text = "---\ntopic: alpha\ntheme: default\n---\n\n## Cover\n";
+    writeFileSync(qmd, text);
+    try {
+      symlinkSync(target, join(root, "decks"), "dir");
+    } catch {
+      return;
+    }
+
+    assert.throws(() => Workspace.open(root), StudioError);
+    assert.equal(existsSync(join(root, "figures", "alpha", "demo", "figure.mjs")), true);
+    assert.equal(existsSync(join(root, "topics")), false);
+    assert.equal(readFileSync(qmd, "utf8"), text);
+    assert.equal(
+      existsSync(join(root, ".slide-studio", "migrate", "topics-v1", "manifest.json")),
+      false,
+    );
+  }
+});
+
+test("topic migration ignores non-directory deck asset names", async (t) => {
+  const root = await scratch(t);
+  const figure = join(root, "figures", "alpha", "demo");
+  mkdirSync(figure, { recursive: true });
+  writeFileSync(join(figure, "figure.mjs"), "export default {};\n");
+  const deck = join(root, "decks", "old");
+  mkdirSync(deck, { recursive: true });
+  writeFileSync(
+    join(deck, "slides.qmd"),
+    "---\ntopic: alpha\ntheme: default\n---\n\n## Cover\n",
+  );
+  for (const name of ["images", "html", "figures"]) {
+    writeFileSync(join(deck, name), `${name} file`);
+  }
+
+  const ws = Workspace.open(root);
+  for (const name of ["images", "html", "figures"]) {
+    assert.equal(readFileSync(join(ws.deck_dir("old"), name), "utf8"), `${name} file`);
+  }
+  assert.equal(existsSync(join(ws.topics, "alpha", "images")), false);
+  assert.deepEqual(readdirSync(join(ws.topics, "alpha", "html")), ["demo"]);
+  assert.equal(readJson(join(ws.state, "migrate", "topics-v1", "manifest.json")).phase, "done");
+  assert.doesNotThrow(() => ws.ensure());
+});
+
+test("topic migration rolls live topics back to stage on a recoverable conflict", async (t) => {
+  const root = await scratch(t);
+  const figure = join(root, "figures", "alpha", "demo");
+  mkdirSync(figure, { recursive: true });
+  const figurePath = join(figure, "figure.mjs");
+  writeFileSync(figurePath, "original");
+  mkdirSync(join(root, "decks", "old"), { recursive: true });
+  writeFileSync(
+    join(root, "decks", "old", "slides.qmd"),
+    "---\ntopic: alpha\ntheme: default\n---\n\n## Cover\n",
+  );
+
+  mkdirSync(join(root, ".slide-studio"), { recursive: true });
+  writeFileSync(join(root, ".slide-studio", "trash"), "not a directory");
+  assert.throws(() => Workspace.open(root), StudioError);
+  assert.equal(existsSync(join(root, "topics", "alpha", "html", "demo", "figure.mjs")), true);
+  rmSync(join(root, ".slide-studio", "trash"), { force: true });
+
+  // The original is edited before the resumed commit; it must be preserved and
+  // the live topics/ tree returned to the recoverable stage.
+  writeFileSync(figurePath, "user edit");
+  let detail = "";
+  assert.throws(() => Workspace.open(root), (error: unknown) => {
+    assert.equal(error instanceof StudioError, true);
+    detail = error instanceof Error ? error.message : String(error);
+    return true;
+  });
+  assert.match(detail, /stage|manifest|退避/u);
+  assert.equal(existsSync(join(root, "topics")), false);
+  const stage = join(root, ".slide-studio", "migrate", "topics-v1", "stage", "topics");
+  assert.equal(existsSync(join(stage, "alpha", "html", "demo", "figure.mjs")), true);
+  assert.equal(readFileSync(figurePath, "utf8"), "user edit");
+  assert.equal(
+    readJson(join(root, ".slide-studio", "migrate", "topics-v1", "manifest.json")).phase,
+    "prepared",
   );
 });
 

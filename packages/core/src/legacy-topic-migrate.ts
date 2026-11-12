@@ -34,7 +34,7 @@ import {
 } from "node:path";
 import { fig_args } from "./legacy-source.js";
 import { isInsideRoot } from "./paths.js";
-import { renameWithRetry, StudioError } from "./legacy-workspace.js";
+import { decodeUtf8, renameWithRetry, StudioError } from "./legacy-workspace.js";
 import type { Workspace } from "./legacy-workspace.js";
 
 type SetFront = (text: string, values: Record<string, unknown>) => string;
@@ -60,7 +60,6 @@ interface QmdPlan {
 interface Manifest {
   phase: "prepared" | "done";
   trash: string;
-  all_before: Record<string, string>;
   before: Record<string, string>;
   after: Record<string, string>;
   mapping: Record<string, string>;
@@ -68,7 +67,6 @@ interface Manifest {
   qmd: Record<string, QmdPlan>;
   source_hashes: Record<string, string>;
   result_hashes: Record<string, string>;
-  all_after?: Record<string, string>;
 }
 
 const TEXT_EXTENSIONS = new Set([".html", ".htm", ".css", ".js", ".mjs", ".svg"]);
@@ -276,6 +274,11 @@ export function hashes(root: string): Record<string, string> {
   );
 }
 
+/**
+ * Best-effort snapshot for diagnostics. Unreadable files are skipped: migration
+ * commits never depend on a full workspace inventory, so an inaccessible
+ * materials file or an evicted cloud placeholder cannot block `done`.
+ */
 export function inventory(root: string): Record<string, string> {
   const result: Record<string, string> = {};
   const walk = (directory: string): void => {
@@ -290,8 +293,15 @@ export function inventory(root: string): Record<string, string> {
       if (inState && (entry.name === "migrate" || entry.name === "trash")) continue;
       const path = join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
-      if (entry.isDirectory()) walk(path);
-      else if (entry.isFile()) result[relative(root, path).replaceAll(sep, "/")] = sha256(readFileSync(path));
+      if (entry.isDirectory()) {
+        walk(path);
+      } else if (entry.isFile()) {
+        try {
+          result[relative(root, path).replaceAll(sep, "/")] = sha256(readFileSync(path));
+        } catch {
+          // An unreadable file is simply absent from this diagnostic snapshot.
+        }
+      }
     }
   };
   walk(root);
@@ -617,44 +627,189 @@ function uniqueTrashDirectory(root: string, state: string): string {
   return relative(root, candidate).replaceAll(sep, "/");
 }
 
+const DECK_ASSET_NAMES = ["images", "html", "figures"] as const;
+
+const MIGRATION_RECOVERY =
+  "原稿や元ファイルを編集した場合は、その内容を別名で保存してください。"
+  + "移行をやり直すには .slide-studio/migrate/topics-v1/manifest.json を確認し、"
+  + "必要なら .slide-studio/migrate/topics-v1/ を退避してから再起動してください。"
+  + "topics/・figures/・decks/ の内容は自動では削除していません。";
+
+/** Followers of a deck symlink point at the same qmd and assets; migrate once. */
+function migrationDecks(ws: WorkspaceView): string[] {
+  const selected = new Map<string, { deck: string; alias: boolean }>();
+  for (const deck of ws.list_decks()) {
+    const folder = ws.deck_dir(deck);
+    let real: string;
+    try {
+      real = realpathSync.native(folder);
+    } catch {
+      continue;
+    }
+    const alias = lstatOrNull(folder)?.isSymbolicLink() === true;
+    const existing = selected.get(real);
+    if (!existing || (existing.alias && !alias)) selected.set(real, { deck, alias });
+  }
+  return [...selected.values()].map((item) => item.deck);
+}
+
+/** A migration that moves figures/ must not commit into a broken decks/ root. */
+function assertDecksRoot(root: string): void {
+  const path = join(root, "decks");
+  const link = lstatOrNull(path);
+  if (!link) return;
+  let real: string;
+  try {
+    real = realpathSync.native(path);
+  } catch {
+    throw new StudioError(
+      "decks/ を解決できません。figures/ は移動していません。"
+        + "decks/ をワークスペース内の通常のフォルダにしてから再起動してください。",
+      "OUTSIDE_ROOT",
+    );
+  }
+  if (link.isSymbolicLink() || !link.isDirectory() || !isInsideRoot(root, real)) {
+    throw new StudioError(
+      "decks/ がシンボリックリンクまたはフォルダではありません。figures/ の移行は開始していません。"
+        + "decks/ をワークスペース内の通常のフォルダにしてから再起動してください。",
+      "OUTSIDE_ROOT",
+    );
+  }
+}
+
+/** Non-directory asset names are ignored; symlinks are refused before staging. */
+function deckAssetDirectories(
+  root: string,
+  folder: string,
+): Array<{ name: string; path: string }> {
+  const output: Array<{ name: string; path: string }> = [];
+  for (const name of DECK_ASSET_NAMES) {
+    const path = join(folder, name);
+    const link = lstatOrNull(path);
+    if (!link) continue;
+    if (link.isSymbolicLink()) {
+      throw new StudioError(
+        `シンボリックリンクは自動移行できません。リンク先をコピーしてから再実行してください: ${relative(root, path)}`,
+        "CONFLICT",
+      );
+    }
+    if (link.isDirectory()) output.push({ name, path });
+  }
+  return output;
+}
+
+function assertWritableQmd(ws: WorkspaceView, deck: string): void {
+  const path = ws.qmd(deck);
+  const link = lstatOrNull(path);
+  if (link?.isSymbolicLink()) {
+    throw new StudioError(
+      "原稿がシンボリックリンクです。自動移行では置き換えません。"
+        + `リンク先の内容を通常のファイルにコピーしてから再実行してください: ${relative(ws.root, path)}`,
+      "CONFLICT",
+    );
+  }
+  if (!link?.isFile()) {
+    throw new StudioError(`原稿を読み取れません。${MIGRATION_RECOVERY}`, "CONFLICT");
+  }
+}
+
+/**
+ * A prepared commit can be rolled back to the stage only while the migration
+ * has not rewritten a qmd or moved any original. Anything else is left alone
+ * and the caller receives the recovery instructions instead.
+ */
+function canRollbackToStage(
+  ws: WorkspaceView,
+  journal: string,
+  plan: Manifest,
+): boolean {
+  const stage = join(journal, "stage", "topics");
+  if (!isDirectory(ws.topics) || pathExists(stage)) return false;
+  for (const rel of plan.originals) {
+    if (!pathExists(join(ws.root, rel))) return false;
+  }
+  for (const [rel, values] of Object.entries(plan.qmd)) {
+    let text: string;
+    try {
+      text = decodeUtf8(readFileSync(join(ws.root, rel)), rel);
+    } catch {
+      return false;
+    }
+    if (values.before !== values.after && text === values.after) return false;
+  }
+  return true;
+}
+
+function rollbackPreparedTopics(
+  ws: WorkspaceView,
+  journal: string,
+  plan: Manifest,
+): boolean {
+  const stage = join(journal, "stage", "topics");
+  if (!canRollbackToStage(ws, journal, plan)) return false;
+  try {
+    safeRename(ws.root, ws.topics, stage);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function finish(ws: WorkspaceView, journal: string, plan: Manifest): void {
   const root = ws.root;
   const stage = join(journal, "stage", "topics");
   const trash = plan.trash
     ? join(root, plan.trash)
     : join(ws.state, "trash", "topics-v1");
+  const conflict = (message: string): StudioError => {
+    const rolledBack = rollbackPreparedTopics(ws, journal, plan);
+    const state = rolledBack ? " topics/ を stage に戻しました。" : "";
+    return new StudioError(`${message}。${state}${MIGRATION_RECOVERY}`, "CONFLICT");
+  };
+  const readQmd = (rel: string): { bytes: Buffer; text: string } => {
+    const path = join(root, rel);
+    if (lstatOrNull(path)?.isSymbolicLink()) {
+      throw conflict(`原稿がシンボリックリンクになっています: ${rel}`);
+    }
+    let bytes: Buffer;
+    try {
+      bytes = readFileSync(path);
+    } catch {
+      throw conflict(`移行中に原稿が変更されました: ${rel}`);
+    }
+    let text: string;
+    try {
+      text = decodeUtf8(bytes, rel);
+    } catch {
+      throw conflict(`移行中の原稿を UTF-8 として読み取れません: ${rel}`);
+    }
+    return { bytes, text };
+  };
 
   for (const rel of plan.originals) {
     const source = join(root, rel);
     const original = existsSync(source) ? source : join(trash, rel);
     if (!sameHashes(hashes(original), expectedFor(plan.before, rel))) {
-      throw new StudioError(`移行中に元ファイルが変更されました: ${rel}`, "CONFLICT");
+      throw conflict(`移行中に元ファイルが変更されました: ${rel}`);
     }
   }
   for (const [rel, values] of Object.entries(plan.qmd)) {
-    let text: string;
-    try {
-      text = readFileSync(join(root, rel), "utf8");
-    } catch {
-      throw new StudioError(`移行中に原稿が変更されました: ${rel}`, "CONFLICT");
-    }
+    const { text } = readQmd(rel);
     if (text !== values.before && text !== values.after) {
-      throw new StudioError(`移行中に原稿が変更されました: ${rel}`, "CONFLICT");
+      throw conflict(`移行中に原稿が変更されました: ${rel}`);
     }
   }
 
   const copied = existsSync(ws.topics) ? ws.topics : stage;
   if (!sameHashes(hashes(copied), plan.after)) {
-    throw new StudioError(
+    throw conflict(
       "トピックの移行コピーが変わっています。.slide-studio/migrate/topics-v1/ を確認してください",
-      "CONFLICT",
     );
   }
   if (!existsSync(ws.topics)) {
     if (!pathExists(stage)) {
-      throw new StudioError(
+      throw conflict(
         "トピックの移行コピーがありません。.slide-studio/migrate/topics-v1/ を確認してください",
-        "CONFLICT",
       );
     }
     safeRename(root, stage, ws.topics);
@@ -664,17 +819,20 @@ function finish(ws: WorkspaceView, journal: string, plan: Manifest): void {
   // the originals. An interrupted run then leaves figures/ in place.
   for (const [rel, values] of Object.entries(plan.qmd)) {
     const path = join(root, rel);
-    let text: string;
-    try {
-      text = readFileSync(path, "utf8");
-    } catch {
-      throw new StudioError(`移行中に原稿が変更されました: ${rel}`, "CONFLICT");
-    }
+    const { bytes, text } = readQmd(rel);
     if (text !== values.before && text !== values.after) {
-      throw new StudioError(`移行中に原稿が変更されました: ${rel}`, "CONFLICT");
+      throw conflict(`移行中に原稿が変更されました: ${rel}`);
     }
     const backup = join(trash, rel);
-    if (!pathExists(backup)) writeAtomic(root, backup, values.before);
+    if (!pathExists(backup)) {
+      // The backup is the exact original byte stream. If an earlier run
+      // already wrote `after`, reconstruct the valid UTF-8 `before` bytes.
+      writeAtomic(
+        root,
+        backup,
+        text === values.before ? bytes : Buffer.from(values.before, "utf8"),
+      );
+    }
     if (text !== values.after) writeAtomic(root, path, values.after);
   }
 
@@ -683,13 +841,12 @@ function finish(ws: WorkspaceView, journal: string, plan: Manifest): void {
     const destination = join(trash, rel);
     if (!existsSync(source)) continue;
     if (!sameHashes(hashes(source), expectedFor(plan.before, rel))) {
-      throw new StudioError(`移行中に元ファイルが変更されました: ${rel}`, "CONFLICT");
+      throw conflict(`移行中に元ファイルが変更されました: ${rel}`);
     }
     safeMkdir(root, dirname(destination));
     renameWithRetry(source, destination);
   }
 
-  plan.all_after = inventory(root);
   plan.phase = "done";
   writeManifest(root, recordPath(journal), plan);
 }
@@ -717,20 +874,21 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
   }
   if (!legacyIsDirectory || existsSync(ws.topics)) return;
   assertNoSymlinks(ws.root, legacy);
+  assertDecksRoot(ws.root);
 
-  const allBefore = inventory(ws.root);
+  const decks = migrationDecks(ws);
+  for (const deck of decks) assertWritableQmd(ws, deck);
+
   const stage = join(journal, "stage", "topics");
   safeRemove(ws.root, stage);
   safeMkdir(ws.root, stage);
 
   const mapping = new Map<string, string>();
   const originals: string[] = [relative(ws.root, legacy).replaceAll(sep, "/")];
-  const decks = ws.list_decks();
   for (const deck of decks) {
     const folder = ws.deck_dir(deck);
-    for (const name of ["images", "html", "figures"]) {
-      const source = join(folder, name);
-      if (pathExists(source)) originals.push(relative(ws.root, source).replaceAll(sep, "/"));
+    for (const asset of deckAssetDirectories(ws.root, folder)) {
+      originals.push(relative(ws.root, asset.path).replaceAll(sep, "/"));
     }
   }
 
@@ -761,12 +919,15 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
   for (const deck of decks) {
     const shelf = ws.deck_shelf(deck);
     const folder = ws.deck_dir(deck);
-    for (const name of ["images", "html", "figures"]) {
-      const source = join(folder, name);
-      if (!existsSync(source)) continue;
-      assertNoSymlinks(ws.root, source);
-      const kind = name === "images" ? "images" : "html";
-      copy_group(ws, source, join(stage, shelf, kind), mapping, join(ws.topic_dir(shelf), kind));
+    for (const asset of deckAssetDirectories(ws.root, folder)) {
+      const kind = asset.name === "images" ? "images" : "html";
+      copy_group(
+        ws,
+        asset.path,
+        join(stage, shelf, kind),
+        mapping,
+        join(ws.topic_dir(shelf), kind),
+      );
     }
   }
 
@@ -775,7 +936,8 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
     const shelf = ws.deck_shelf(deck);
     const folder = ws.deck_dir(deck);
     const path = ws.qmd(deck);
-    const text = readFileSync(path, "utf8");
+    assertWritableQmd(ws, deck);
+    const text = decodeUtf8(readFileSync(path), relative(ws.root, path));
     let updated = replaceFigureRefs(text, (ref) => {
       const source = ref.startsWith("./")
         ? join(folder, "figures", ref.slice(2))
@@ -835,7 +997,11 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
     const link = lstatOrNull(copied);
     const key = relative(ws.root, source).replaceAll(sep, "/");
     if (!link?.isFile() || sha256(readFileSync(copied)) !== before[key]) {
-      throw new StudioError(`コピーを確認できませんでした: ${relative(ws.root, source)}`, "CONFLICT");
+      throw new StudioError(
+        `コピーを確認できませんでした: ${relative(ws.root, source)}。`
+          + "figures/ や元ファイルは移動していません。再起動してやり直してください。",
+        "CONFLICT",
+      );
     }
   }
 
@@ -843,12 +1009,13 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
   for (const [source, destination] of mapping) {
     if (changed.has(destination) || !TEXT_EXTENSIONS.has(extname(source).toLowerCase())) continue;
     changed.add(destination);
-    let text: string;
+    let bytes: Buffer;
     try {
-      text = readFileSync(source, "utf8");
+      bytes = readFileSync(source);
     } catch {
       continue;
     }
+    const text = decodeUtf8(bytes, relative(ws.root, source));
     writeAtomic(
       ws.root,
       join(stage, relative(ws.topics, destination)),
@@ -869,7 +1036,6 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
   const plan: Manifest = {
     phase: "prepared",
     trash: uniqueTrashDirectory(ws.root, ws.state),
-    all_before: allBefore,
     before,
     after,
     mapping: mappingPlan,

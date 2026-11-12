@@ -148,6 +148,24 @@ function sha256Bytes(data: Buffer | string): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
+/**
+ * Decode text without replacing invalid bytes. `ignoreBOM` keeps a leading
+ * BOM in the decoded string, matching `Buffer.toString("utf8")` and
+ * `read_text()`. Callers that back up or rewrite a file must fail before
+ * touching it when this throws.
+ */
+export function decodeUtf8(data: Buffer | Uint8Array, label: string): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(data);
+  } catch {
+    throw new StudioError(
+      `${label} は UTF-8 として読み取れません。元のファイルは変更していません。`
+        + "文字コードを UTF-8 に変換してから再実行してください。",
+      "CONFLICT",
+    );
+  }
+}
+
 function lstatOrNull(path: string): Stats | null {
   try {
     return lstatSync(path);
@@ -814,17 +832,24 @@ export class Workspace {
     // move decks/preferences forward without touching customized themes.
     const oldSerif = join(this.themes, "serif.css");
     if (this.#isRegularFile(oldSerif) && this.#isRegularFile(join(this.themes, "terracotta.css"))) {
-      const digest = sha256Bytes(this.#read(oldSerif, "serif.css"));
+      const oldSerifBytes = this.#read(oldSerif, "serif.css");
+      const digest = sha256Bytes(oldSerifBytes);
       const untouched = digest === placed["serif.css"] || (OLD_THEMES["serif.css"]?.has(digest) ?? false);
       if (untouched) {
         const trash = join(this.state, "trash", "themes", timeNs());
-        this.#write(join(trash, "serif.css"), this.#read(oldSerif, "serif.css"));
-        for (const deck of this.list_decks()) {
-          if (this.deck_theme(deck) !== "serif") continue;
-          const path = this.qmd(deck);
-          const text = this.#readText(path, "slides.qmd");
-          this.#write(join(trash, "decks", deck, "slides.qmd"), text);
-          this.#write(path, set_front(text, { theme: "terracotta" }));
+        // Decode every affected qmd before writing any backup or rewrite so a
+        // non-UTF-8 deck is left completely untouched.
+        const decks = this.list_decks()
+          .filter((deck) => this.deck_theme(deck) === "serif")
+          .map((deck) => {
+            const path = this.qmd(deck);
+            const bytes = this.#read(path, "slides.qmd");
+            return { deck, path, bytes, text: decodeUtf8(bytes, "slides.qmd") };
+          });
+        this.#write(join(trash, "serif.css"), oldSerifBytes);
+        for (const target of decks) {
+          this.#write(join(trash, "decks", target.deck, "slides.qmd"), target.bytes);
+          this.#write(target.path, set_front(target.text, { theme: "terracotta" }));
         }
         const prefs = this.prefs();
         const recent = this.#stringList(prefs.recent_themes).map((name) =>
@@ -891,12 +916,18 @@ export class Workspace {
     const recentThemes = this.#stringList(prefs.recent_themes);
     if (exists || affected.length > 0 || prefs.theme === name || recentThemes.includes(name)) {
       const trash = join(this.state, "trash", "themes", timeNs());
-      if (exists) this.#write(join(trash, `${name}.css`), this.#read(retired, `${name}.css`));
-      for (const deck of affected) {
+      const retiredBytes = exists ? this.#read(retired, `${name}.css`) : null;
+      // Decode before writing the theme or deck backups: a non-UTF-8 qmd must
+      // not be replaced with a lossy round-trip.
+      const decks = affected.map((deck) => {
         const path = this.qmd(deck);
-        const text = this.#readText(path, "slides.qmd");
-        this.#write(join(trash, "decks", deck, "slides.qmd"), text);
-        this.#write(path, set_front(text, { theme: "default" }));
+        const bytes = this.#read(path, "slides.qmd");
+        return { deck, path, bytes, text: decodeUtf8(bytes, "slides.qmd") };
+      });
+      if (retiredBytes) this.#write(join(trash, `${name}.css`), retiredBytes);
+      for (const target of decks) {
+        this.#write(join(trash, "decks", target.deck, "slides.qmd"), target.bytes);
+        this.#write(target.path, set_front(target.text, { theme: "default" }));
       }
       const recent = this.#stringList(prefs.recent_themes).map((value) =>
         value === name ? "default" : value
@@ -929,12 +960,13 @@ export class Workspace {
       .sort()) {
       const path = join(directory, name);
       if (!this.#isRegularFile(path)) continue;
-      const css = this.#readText(path, name);
+      const bytes = this.#read(path, name);
+      const css = decodeUtf8(bytes, name);
       let updated = drop_cover_layout(refresh_heading_options(css, this.#themeVariables));
       if (this.#themeVariables.every((variable) => theme_variables(css).includes(variable))) {
         const repainted = with_current_palette(updated, read_vars(css, this.#themeVariables));
         if (repainted !== updated) {
-          this.#write(join(this.state, "trash", "themes", timeNs(), name), css);
+          this.#write(join(this.state, "trash", "themes", timeNs(), name), bytes);
           updated = repainted;
         }
       }
@@ -1618,6 +1650,10 @@ export class Workspace {
     return this.#read(path, label).toString("utf8");
   }
 
+  #readTextStrict(path: string, label: string): string {
+    return decodeUtf8(this.#read(path, label), label);
+  }
+
   #write(path: string, data: string | Uint8Array, mode?: number): void {
     this.#ensureDirectory(dirname(path), `folder for ${basename(path)}`);
     const link = lstatOrNull(path);
@@ -1820,8 +1856,8 @@ export class Workspace {
       let merged: string;
       try {
         merged = mergeBibtexTexts([
-          this.#isRegularFile(target) ? this.#readText(target, "reference.bib") : "",
-          ...old.map((path) => this.#readText(path, "reference.bib")),
+          this.#isRegularFile(target) ? this.#readTextStrict(target, "reference.bib") : "",
+          ...old.map((path) => this.#readTextStrict(path, "reference.bib")),
         ]);
       } catch {
         // A conflict or unreadable BibTeX must never delete the local file.
@@ -1872,8 +1908,8 @@ export class Workspace {
     for (const [target, old] of this.#bibliographyPlans()) {
       try {
         mergeBibtexTexts([
-          this.#isRegularFile(target) ? this.#readText(target, "reference.bib") : "",
-          ...old.map((path) => this.#readText(path, "reference.bib")),
+          this.#isRegularFile(target) ? this.#readTextStrict(target, "reference.bib") : "",
+          ...old.map((path) => this.#readTextStrict(path, "reference.bib")),
         ]);
       } catch (error) {
         errors.push(
