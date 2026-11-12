@@ -99,5 +99,39 @@
     "comparison": "Exact page DOM tree including whitespace text nodes, sorted attribute order, page metadata, warnings/cites/unsupported; reference Pandoc 3.9",
     "integrated_legacy_core_tests": 85,
     "full_app_verification": "pending"
-  }
+  },
+  "ui_restore": {
+    "commits": [
+      "84646f6",
+      "2b25fcf"
+    ],
+    "status": "original assets and stage1 navigation integrated; full direct editing still pending",
+    "validation": "real sandboxed Electron cross-origin Stage1 passes; 13 bridge unit tests pass; API reload review repair in progress"
+  },
+  "direct_edit_core": {
+    "commit": "a243605",
+    "tests": 52,
+    "result": "passed; 20 chunk goldens, 9 conversions, 240 merge3 differential cases",
+    "review": "pending: Opus quota returned 429 usage_limit_reached; reset at 22:40 JST"
+  },
+  "integrated_legacy_tests": {
+    "tests": 149,
+    "passed": 149,
+    "skipped": 0,
+    "command": "npm run build && node --test dist/tests/core/legacy-*.test.js"
+  },
+  "workspace_integrity_followup": {
+    "commit": "509f742",
+    "tests": 34,
+    "review_remaining": [
+      "fatal UTF8/raw backup preservation",
+      "remove whole-workspace inventory",
+      "deduplicate alias deck migration",
+      "validate root before migration commit",
+      "ignore nondirectory migration inputs"
+    ],
+    "status": "followup fixes queued"
+  },
+  "render_review_status": "concrete review fixes in progress; render parity pass does not imply review closure",
+  "distribution_status": "Previous installed app and release artifacts are superseded reduced UI. Do not distribute; rebuild after complete parity."
 }

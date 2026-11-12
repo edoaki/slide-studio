@@ -1,0 +1,455 @@
+{
+  "reference": "legacy/python ca1f148",
+  "routes": [
+    {
+      "path": "/api/deck/{deck}/checks",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "get"
+    },
+    {
+      "path": "/files/decks/__theme-sample__/sample.html",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "sample_page"
+    },
+    {
+      "path": "/api/themes",
+      "methods": [
+        "GET",
+        "HEAD",
+        "POST"
+      ],
+      "endpoint": "collection"
+    },
+    {
+      "path": "/api/themes/select",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "select"
+    },
+    {
+      "path": "/api/themes/{name}",
+      "methods": [
+        "DELETE",
+        "GET",
+        "HEAD",
+        "PUT"
+      ],
+      "endpoint": "item"
+    },
+    {
+      "path": "/api/deck/{deck}/shots",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "get"
+    },
+    {
+      "path": "/api/deck/{deck}/shots/priority",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "priority"
+    },
+    {
+      "path": "/api/home/manage",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "manage"
+    },
+    {
+      "path": "/api/ai/status",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/ai/roles",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/ai/roles/{role}/extra",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/ai/runtimes",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/ai/{provider}/login",
+      "methods": [
+        "GET",
+        "HEAD",
+        "POST"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/ai/{provider}/runtime",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/ai/favorites",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/deck/{deck}/chat",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/deck/{deck}/chat/open",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/deck/{deck}/chat/tabs",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/deck/{deck}/chat/tabs/{tab}",
+      "methods": [
+        "PATCH"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/deck/{deck}/chat/tabs/{tab}/send",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/deck/{deck}/chat/rounds/{round}/continue",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/deck/{deck}/chat/rounds/{round}/cancel",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/deck/{deck}/chat/rounds/{round}/restore",
+      "methods": [
+        "GET",
+        "HEAD",
+        "POST"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/deck/{deck}/chat/rounds/{round}/handoff",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "handler"
+    },
+    {
+      "path": "/api/open-external",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "open_external"
+    },
+    {
+      "path": "/topic/{shelf}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "page"
+    },
+    {
+      "path": "/api/topic/{shelf}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "topic_get"
+    },
+    {
+      "path": "/api/topic/{shelf}/html/delete",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "topic_html_delete"
+    },
+    {
+      "path": "/api/topic/{shelf}",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "topic_delete"
+    },
+    {
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "page"
+    },
+    {
+      "path": "/agents",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "page"
+    },
+    {
+      "path": "/deck/{deck}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "page"
+    },
+    {
+      "path": "/figure/{rest:path}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "page"
+    },
+    {
+      "path": "/api/env",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "env"
+    },
+    {
+      "path": "/api/home",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "home"
+    },
+    {
+      "path": "/api/setup",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "setup"
+    },
+    {
+      "path": "/api/deck/{deck}/download/{kind}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "download"
+    },
+    {
+      "path": "/api/deck/{deck}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "deck_get"
+    },
+    {
+      "path": "/api/deck/{deck}/source",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "deck_source"
+    },
+    {
+      "path": "/api/deck/{deck}/chunks",
+      "methods": [
+        "GET",
+        "HEAD",
+        "POST"
+      ],
+      "endpoint": "chunks"
+    },
+    {
+      "path": "/api/deck/{deck}/style",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "deck_style"
+    },
+    {
+      "path": "/api/deck/{deck}/memo",
+      "methods": [
+        "GET",
+        "HEAD",
+        "PUT"
+      ],
+      "endpoint": "deck_memo"
+    },
+    {
+      "path": "/api/deck/{deck}/assets",
+      "methods": [
+        "GET",
+        "HEAD",
+        "POST"
+      ],
+      "endpoint": "deck_assets"
+    },
+    {
+      "path": "/api/deck/{deck}/assets/{op}",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "deck_assets_op"
+    },
+    {
+      "path": "/api/deck/{deck}/materials",
+      "methods": [
+        "GET",
+        "HEAD",
+        "POST"
+      ],
+      "endpoint": "deck_materials"
+    },
+    {
+      "path": "/api/deck/{deck}/materials/{op}",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "deck_materials_op"
+    },
+    {
+      "path": "/api/deck/{deck}/library",
+      "methods": [
+        "GET",
+        "HEAD",
+        "POST"
+      ],
+      "endpoint": "deck_library"
+    },
+    {
+      "path": "/api/topic/{shelf}/bib/verify",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "topic_bib_verify"
+    },
+    {
+      "path": "/api/topic/{shelf}/bib",
+      "methods": [
+        "PATCH"
+      ],
+      "endpoint": "topic_bib_verify"
+    },
+    {
+      "path": "/api/deck/{deck}/bib",
+      "methods": [
+        "GET",
+        "HEAD",
+        "PATCH",
+        "POST"
+      ],
+      "endpoint": "deck_bib"
+    },
+    {
+      "path": "/api/math",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "math"
+    },
+    {
+      "path": "/api/deck/{deck}/{action}",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "deck_operation"
+    },
+    {
+      "path": "/api/structure",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "deck_structure"
+    },
+    {
+      "path": "/api/new",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "new_deck"
+    },
+    {
+      "path": "/api/topics",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "new_topic"
+    },
+    {
+      "path": "/api/events",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "events"
+    },
+    {
+      "path": "/files/decks/{deck}/__slide-studio_preview__.html",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "endpoint": "preview"
+    },
+    {
+      "path": "/web",
+      "methods": null,
+      "endpoint": null
+    },
+    {
+      "path": "/files",
+      "methods": null,
+      "endpoint": null
+    }
+  ]
+}

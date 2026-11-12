@@ -16,12 +16,14 @@
     "build": "node scripts/build-renderer.mjs --clean && tsc && node scripts/build-renderer.mjs",
     "dev:desktop": "npm start",
     "setup:pandoc": "node scripts/setup-pandoc.mjs",
-    "test": "npm run build && node --test dist/tests/renderer/*.test.js dist/tests/core/*.test.js dist/tests/desktop/*.test.js dist/tests/packaging/*.test.js",
+    "test": "npm run build && node --test dist/tests/renderer/*.test.js dist/tests/core/*.test.js dist/tests/desktop/*.test.js dist/tests/packaging/*.test.js dist/tests/bridge/*.test.js",
     "test:desktop": "npm run build && node --test dist/tests/desktop/*.test.js",
     "test:desktop:e2e": "npm run build && node --test dist/tests/e2e/*.test.js",
     "start": "npm run build && node scripts/dev-desktop.mjs",
     "dist:mac": "npm run build && node scripts/package-desktop.mjs --mac",
-    "dist:win": "npm run build && node scripts/package-desktop.mjs --win"
+    "dist:win": "npm run build && node scripts/package-desktop.mjs --win",
+    "test:bridge": "npm run build && node --test dist/tests/bridge/*.test.js",
+    "test:bridge:e2e": "npm run build && node scripts/test-bridge.mjs"
   },
   "dependencies": {
     "cheerio": "1.2.0",
