@@ -36,13 +36,19 @@ export const strings = {
     placeholder: 'ここに QMD 原稿を入力します。',
     placeholderEmpty: 'スライドを作成するか、一覧から選択してください。',
     readOnly: 'この原稿は読み取り専用です。',
+    readOnlyDirty:
+      '読み取り専用ですが、未保存の変更があります。必要な場合は新しいスライドへ退避してください。',
     loading: 'スライドを読み込み中…',
-    unsaved: '未保存の変更があります。'
+    unsaved: '未保存の変更があります。',
+    mixedEol: '改行コードが混在しています。保存すると改行コードが統一されます。',
+    mixedEolReadOnly: '改行コードが混在しています。',
+    bom: 'BOM 付きの原稿です。保存時は BOM が保持されます。'
   },
 
   preview: {
     label: 'プレビュー',
     loading: 'プレビューを更新しています…',
+    retrying: '混雑中のため再試行しています…',
     ready: 'プレビュー更新済み',
     readyWithWarnings: 'プレビュー更新済み（警告 {count} 件）',
     error: 'プレビュー更新エラー',
@@ -73,7 +79,23 @@ export const strings = {
     conflict: '保存の競合',
     conflictDetail: '外部で原稿が変更されています。原稿は上書きしていません。',
     readOnly: '読み取り専用',
+    readOnlyDirty: '読み取り専用（未保存）',
     error: '保存エラー'
+  },
+
+  conflict: {
+    hint: '外部で原稿が変更されています。再読込するか、ローカル原稿で明示的に上書きしてください。',
+    reload: 'ディスクから再読込',
+    overwrite: 'ローカルで上書き',
+    reloadConfirm:
+      'ディスク上の原稿を読み込み直します。未保存の変更は失われます。よろしいですか？',
+    copyBeforeReload:
+      'ローカル変更を新しいスライドとして保存してから再読込しますか？',
+    overwriteConfirm:
+      'ローカルの原稿で外部の変更を上書きします。よろしいですか？',
+    copyDeckTitle: 'ローカル変更の退避',
+    busy: '競合を処理しています…',
+    error: '競合の回復に失敗しました。'
   },
 
   export: {
@@ -118,6 +140,7 @@ export const strings = {
     deckCreate: 'スライドを作成できませんでした。',
     workspaceSelect: '保管フォルダを選択できませんでした。',
     save: '保存できませんでした。',
+    conflictRecovery: '競合の回復に失敗しました。',
     preview: 'プレビューを更新できませんでした。',
     export: '書き出しに失敗しました。',
     generic: '処理に失敗しました。',

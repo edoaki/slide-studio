@@ -556,6 +556,55 @@ button {
   white-space: nowrap;
 }
 
+.button-danger {
+  border-color: #e2adb4;
+  color: #9b1f30;
+}
+
+.button-danger:hover:not(:disabled) {
+  border-color: #d28b95;
+  background: #fff4f6;
+}
+
+.conflict-recovery {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0c4cb;
+  background: var(--danger-soft);
+  color: #8f1d2c;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.conflict-recovery-text {
+  flex: 1 1 220px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.conflict-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.deck-notice {
+  flex: 0 0 auto;
+  padding: 7px 13px;
+  border-bottom: 1px solid #f0dfb4;
+  background: var(--warning-soft);
+  color: #755300;
+  font-size: 10.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .source-editor {
   flex: 1 1 auto;
   width: 100%;

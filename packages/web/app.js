@@ -7,6 +7,8 @@ const DESKTOP_API = Object.freeze({
 });
 
 const PREVIEW_DEBOUNCE_MS = 400;
+const PREVIEW_BUSY_MAX_RETRIES = 3;
+const PREVIEW_BUSY_BASE_DELAY_MS = 300;
 
 const TOKEN = readTokenAndCleanUrl();
 
@@ -40,6 +42,11 @@ const els = {
   editorLabel: document.getElementById('editor-label'),
   activeDeckTitle: document.getElementById('active-deck-title'),
   editorNote: document.getElementById('editor-note'),
+  conflictRecovery: document.getElementById('conflict-recovery'),
+  conflictRecoveryText: document.getElementById('conflict-recovery-text'),
+  conflictReload: document.getElementById('conflict-reload'),
+  conflictOverwrite: document.getElementById('conflict-overwrite'),
+  deckNotice: document.getElementById('deck-notice'),
   sourceEditor: document.getElementById('source-editor'),
   previewLabel: document.getElementById('preview-label'),
   previewStatus: document.getElementById('preview-status'),
@@ -73,10 +80,13 @@ const state = {
   workspaceBusy: false,
   creating: false,
   saving: false,
+  recovering: false,
+  composing: false,
   saveState: 'idle',
   saveErrorCode: '',
   saveErrorText: '',
   conflict: false,
+  conflictNotice: '',
   exporting: null,
   exportText: '',
   workspaceNote: '',
@@ -88,10 +98,12 @@ const state = {
     status: 'empty',
     url: null,
     origin: null,
+    pinnedOrigin: null,
     slides: [],
     warnings: [],
     index: 0,
     readyCount: 0,
+    busyAttempt: 0,
     errorText: ''
   }
 };
@@ -160,6 +172,8 @@ function applyStaticLabels() {
   els.slideSelect.setAttribute('aria-label', strings.preview.slideSelectLabel);
   els.diagnosticsTitle.textContent = strings.preview.diagnosticsHead;
   els.saveButton.textContent = strings.save.button;
+  els.conflictReload.textContent = strings.conflict.reload;
+  els.conflictOverwrite.textContent = strings.conflict.overwrite;
   els.exportHtml.textContent = strings.export.html;
   els.exportPdf.textContent = strings.export.pdf;
   els.exportGroup.setAttribute('aria-label', strings.export.groupLabel);
@@ -205,6 +219,25 @@ function bindEvents() {
   });
 
   els.sourceEditor.addEventListener('input', onSourceInput);
+  els.sourceEditor.addEventListener('compositionstart', () => {
+    state.composing = true;
+  });
+  els.sourceEditor.addEventListener('compositionend', () => {
+    state.composing = false;
+    if (els.sourceEditor.value !== state.source) {
+      onSourceInput();
+    } else {
+      renderEditor();
+    }
+  });
+
+  els.conflictReload.addEventListener('click', () => {
+    void reloadConflict();
+  });
+
+  els.conflictOverwrite.addEventListener('click', () => {
+    void overwriteConflict();
+  });
 
   els.previousSlide.addEventListener('click', () => {
     navigateSlide(-1);
@@ -227,6 +260,8 @@ function bindEvents() {
 }
 
 function onGlobalKeydown(event) {
+  if (event.isComposing || event.keyCode === 229) return;
+
   if (
     (event.metaKey || event.ctrlKey) &&
     !event.altKey &&
@@ -379,6 +414,13 @@ function errorText(error, contextKey) {
   return text;
 }
 
+function format(template, values) {
+  return String(template).replace(/\{(\w+)\}/g, (token, key) => {
+    if (!Object.prototype.hasOwnProperty.call(values, key)) return token;
+    return String(values[key]);
+  });
+}
+
 function uiBusy() {
   return (
     state.booting ||
@@ -389,14 +431,18 @@ function uiBusy() {
 }
 
 function navigationLocked() {
-  return state.fatal || uiBusy() || state.saving || Boolean(state.exporting);
+  return (
+    state.fatal ||
+    uiBusy() ||
+    state.saving ||
+    state.recovering ||
+    Boolean(state.exporting)
+  );
 }
 
 function isDirty() {
   return Boolean(
-    state.currentDeck &&
-      !state.currentDeck.readOnly &&
-      state.source !== state.originalSource
+    state.currentDeck && state.source !== state.originalSource
   );
 }
 
@@ -439,10 +485,14 @@ function adoptWorkspace(info) {
   state.originalSource = '';
   state.loadingDeck = false;
   state.creating = false;
+  state.saving = false;
+  state.recovering = false;
+  state.composing = false;
   state.saveState = 'idle';
   state.saveErrorCode = '';
   state.saveErrorText = '';
   state.conflict = false;
+  state.conflictNotice = '';
   state.exporting = null;
   state.exportText = '';
   state.workspaceNote = '';
@@ -460,6 +510,9 @@ function clearDeckState() {
   state.saveErrorCode = '';
   state.saveErrorText = '';
   state.conflict = false;
+  state.conflictNotice = '';
+  state.recovering = false;
+  state.composing = false;
   state.exporting = null;
   state.exportText = '';
   resetPreview();
@@ -490,6 +543,10 @@ async function selectDeck(id, options = {}) {
     if (isAbort(error) || generation !== state.deckGeneration) return;
     state.loadingDeck = false;
     showAppError(errorText(error, 'deckLoad'), () => selectDeck(id));
+    if (state.currentDeck) {
+      state.preview.busyAttempt = 0;
+      schedulePreview(0);
+    }
     renderAll();
     return;
   } finally {
@@ -510,6 +567,7 @@ function applyDeckDocument(document) {
   state.saveErrorCode = '';
   state.saveErrorText = '';
   state.conflict = false;
+  state.conflictNotice = '';
   state.exportText = '';
   upsertDeckSummary(deck);
   hideNewDeckError();
@@ -519,7 +577,7 @@ function applyDeckDocument(document) {
 }
 
 async function createDeck() {
-  if (state.saving || uiBusy()) return;
+  if (navigationLocked()) return;
 
   const title = els.newTitle.value.trim();
   hideNewDeckError();
@@ -554,6 +612,10 @@ async function createDeck() {
   } catch (error) {
     if (isAbort(error) || generation !== state.deckGeneration) return;
     showNewDeckError(errorText(error, 'deckCreate'));
+    if (state.currentDeck) {
+      state.preview.busyAttempt = 0;
+      schedulePreview(0);
+    }
   } finally {
     state.creating = false;
     renderAll();
@@ -599,11 +661,15 @@ async function selectWorkspace() {
   }
 }
 
-async function saveDeck() {
-  if (!state.currentDeck || state.saving || uiBusy()) return;
-  if (state.currentDeck.readOnly) return;
+async function saveDeck(options = {}) {
+  const recovery = options.recovery === true;
 
-  if (!isDirty()) {
+  if (!state.currentDeck || state.saving) return;
+  if (!recovery && (uiBusy() || state.recovering || state.exporting)) return;
+  if (state.currentDeck.readOnly) return;
+  if (!recovery && (state.conflict || state.saveState === 'conflict')) return;
+
+  if (!recovery && !isDirty()) {
     state.saveState = 'saved';
     renderSaveState();
     return;
@@ -611,14 +677,21 @@ async function saveDeck() {
 
   const deck = state.currentDeck;
   const generation = state.deckGeneration;
-  const sourceAtSave = state.source;
-  const versionAtSave = deck.version;
+  const sourceAtSave =
+    recovery && typeof options.source === 'string'
+      ? options.source
+      : state.source;
+  const versionAtSave =
+    recovery && typeof options.version === 'string'
+      ? options.version
+      : deck.version;
 
   state.saving = true;
   state.saveState = 'saving';
   state.saveErrorCode = '';
   state.saveErrorText = '';
   state.conflict = false;
+  state.conflictNotice = '';
   // Disable navigation while the version compare/write is in flight, but keep
   // the editor editable so keystrokes made during the request are never lost.
   renderAll();
@@ -652,6 +725,14 @@ async function saveDeck() {
       state.saveState = 'conflict';
       state.saveErrorCode = 'CONFLICT';
       state.saveErrorText = strings.save.conflictDetail;
+      state.conflictNotice = '';
+    } else if (recovery) {
+      // The external change is still unresolved; keep the recovery actions.
+      state.conflict = true;
+      state.saveState = 'conflict';
+      state.saveErrorCode = error.code || '';
+      state.saveErrorText = errorText(error, 'save');
+      state.conflictNotice = errorText(error, 'conflictRecovery');
     } else {
       state.conflict = false;
       state.saveState = 'error';
@@ -715,7 +796,7 @@ async function saveDeck() {
     bom:
       typeof saved?.bom === 'boolean' ? saved.bom : state.currentDeck.bom,
     diagnostics: Array.isArray(saved?.diagnostics)
-      ? saved.diagnostics
+      ? normalizeWarnings(saved.diagnostics)
       : state.currentDeck.diagnostics,
     source: state.source
   };
@@ -724,15 +805,178 @@ async function saveDeck() {
   state.saveErrorCode = '';
   state.saveErrorText = '';
   state.conflict = false;
+  state.conflictNotice = '';
 
   hideAppError();
   renderAll();
 }
 
+function conflictBusy() {
+  return Boolean(
+    state.saving ||
+      state.recovering ||
+      state.exporting ||
+      uiBusy()
+  );
+}
+
+async function reloadConflict() {
+  if (!state.currentDeck || !state.conflict || conflictBusy()) return;
+  if (!window.confirm(strings.conflict.reloadConfirm)) return;
+
+  const deck = state.currentDeck;
+  const generation = state.deckGeneration;
+  const localSource = state.source;
+  const shouldCopy =
+    isDirty() && window.confirm(strings.conflict.copyBeforeReload);
+
+  state.recovering = true;
+  state.conflictNotice = '';
+  renderAll();
+
+  try {
+    if (shouldCopy) {
+      await copyLocalSourceToNewDeck(localSource);
+    }
+
+    const fresh = await api(
+      `/api/deck/${encodeURIComponent(deck.id)}/source`
+    );
+    if (
+      generation !== state.deckGeneration ||
+      state.currentDeck?.id !== deck.id
+    ) {
+      return;
+    }
+
+    applyDeckDocument(fresh);
+    hideAppError();
+  } catch (error) {
+    if (isAbort(error)) return;
+    if (
+      generation !== state.deckGeneration ||
+      state.currentDeck?.id !== deck.id
+    ) {
+      return;
+    }
+    state.conflict = true;
+    state.saveState = 'conflict';
+    state.conflictNotice = errorText(error, 'conflictRecovery');
+  } finally {
+    state.recovering = false;
+    renderAll();
+  }
+}
+
+async function overwriteConflict() {
+  if (!state.currentDeck || !state.conflict || conflictBusy()) return;
+  if (state.currentDeck.readOnly) {
+    state.conflictNotice = strings.editor.readOnly;
+    renderConflictRecovery();
+    return;
+  }
+  if (!window.confirm(strings.conflict.overwriteConfirm)) return;
+
+  const deck = state.currentDeck;
+  const generation = state.deckGeneration;
+  const localSource = state.source;
+
+  state.recovering = true;
+  state.conflictNotice = '';
+  renderAll();
+
+  try {
+    // The contract does not place currentVersion reliably on HTTP errors, so
+    // fetch the authoritative version without adopting the external source.
+    const fresh = await api(
+      `/api/deck/${encodeURIComponent(deck.id)}/source`
+    );
+    if (
+      generation !== state.deckGeneration ||
+      state.currentDeck?.id !== deck.id
+    ) {
+      return;
+    }
+
+    const version = typeof fresh?.version === 'string' ? fresh.version : '';
+    if (!version) {
+      throw makeApiError(
+        'INVALID_RESPONSE',
+        strings.errors.INVALID_RESPONSE
+      );
+    }
+
+    await saveDeck({
+      recovery: true,
+      source: localSource,
+      version
+    });
+  } catch (error) {
+    if (isAbort(error)) return;
+    if (
+      generation !== state.deckGeneration ||
+      state.currentDeck?.id !== deck.id
+    ) {
+      return;
+    }
+    state.conflict = true;
+    state.saveState = 'conflict';
+    state.conflictNotice = errorText(error, 'conflictRecovery');
+  } finally {
+    state.recovering = false;
+    renderAll();
+  }
+}
+
+async function copyLocalSourceToNewDeck(localSource) {
+  const created = await api(DESKTOP_API.decks, {
+    method: 'POST',
+    body: { title: strings.conflict.copyDeckTitle }
+  });
+
+  const id =
+    created && (typeof created.id === 'string' || typeof created.id === 'number')
+      ? String(created.id)
+      : '';
+  const version = typeof created?.version === 'string' ? created.version : '';
+  if (!id || !version) {
+    throw makeApiError('INVALID_RESPONSE', strings.errors.INVALID_RESPONSE);
+  }
+
+  const saved = await api(`/api/deck/${encodeURIComponent(id)}/source`, {
+    method: 'PUT',
+    body: { source: localSource, version }
+  });
+
+  const title =
+    typeof saved?.title === 'string'
+      ? saved.title
+      : typeof created.title === 'string'
+        ? created.title
+        : strings.conflict.copyDeckTitle;
+  const updatedAt =
+    typeof saved?.updatedAt === 'string'
+      ? saved.updatedAt
+      : typeof created.updatedAt === 'string'
+        ? created.updatedAt
+        : '';
+
+  upsertDeckSummary({ id, title, updatedAt }, { prepend: true });
+  renderDeckList();
+}
+
 function onSourceInput() {
-  if (!state.currentDeck || state.currentDeck.readOnly || uiBusy()) return;
+  if (
+    !state.currentDeck ||
+    state.currentDeck.readOnly ||
+    uiBusy() ||
+    state.recovering
+  ) {
+    return;
+  }
 
   state.source = els.sourceEditor.value;
+  state.preview.busyAttempt = 0;
 
   if (!state.saving) {
     if (state.conflict) {
@@ -746,6 +990,7 @@ function onSourceInput() {
 
   renderSaveState();
   renderEditorMeta();
+  renderDeckNotice();
   schedulePreview(PREVIEW_DEBOUNCE_MS);
 }
 
@@ -753,7 +998,7 @@ async function exportDeck(format) {
   if (
     !state.currentDeck ||
     state.exporting ||
-    uiBusy() ||
+    navigationLocked() ||
     (format !== 'html' && format !== 'pdf')
   ) {
     return;
@@ -781,7 +1026,7 @@ async function exportDeck(format) {
       state.exportText = strings.export.cancelled;
     } else {
       const file = basename(String(result.file));
-      state.exportText = strings.export.saved.replace('{file}', file);
+      state.exportText = format(strings.export.saved, { file });
     }
   } catch (error) {
     if (generation !== state.deckGeneration || state.currentDeck?.id !== deck.id) {
@@ -853,11 +1098,15 @@ async function requestPreview() {
     const slides = normalizeSlides(response?.slides);
     const warnings = normalizeWarnings(response?.warnings);
 
+    if (!state.preview.pinnedOrigin) {
+      state.preview.pinnedOrigin = url.origin;
+    }
     state.preview.origin = url.origin;
     state.preview.url = url.href;
     state.preview.slides = slides;
     state.preview.warnings = warnings;
     state.preview.readyCount = slides.length;
+    state.preview.busyAttempt = 0;
     state.preview.status = 'ready';
     state.preview.errorText = '';
 
@@ -876,6 +1125,25 @@ async function requestPreview() {
       return;
     }
 
+    if (state.source !== sourceAtRequest) {
+      // A newer edit owns the next preview request and its debounce timer.
+      return;
+    }
+
+    const busy = error.code === 'BUSY' || error.status === 503;
+    if (busy && state.preview.busyAttempt < PREVIEW_BUSY_MAX_RETRIES) {
+      state.preview.busyAttempt += 1;
+      state.preview.status = 'loading';
+      state.preview.errorText = '';
+      renderPreviewStatus();
+      renderPreviewPlaceholder();
+      schedulePreview(
+        PREVIEW_BUSY_BASE_DELAY_MS *
+          2 ** (state.preview.busyAttempt - 1)
+      );
+      return;
+    }
+
     state.preview.status = 'error';
     state.preview.errorText = errorText(error, 'preview');
     renderPreview();
@@ -888,8 +1156,9 @@ async function requestPreview() {
 
 function validatePreviewUrl(value) {
   let url;
+  const raw = typeof value === 'string' ? value : String(value ?? '');
   try {
-    url = new URL(value);
+    url = new URL(raw);
   } catch {
     throw makeApiError(
       'INVALID_PREVIEW_URL',
@@ -897,12 +1166,29 @@ function validatePreviewUrl(value) {
     );
   }
 
+  let decodedHref = url.href;
+  try {
+    decodedHref = decodeURIComponent(url.href);
+  } catch {
+    decodedHref = url.href;
+  }
+  const hasToken =
+    TOKEN.length > 0 &&
+    (url.href.includes(TOKEN) ||
+      decodedHref.includes(TOKEN) ||
+      raw.includes(TOKEN));
+  const outsidePinnedOrigin =
+    state.preview.pinnedOrigin !== null &&
+    url.origin !== state.preview.pinnedOrigin;
+
   if (
     (url.protocol !== 'http:' && url.protocol !== 'https:') ||
     url.hostname !== '127.0.0.1' ||
     url.username ||
     url.password ||
-    url.origin === window.location.origin
+    url.origin === window.location.origin ||
+    hasToken ||
+    outsidePinnedOrigin
   ) {
     throw makeApiError(
       'INVALID_PREVIEW_URL',
@@ -933,8 +1219,10 @@ function resetPreview() {
   state.preview.warnings = [];
   state.preview.index = 0;
   state.preview.readyCount = 0;
+  state.preview.busyAttempt = 0;
   state.preview.errorText = '';
-
+  // Keep pinnedOrigin across decks/workspaces. The host's content origin is
+  // stable for the lifetime of this admin page.
   els.previewFrame.hidden = true;
   els.previewFrame.removeAttribute('src');
   els.previewFrameWrap.hidden = true;
@@ -1022,6 +1310,8 @@ function renderAll() {
   renderDeckList();
   renderNewDeckControls();
   renderEditor();
+  renderConflictRecovery();
+  renderDeckNotice();
   renderSaveState();
   renderExportState();
   renderPreview();
@@ -1048,10 +1338,9 @@ function renderWorkspace() {
 
 function renderDeckList() {
   els.deckList.replaceChildren();
-  els.deckCount.textContent = strings.deck.count.replace(
-    '{count}',
-    String(state.decks.length)
-  );
+  els.deckCount.textContent = format(strings.deck.count, {
+    count: state.decks.length
+  });
   els.deckList.setAttribute('aria-busy', String(state.booting || state.loadingDeck));
 
   if (state.booting && !state.workspace) {
@@ -1101,13 +1390,38 @@ function renderNewDeckControls() {
     : strings.deck.create;
 }
 
-function renderEditor() {
-  if (els.sourceEditor.value !== state.source) {
-    els.sourceEditor.value = state.source;
+function syncEditorValue() {
+  if (els.sourceEditor.value === state.source) return;
+  if (state.composing) return;
+
+  const selectionStart = els.sourceEditor.selectionStart;
+  const selectionEnd = els.sourceEditor.selectionEnd;
+  const selectionDirection = els.sourceEditor.selectionDirection;
+  const scrollTop = els.sourceEditor.scrollTop;
+  const scrollLeft = els.sourceEditor.scrollLeft;
+
+  els.sourceEditor.value = state.source;
+
+  const max = state.source.length;
+  try {
+    els.sourceEditor.setSelectionRange(
+      Math.min(selectionStart, max),
+      Math.min(selectionEnd, max),
+      selectionDirection || 'none'
+    );
+  } catch {
+    // Selection restoration is cosmetic; never block rendering for it.
   }
+  els.sourceEditor.scrollTop = scrollTop;
+  els.sourceEditor.scrollLeft = scrollLeft;
+}
+
+function renderEditor() {
+  syncEditorValue();
 
   const deck = state.currentDeck;
-  const locked = !deck || uiBusy() || deck.readOnly;
+  const locked =
+    !deck || uiBusy() || state.recovering || deck.readOnly;
   els.sourceEditor.readOnly = locked;
   els.sourceEditor.setAttribute('aria-readonly', String(locked));
   els.sourceEditor.placeholder = deck
@@ -1125,13 +1439,66 @@ function renderEditorMeta() {
   let note = '';
 
   if (deck) {
-    if (deck.readOnly) note = strings.editor.readOnly;
-    else if (state.loadingDeck) note = strings.editor.loading;
-    else if (isDirty()) note = strings.editor.unsaved;
+    if (deck.readOnly) {
+      note = isDirty()
+        ? strings.editor.readOnlyDirty
+        : strings.editor.readOnly;
+    } else if (state.recovering) {
+      note = strings.conflict.busy;
+    } else if (state.loadingDeck) {
+      note = strings.editor.loading;
+    } else if (isDirty()) {
+      note = strings.editor.unsaved;
+    }
   }
 
   els.editorNote.textContent = note;
   els.editorNote.title = note;
+}
+
+function renderConflictRecovery() {
+  const visible = Boolean(state.currentDeck && state.conflict);
+  els.conflictRecovery.hidden = !visible;
+
+  if (!visible) {
+    els.conflictRecoveryText.textContent = '';
+    return;
+  }
+
+  let text = strings.conflict.hint;
+  if (state.recovering && !state.saving) {
+    text += ` ${strings.conflict.busy}`;
+  }
+  if (state.conflictNotice) {
+    text += ` ${state.conflictNotice}`;
+  }
+  els.conflictRecoveryText.textContent = text;
+
+  const busy = conflictBusy();
+  els.conflictReload.disabled = busy;
+  els.conflictOverwrite.disabled = busy;
+}
+
+function renderDeckNotice() {
+  const deck = state.currentDeck;
+  const messages = [];
+
+  if (deck) {
+    if (deck.readOnly && isDirty()) {
+      messages.push(strings.editor.readOnlyDirty);
+    }
+    if (deck.eol === 'mixed') {
+      messages.push(
+        deck.readOnly
+          ? strings.editor.mixedEolReadOnly
+          : strings.editor.mixedEol
+      );
+    }
+    if (deck.bom) messages.push(strings.editor.bom);
+  }
+
+  els.deckNotice.textContent = messages.join(' ');
+  els.deckNotice.hidden = messages.length === 0;
 }
 
 function renderSaveState() {
@@ -1143,8 +1510,11 @@ function renderSaveState() {
   if (!deck) {
     text = strings.save.none;
   } else if (deck.readOnly) {
-    text = strings.save.readOnly;
+    text = isDirty()
+      ? strings.save.readOnlyDirty
+      : strings.save.readOnly;
     statusState = 'readonly';
+    if (isDirty()) title = strings.editor.readOnlyDirty;
   } else if (state.saving) {
     text = strings.save.saving;
     statusState = 'saving';
@@ -1172,13 +1542,22 @@ function renderSaveState() {
     !deck ||
     deck.readOnly ||
     state.saving ||
+    state.recovering ||
+    Boolean(state.exporting) ||
+    state.conflict ||
+    state.saveState === 'conflict' ||
     !isDirty() ||
     uiBusy();
 }
 
 function renderExportState() {
   const deck = state.currentDeck;
-  const blocked = !deck || Boolean(state.exporting) || uiBusy();
+  const blocked =
+    !deck ||
+    Boolean(state.exporting) ||
+    state.saving ||
+    state.recovering ||
+    uiBusy();
 
   els.exportHtml.disabled = blocked;
   els.exportPdf.disabled = blocked;
@@ -1191,6 +1570,29 @@ function renderExportState() {
   els.exportStatus.textContent = state.exportText;
   els.exportStatus.title = state.exportText;
   els.exportStatus.hidden = !state.exportText;
+}
+
+function combinedDiagnostics() {
+  const combined = [];
+  const seen = new Set();
+  const source = [
+    ...(state.currentDeck?.diagnostics || []),
+    ...state.preview.warnings
+  ];
+
+  for (const diagnostic of source) {
+    const key = [
+      diagnostic.line ?? '',
+      diagnostic.severity,
+      diagnostic.code,
+      diagnostic.message
+    ].join('\u0000');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    combined.push(diagnostic);
+  }
+
+  return combined;
 }
 
 function renderPreview() {
@@ -1211,16 +1613,18 @@ function renderPreviewStatus() {
       : strings.preview.emptyNoDeck;
     if (state.booting) statusState = 'loading';
   } else if (state.preview.status === 'loading') {
-    text = strings.preview.loading;
+    text =
+      state.preview.busyAttempt > 0
+        ? strings.preview.retrying
+        : strings.preview.loading;
     statusState = 'loading';
   } else if (state.preview.status === 'ready') {
-    const warningCount = state.preview.warnings.length;
+    const warningCount = combinedDiagnostics().length;
     text =
       warningCount > 0
-        ? strings.preview.readyWithWarnings.replace(
-            '{count}',
-            String(warningCount)
-          )
+        ? format(strings.preview.readyWithWarnings, {
+            count: warningCount
+          })
         : strings.preview.ready;
     statusState = 'ready';
   } else if (state.preview.status === 'error') {
@@ -1253,7 +1657,10 @@ function renderPreviewPlaceholder() {
       ? strings.preview.loading
       : strings.preview.emptyNoDeck;
   } else if (state.preview.status === 'loading') {
-    text = strings.preview.loading;
+    text =
+      state.preview.busyAttempt > 0
+        ? strings.preview.retrying
+        : strings.preview.loading;
   } else if (state.preview.status === 'error') {
     text = state.preview.errorText || strings.preview.error;
   } else {
@@ -1295,12 +1702,10 @@ function renderSlides() {
     const slide = slides[index];
     const option = document.createElement('option');
     option.value = String(slide.index);
-    option.textContent = strings.preview.slideOption
-      .replace('{number}', String(index + 1))
-      .replace(
-        '{title}',
-        slide.title || strings.preview.untitledSlide
-      );
+    option.textContent = format(strings.preview.slideOption, {
+      number: index + 1,
+      title: slide.title || strings.preview.untitledSlide
+    });
     els.slideSelect.append(option);
   }
 
@@ -1308,13 +1713,14 @@ function renderSlides() {
   els.slideSelect.disabled = !canNavigate;
   els.previousSlide.disabled = !canNavigate || position <= 0;
   els.nextSlide.disabled = !canNavigate || position >= slides.length - 1;
-  els.pageIndicator.textContent = strings.preview.pageOf
-    .replace('{current}', String(position + 1))
-    .replace('{total}', String(slides.length));
+  els.pageIndicator.textContent = format(strings.preview.pageOf, {
+    current: position + 1,
+    total: slides.length
+  });
 }
 
 function renderDiagnostics() {
-  const warnings = state.preview.warnings;
+  const warnings = combinedDiagnostics();
   els.diagnosticsList.replaceChildren();
   els.diagnostics.hidden = warnings.length === 0;
 
@@ -1323,9 +1729,9 @@ function renderDiagnostics() {
     return;
   }
 
-  els.diagnosticsCount.textContent = strings.preview.diagnosticsCount.replace(
-    '{count}',
-    String(warnings.length)
+  els.diagnosticsCount.textContent = format(
+    strings.preview.diagnosticsCount,
+    { count: warnings.length }
   );
 
   for (const warning of warnings) {
@@ -1339,13 +1745,15 @@ function renderDiagnostics() {
       warning.line !== null &&
       Number.isFinite(Number(warning.line));
     let text = hasLine
-      ? strings.preview.warningItemLine
-          .replace('{severity}', severity)
-          .replace('{line}', String(warning.line))
-          .replace('{message}', warning.message)
-      : strings.preview.warningItem
-          .replace('{severity}', severity)
-          .replace('{message}', warning.message);
+      ? format(strings.preview.warningItemLine, {
+          severity,
+          line: warning.line,
+          message: warning.message
+        })
+      : format(strings.preview.warningItem, {
+          severity,
+          message: warning.message
+        });
     if (warning.code) text += ` [${warning.code}]`;
 
     item.className = 'diagnostic';
@@ -1411,7 +1819,7 @@ function normalizeDeckDocument(document, source) {
         : 'lf',
     bom: Boolean(value.bom),
     readOnly: Boolean(value.readOnly),
-    diagnostics: Array.isArray(value.diagnostics) ? value.diagnostics : []
+    diagnostics: normalizeWarnings(value.diagnostics)
   };
 }
 

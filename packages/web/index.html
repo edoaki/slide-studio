@@ -115,6 +115,30 @@
                 </div>
                 <span id="editor-note" class="pane-note" aria-live="polite"></span>
               </div>
+              <div
+                id="conflict-recovery"
+                class="conflict-recovery"
+                data-testid="conflict-recovery"
+                role="alert"
+                hidden
+              >
+                <div id="conflict-recovery-text" class="conflict-recovery-text"></div>
+                <div class="conflict-actions">
+                  <button
+                    id="conflict-reload"
+                    class="button button-small"
+                    type="button"
+                    data-testid="conflict-reload"
+                  ></button>
+                  <button
+                    id="conflict-overwrite"
+                    class="button button-small button-danger"
+                    type="button"
+                    data-testid="conflict-overwrite"
+                  ></button>
+                </div>
+              </div>
+              <div id="deck-notice" class="deck-notice" role="status" hidden></div>
               <textarea
                 id="source-editor"
                 class="source-editor"
