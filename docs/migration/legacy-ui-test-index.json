@@ -1,0 +1,4228 @@
+{
+  "reference": "legacy/python ca1f148",
+  "scope": "Top-level legacy E2E test functions; parametrized case count not expanded. Pending means no claimed Electron equivalence.",
+  "function_count": 377,
+  "tests": [
+    {
+      "id": "tests/e2e/test_agents.py::test_roles_screen_and_settings",
+      "line": 7,
+      "fixtures": [
+        "gui",
+        "page",
+        "monkeypatch"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_catalog_checks_only_and_selection",
+      "line": 35,
+      "fixtures": [
+        "gui",
+        "page",
+        "tmp_path"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_click_survives_redraw_while_pressed",
+      "line": 72,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_expanded_codex_help_scrolls_into_view",
+      "line": 84,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_favorites_uncheck_keeps_selected_model_and_subagents",
+      "line": 107,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_slider_commit_drag_cancel_lock_and_bounds",
+      "line": 141,
+      "fixtures": [
+        "gui",
+        "page",
+        "tmp_path"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_unavailable_favorites_can_be_removed_at_limit",
+      "line": 190,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_effort_clicks_during_save_keep_last_choice",
+      "line": 210,
+      "fixtures": [
+        "gui",
+        "page",
+        "role",
+        "fail_first"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_subagent_toggles_preserve_selection_and_lock",
+      "line": 251,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_claude_and_agy_show_login_button_instead_of_commands",
+      "line": 273,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_home_runtime_rows",
+      "line": 298,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_waiting_login_can_be_pressed_again_in_model_picker",
+      "line": 331,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_ai_model.py::test_download_then_login_are_separate_actions",
+      "line": 362,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_background_check.py::test_check_status_marker_goes_to_issue_step",
+      "line": 9,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_background_check.py::test_duplicate_attribute_warning_opens_source",
+      "line": 25,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_background_check.py::test_old_check_never_displays_clean",
+      "line": 50,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_background_check.py::test_export_lists_errors_then_allows_force",
+      "line": 60,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_background_check.py::test_check_status_lists_issues_and_goes_to_page",
+      "line": 82,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_background_check.py::test_check_status_opens_list_when_no_issue_has_a_page",
+      "line": 109,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_background_check.py::test_export_issue_goes_to_its_page",
+      "line": 122,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_bibliography.py::test_edit_bibliography_year_and_cancel",
+      "line": 9,
+      "fixtures": [
+        "gui",
+        "page",
+        "field"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_bibliography.py::test_bibliography_edit_form_shows_whole_text",
+      "line": 44,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_bibliography.py::test_bibliography_height_resize",
+      "line": 84,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_bibliography.py::test_deck_bibliography_and_warning_navigation",
+      "line": 124,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_bibliography.py::test_verify_from_home_and_editor",
+      "line": 162,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_click_selects_content_and_q_e_layers",
+      "line": 123,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_frame_color_by_kind",
+      "line": 166,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_handles_follow_line_and_end_reliably",
+      "line": 179,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_click_outside_block_returns_to_selection",
+      "line": 214,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_a_d_follow_height_in_next_column",
+      "line": 238,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_shift_s_runs_without_waiting_and_undoes_once",
+      "line": 251,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_alt_adds_block_and_empty_is_not_written",
+      "line": 273,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_handles_change_size_and_survive_reload",
+      "line": 303,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_text_edit_after_padding",
+      "line": 347,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_padding_only_this_block_and_for_all",
+      "line": 374,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_padding_handle_follows_pointer",
+      "line": 430,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_text_buffer_includes_leading_and_can_reach_zero",
+      "line": 457,
+      "fixtures": [
+        "gui",
+        "page",
+        "wrapped",
+        "body"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_drag_moves_block_and_to_other_page",
+      "line": 506,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_arrows_move_page_while_selected",
+      "line": 540,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_rail_uses_same_keys_and_gutter",
+      "line": 553,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_html_resize_keeps_ratio_and_exposes_column_width",
+      "line": 582,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_framed_block_outer_spacing_starts_from_default",
+      "line": 627,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_outer_spacing_meta_and_bordered_neighbors",
+      "line": 643,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_spacing_keys_and_hover_preview",
+      "line": 678,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_outer_spacing_media_reload_shift_and_cancel",
+      "line": 710,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_spacing_control_release_outside_keeps_selection",
+      "line": 742,
+      "fixtures": [
+        "gui",
+        "page",
+        "control"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_unchanged_outer_spacing_preserves_source",
+      "line": 768,
+      "fixtures": [
+        "gui",
+        "page",
+        "return_to_start"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_spacing_handle_release_keeps_selection",
+      "line": 790,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_spacing_choices_and_tooltip_do_not_cover_selection",
+      "line": 813,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops.py::test_outer_spacing_keeps_existing_paragraph_gap",
+      "line": 841,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_list_backspace_boundaries",
+      "line": 34,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_reorder_insert_and_columns",
+      "line": 55,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_size_and_padding_round_trip",
+      "line": 84,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_move_to_page_end_and_wrapper_moves_together",
+      "line": 109,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_move_column_out_takes_contents",
+      "line": 121,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_removing_column_keeps_remaining_frame_and_step",
+      "line": 140,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_moving_column_out_keeps_both_frames",
+      "line": 165,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_column_collapse_keeps_outer_frame_and_step",
+      "line": 192,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_add_paragraph_beside_padding_wrapper",
+      "line": 216,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_moves_only_when_order_changes",
+      "line": 237,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_decoration_keeps_wrappers_and_other_attributes",
+      "line": 248,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_align_follows_surrounding_alignment",
+      "line": 273,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_design_roundtrip_preserves_content_and_layout",
+      "line": 289,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_outer_spacing_preserves_other_options",
+      "line": 322,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_designed_box_keeps_boundary_when_adding_and_moving",
+      "line": 346,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_horizontal_split_and_design_have_one_column_structure",
+      "line": 382,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_design_merges_existing_single_box_into_column",
+      "line": 412,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_move_framed_box_into_empty_column_promotes_it",
+      "line": 427,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_move_box_into_column_keeps_independent_styles",
+      "line": 442,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_block_ops_js.py::test_design_after_adding_description_targets_column_and_can_be_removed",
+      "line": 467,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_double_click_text_accepts_keyboard_input",
+      "line": 45,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_direct_edit_other_pages_and_undo",
+      "line": 65,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_enter_line_break_and_blank_line",
+      "line": 90,
+      "fixtures": [
+        "gui",
+        "page",
+        "enters",
+        "at_end"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_nested_edit_and_move_delete",
+      "line": 116,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_click_does_not_change_slide",
+      "line": 144,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_custom_format_and_raw_page",
+      "line": 159,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_image_alignment_and_click_selection",
+      "line": 180,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_undo_edit_and_stale_conversion_preserve_input",
+      "line": 204,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_text_click_places_caret_and_keeps_editing_in_padding",
+      "line": 225,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_selected_text_drag_enters_editing_and_replaces_selection",
+      "line": 255,
+      "fixtures": [
+        "gui",
+        "page",
+        "wrapped"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_selected_whitespace_enters_editing_at_nearest_line_end",
+      "line": 293,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_blocks.py::test_text_with_non_roundtripping_spacing_can_be_edited",
+      "line": 344,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_chat_toggle_shortcut_and_icon",
+      "line": 34,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_open_chat_shortcut",
+      "line": 56,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_drafts_per_page_send_and_restore",
+      "line": 83,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_lock_while_running_and_whole_deck_target",
+      "line": 124,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_logged_out_shows_guidance_and_blocks_send",
+      "line": 141,
+      "fixtures": [
+        "gui",
+        "page",
+        "monkeypatch"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_codex_missing_login_failure_can_retry",
+      "line": 169,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_undo_clearing_drafts",
+      "line": 188,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_figure_target_and_keys",
+      "line": 214,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_model_effort_attach_and_context",
+      "line": 259,
+      "fixtures": [
+        "gui",
+        "page",
+        "tmp_path"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_subagent_settings_per_chat_persist_and_run",
+      "line": 346,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_model_changes_keep_subagent_on",
+      "line": 407,
+      "fixtures": [
+        "gui",
+        "page",
+        "tmp_path"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_role_save_failure_does_not_erase_queued_change",
+      "line": 443,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_review_issues_left_after_limit_can_be_resent",
+      "line": 481,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_check_errors_from_before_are_shown_apart",
+      "line": 502,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_cycle_uses_current_version_review_for_display_and_retry",
+      "line": 521,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_continue_with_selected_model_keeps_chat",
+      "line": 556,
+      "fixtures": [
+        "gui",
+        "page",
+        "tmp_path"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_continue_review_picker_changes_only_reviewer",
+      "line": 586,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_send_feedback_before_save_and_failed_request",
+      "line": 617,
+      "fixtures": [
+        "gui",
+        "page",
+        "mode",
+        "tmp_path"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_resolved_reviews_hidden_and_decisions_orange",
+      "line": 690,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_ai_question_is_answered_with_a_click",
+      "line": 715,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_ai_questions_with_multiple_choices_wait_for_send",
+      "line": 751,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_last_tab_is_replaced_not_emptied",
+      "line": 777,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_reload_starts_fresh_and_keeps_only_running_conversations_open",
+      "line": 808,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_plus_reuses_empty_tab_and_names_drafts",
+      "line": 858,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_main_effort_does_not_change_subagents",
+      "line": 881,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_history_lists_all_modes_and_opens_matching_editor",
+      "line": 919,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_add_and_pick_show_before_save_finishes",
+      "line": 946,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat.py::test_cancelled_message_copy_edit_and_followup",
+      "line": 970,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_targets.py::test_figure_selection_survives_chat_clicks_until_page_operation",
+      "line": 11,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_targets.py::test_anonymous_draft_requires_reselection_after_insertion",
+      "line": 59,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_targets.py::test_legacy_anonymous_draft_kept_until_reselected",
+      "line": 95,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_targets.py::test_fixed_figure_keeps_instruction_while_browsing",
+      "line": 116,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_targets.py::test_figure_navigation_does_not_limit_sent_instruction_to_step",
+      "line": 147,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_targets.py::test_fixed_page_keeps_instruction_while_browsing",
+      "line": 170,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_targets.py::test_fixed_page_is_per_conversation_and_explicit_target_clears_it",
+      "line": 205,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_theme.py::test_theme_chat_prompt_only_when_closed",
+      "line": 7,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_theme.py::test_theme_chat_switch_send_restore",
+      "line": 26,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_theme.py::test_theme_chat_can_send_from_second_tab_while_first_runs",
+      "line": 68,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_chat_theme.py::test_theme_cards_show_slide_lock_and_recover",
+      "line": 92,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_click_caret.py::test_slide_text",
+      "line": 30,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_click_caret.py::test_selected_list_whitespace_edits_clicked_row_end",
+      "line": 44,
+      "fixtures": [
+        "gui",
+        "page",
+        "row",
+        "side"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_click_caret.py::test_manuscript_card",
+      "line": 70,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_click_caret.py::test_manuscript_heading",
+      "line": 80,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_click_caret.py::test_slide_heading",
+      "line": 90,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_click_caret.py::test_slide_heading_skips_markup",
+      "line": 101,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_click_caret.py::test_card_on_other_page",
+      "line": 119,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_drag_state.py::test_cover_drag_survives_theme_and_manuscript_tabs",
+      "line": 9,
+      "fixtures": [
+        "page",
+        "gui",
+        "from_text"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_drag_state.py::test_cover_preview_matches_export_with_outer_spacing",
+      "line": 45,
+      "fixtures": [
+        "page",
+        "gui",
+        "switch_theme"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_rewrites_source",
+      "line": 35,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_affiliation_position_in_form",
+      "line": 69,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_author_typography_saved_and_rendered",
+      "line": 91,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_people_and_affiliations",
+      "line": 161,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_title_and_subtitle",
+      "line": 207,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_front_matter_and_cover_hidden_in_raw_editor",
+      "line": 225,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_title_on_slide_like_other_pages",
+      "line": 250,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_cover_layout_geometry_padding_and_reload",
+      "line": 306,
+      "fixtures": [
+        "gui",
+        "page",
+        "theme"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_authors_move_and_affiliation_position",
+      "line": 370,
+      "fixtures": [
+        "gui",
+        "page",
+        "people"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_cover_double_click_keeps_caret_and_drag_selects",
+      "line": 423,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_cover_title_align_follows_theme",
+      "line": 445,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_cover_title_font_size_can_be_changed",
+      "line": 468,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_form.py::test_cover_title_font_size_from_selection",
+      "line": 485,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_cover_toc_layout.py::test_cover_authors_and_toc_heading_follow_the_theme",
+      "line": 57,
+      "fixtures": [
+        "ws",
+        "theme"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_design_is_chosen_per_block_and_colors_are_shared_in_theme",
+      "line": 27,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_design_menu_follows_external_theme_change",
+      "line": 168,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_box_padding_selects_box_and_content_selects_child",
+      "line": 190,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_designed_text_stays_editable_in_one_wrapper",
+      "line": 226,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_add_description_after_framing_name",
+      "line": 247,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_split_and_frame_use_columns_without_inner_boxes",
+      "line": 273,
+      "fixtures": [
+        "gui",
+        "page",
+        "design_first"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_open_merges_legacy_column_box",
+      "line": 323,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_open_keeps_framed_box_inside_decorated_column",
+      "line": 338,
+      "fixtures": [
+        "gui",
+        "page",
+        "outer_style"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_slide_background_does_not_offer_gradient_editor",
+      "line": 366,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_decoration.py::test_text_shadow_radius_and_new_designs",
+      "line": 385,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_home_lists_deck_and_opens_it",
+      "line": 18,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_typing_updates_slide_and_file",
+      "line": 28,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_external_change_updates_slide",
+      "line": 43,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_conflict_keeps_unsaved_input",
+      "line": 57,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_save_conflict_409",
+      "line": 75,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_conflict_copy",
+      "line": 88,
+      "fixtures": [
+        "gui",
+        "page",
+        "clipboard"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_open_and_close_does_not_touch_file",
+      "line": 122,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_pandoc_error_keeps_last_slides",
+      "line": 134,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_undo_redo",
+      "line": 149,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_history_buttons_keep_manuscript_scroll",
+      "line": 164,
+      "fixtures": [
+        "gui",
+        "page",
+        "raw"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_slow_save_serializes_and_keeps_latest_input",
+      "line": 200,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_preview_has_no_fractional_edge_gap",
+      "line": 228,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_current_slide_stays_visible_when_editor_resizes",
+      "line": 245,
+      "fixtures": [
+        "gui",
+        "page",
+        "raw"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_preview_follows_resize_in_same_frame",
+      "line": 274,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_bar_undo_redo_tips_and_no_insert_button",
+      "line": 300,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_chat_width_drag_and_keep",
+      "line": 315,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_zero_key_closes_left_panel",
+      "line": 341,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_chat_open_on_entry_at_any_width",
+      "line": 363,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_ai_lock_marks_editing_panes_orange",
+      "line": 389,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_theme_stays_editable_during_ai_lock",
+      "line": 401,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_page_lock_marks_only_that_page",
+      "line": 413,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_figure_lock_is_quiet",
+      "line": 426,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_editor.py::test_page_lock_keeps_other_pages_editable_and_merges",
+      "line": 442,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_history.py::test_material_actions_share_source_history",
+      "line": 24,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_history.py::test_rename_move_delete_and_restore",
+      "line": 51,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_history.py::test_draft_history_is_independent_from_source",
+      "line": 77,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_history.py::test_common_history_failure_and_order",
+      "line": 102,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_history.py::test_external_source_is_not_an_undo_step",
+      "line": 124,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_history.py::test_chat_attachment_is_saved_only_when_sent",
+      "line": 146,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_history.py::test_pasted_image_remains_after_source_undo",
+      "line": 162,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_history.py::test_all_padding_restores_css_and_source_in_one_step",
+      "line": 188,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home.py::test_create_resume_copy_and_home_navigation",
+      "line": 7,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home.py::test_export_and_download",
+      "line": 42,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home.py::test_missing_browser_can_be_prepared_in_gui",
+      "line": 85,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home.py::test_export_panel_is_compact_and_anchored",
+      "line": 104,
+      "fixtures": [
+        "page",
+        "gui",
+        "tmp_path"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_environment.py::test_home_installs_ai_then_logs_in_and_fits_narrow_screen",
+      "line": 87,
+      "fixtures": [
+        "page",
+        "gui",
+        "home_ai",
+        "tmp_path"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_environment.py::test_home_login_failure_and_pending_login_can_be_retried",
+      "line": 132,
+      "fixtures": [
+        "page",
+        "gui",
+        "home_ai"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_environment.py::test_home_resumes_monitoring_install_after_reload",
+      "line": 157,
+      "fixtures": [
+        "page",
+        "gui",
+        "home_ai"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_environment.py::test_home_install_progress_does_not_wait_for_account_status",
+      "line": 179,
+      "fixtures": [
+        "page",
+        "gui",
+        "home_ai"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_environment.py::test_home_install_poll_retries_after_temporary_error",
+      "line": 200,
+      "fixtures": [
+        "page",
+        "gui",
+        "home_ai"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_manage.py::test_rename_and_undo_by_notification",
+      "line": 14,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_manage.py::test_folder_rename_keeps_title",
+      "line": 31,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_manage.py::test_menu_keyboard_and_outside_click",
+      "line": 50,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_manage.py::test_delete_cancel_confirm_and_keyboard_undo",
+      "line": 68,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_home_manage.py::test_running_deck_has_no_actions",
+      "line": 87,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_paste_image_after_selected_block_and_save",
+      "line": 35,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_insert_table_and_reload",
+      "line": 61,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_insert_math_preview_and_edit_with_enter",
+      "line": 82,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_slash_menu_removes_slash_and_inserts_after_live_paragraph",
+      "line": 117,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_tsv_paste_in_live_paragraph",
+      "line": 135,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_assets_tabs_counts_and_invalid_html",
+      "line": 161,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_asset_preview_close_keeps_focus_moved_to_another_card",
+      "line": 204,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_select_and_delete_assets_then_undo",
+      "line": 228,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_drag_asset_onto_slide_and_page_strip",
+      "line": 312,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_insert_citation_from_bibliography",
+      "line": 344,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_edit_table_with_toolbar",
+      "line": 359,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_insert_at_key_caret_and_page_end",
+      "line": 383,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_insert.py::test_pure_table_image_math_code_and_inline_helpers",
+      "line": 399,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_launch.py::test_last_window_exits_promptly_but_reload_and_other_windows_do_not",
+      "line": 13,
+      "fixtures": [
+        "ws",
+        "page",
+        "initial_setup"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_layout_lint.py::test_layout_issues_on_slide_strip_and_toolbar",
+      "line": 18,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_layout_lint.py::test_layout_issues_follow_changes_in_slide",
+      "line": 46,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_math_candidates_narrow_by_prefix_and_tab_fills",
+      "line": 48,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_math_candidates_arrow_and_enter",
+      "line": 69,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_math_layout_order_grow_matrix_and_recent",
+      "line": 82,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_math_snippet_and_candidate_undo",
+      "line": 113,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_math_popup_moves_and_keeps_size",
+      "line": 131,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_table_has_no_candidates_or_buttons",
+      "line": 160,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_popup_closes_on_click_in_slide",
+      "line": 168,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_block_view_math_chip_opens_editor",
+      "line": 179,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_emptying_math_removes_block",
+      "line": 204,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_preview_of_math_with_line_breaks",
+      "line": 220,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_image_from_other_deck_is_shared",
+      "line": 228,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_library.py::test_match_helpers",
+      "line": 241,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_links.py::test_link_selection_update_remove_and_cancel",
+      "line": 23,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_links.py::test_link_without_selection_and_undo",
+      "line": 51,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_links.py::test_slash_link_opens_new_tab",
+      "line": 69,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_links.py::test_pdf_preserves_link",
+      "line": 93,
+      "fixtures": [
+        "ws"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_links.py::test_link_dom_preserves_format_and_native_undo",
+      "line": 104,
+      "fixtures": [],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_links.py::test_app_links_open_new_tabs",
+      "line": 144,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_links.py::test_exported_slide_links_open_new_tabs",
+      "line": 161,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_links.py::test_presentation_links_use_default_browser",
+      "line": 175,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_location.py::test_choose_custom_location",
+      "line": 7,
+      "fixtures": [
+        "page",
+        "tmp_path",
+        "monkeypatch",
+        "location_server"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_location.py::test_choose_existing_location",
+      "line": 32,
+      "fixtures": [
+        "page",
+        "tmp_path",
+        "monkeypatch",
+        "ws",
+        "location_server"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_location.py::test_switch_and_return_to_recent_folder",
+      "line": 46,
+      "fixtures": [
+        "page",
+        "tmp_path",
+        "ws",
+        "location_server"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_materials.py::test_materials_tab_lists_adds_and_opens",
+      "line": 24,
+      "fixtures": [
+        "gui",
+        "page",
+        "monkeypatch"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_materials.py::test_materials_create_rename_move_delete",
+      "line": 72,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_materials.py::test_materials_add_files_and_folder_and_preview",
+      "line": 135,
+      "fixtures": [
+        "gui",
+        "page",
+        "monkeypatch",
+        "tmp_path"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_materials.py::test_materials_large_closed_folder_keeps_other_folders_visible",
+      "line": 179,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_opens_memo_for_blank_deck_and_switches_chat",
+      "line": 24,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_opens_qmd_for_deck_with_content",
+      "line": 86,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_preserves_hidden_memo_fields",
+      "line": 100,
+      "fixtures": [
+        "gui",
+        "page",
+        "scope",
+        "position"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_memo_conflict_copy",
+      "line": 125,
+      "fixtures": [
+        "gui",
+        "page",
+        "clipboard"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_external_change_keeps_caret_and_scroll",
+      "line": 160,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_handoff_starts_from_screen_and_shows_memo_diff",
+      "line": 177,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_handoff_continue_draft_persists_without_starting",
+      "line": 204,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_memo_fields_scroll_with_body",
+      "line": 226,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_reflect_slides_button",
+      "line": 248,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_memo.py::test_memo_has_no_draft_to_slides_shortcut",
+      "line": 276,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_nested_block_selection.py::test_vertical_add_stays_inside_selected_frame",
+      "line": 39,
+      "fixtures": [
+        "gui",
+        "page",
+        "direction",
+        "text",
+        "key"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_overview.py::test_groups_by_chapter_and_keys",
+      "line": 38,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_overview.py::test_key_from_inside_the_slide",
+      "line": 62,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_overview.py::test_scrub_steps_and_open_first_step",
+      "line": 79,
+      "fixtures": [
+        "stepped",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_overview.py::test_exported_html_scrubs_steps",
+      "line": 104,
+      "fixtures": [
+        "stepped",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_reorder.py::test_drag_page_and_undo",
+      "line": 10,
+      "fixtures": [
+        "gui",
+        "page",
+        "surface"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_reorder.py::test_move_page_preserves_source_and_boundaries",
+      "line": 47,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_reorder.py::test_drag_to_end_and_cancel",
+      "line": 62,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_reorder.py::test_qmd_drag_scrolls_before_edge_and_stops",
+      "line": 106,
+      "fixtures": [
+        "gui",
+        "page",
+        "direction"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_reorder.py::test_drop_updates_before_save",
+      "line": 159,
+      "fixtures": [
+        "gui",
+        "page",
+        "surface"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_strip.py::test_visible_priority_tracks_scroll_filter_and_overview",
+      "line": 47,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_strip.py::test_theme_reshoots_visible_pages_first_and_publishes_each_step",
+      "line": 62,
+      "fixtures": [
+        "shooting",
+        "page",
+        "monkeypatch"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_strip.py::test_thumbnails_only",
+      "line": 100,
+      "fixtures": [
+        "shooting",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_strip.py::test_scrub_steps_and_open_first_step",
+      "line": 111,
+      "fixtures": [
+        "shooting",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_strip.py::test_default_width_200_capped_at_quarter_of_slide",
+      "line": 136,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_strip.py::test_resize_handle_caps_at_quarter_of_slide",
+      "line": 149,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_strip.py::test_heading_edit_keeps_other_thumbnail_images",
+      "line": 172,
+      "fixtures": [
+        "shooting",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_strip.py::test_shots_only_reshoot_changed_pages",
+      "line": 208,
+      "fixtures": [
+        "shooting",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_strip.py::test_edits_update_thumbnails_while_check_is_running",
+      "line": 236,
+      "fixtures": [
+        "shooting",
+        "page",
+        "monkeypatch",
+        "edit"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_templates.py::test_all_templates_source_and_replacement",
+      "line": 16,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_templates.py::test_picker_cancel_insert_heading_and_placeholder_selection",
+      "line": 65,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_templates.py::test_slash_image_and_material_drop_replace_placeholder",
+      "line": 101,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_templates.py::test_unique_pages_disabled_and_references_read_only",
+      "line": 141,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_templates.py::test_references_paginate_by_height",
+      "line": 157,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_page_templates.py::test_add_reference_and_appendix_pages",
+      "line": 192,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_current_page_starts_at_first_step_and_returns",
+      "line": 28,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_horizontal_wheel_moves_pages_once_per_gesture",
+      "line": 49,
+      "fixtures": [
+        "gui",
+        "page",
+        "present",
+        "outside"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_repeated_swipes_during_momentum",
+      "line": 93,
+      "fixtures": [
+        "gui",
+        "page",
+        "present",
+        "outside"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_first_and_fixed_until_exit",
+      "line": 136,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_flushes_pending_source_before_start",
+      "line": 153,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_fullscreen_exit_finishes_presentation",
+      "line": 170,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_save_failure_does_not_start",
+      "line": 188,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_render_failure_does_not_start",
+      "line": 205,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_start_shortcuts",
+      "line": 217,
+      "fixtures": [
+        "gui",
+        "page",
+        "shortcut",
+        "expected",
+        "focus"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_shortcuts_do_not_interrupt_typing",
+      "line": 237,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_p_opens_export_choices",
+      "line": 256,
+      "fixtures": [
+        "gui",
+        "page",
+        "focus",
+        "format"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_f_key_release_keeps_fullscreen",
+      "line": 284,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_present.py::test_export_progress_updates_during_check",
+      "line": 299,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_table_text_selection_does_not_delete_block",
+      "line": 10,
+      "fixtures": [
+        "gui",
+        "page",
+        "key",
+        "focus"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_block_edit_preserves_source_and_undo",
+      "line": 67,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_list_backspace_keeps_break_then_joins",
+      "line": 86,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_block_fold_switch_and_nested_edit",
+      "line": 117,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_selection_tools_close_when_clicking_outside",
+      "line": 147,
+      "fixtures": [
+        "gui",
+        "page",
+        "selection"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_select_add_below_split_and_delete",
+      "line": 170,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_split_right_ratio_and_unwrap",
+      "line": 196,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_drag_column_out",
+      "line": 220,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_drag_shows_no_mark_where_nothing_changes",
+      "line": 239,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_move_description_into_and_out_of_designed_box",
+      "line": 257,
+      "fixtures": [
+        "gui",
+        "page",
+        "surface"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_nudge_drag_and_pages",
+      "line": 292,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_click_other_card_while_editing",
+      "line": 324,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_qmd_blocks.py::test_click_other_page_card_while_editing_heading",
+      "line": 340,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_slide_name.py::test_preview_heading_edits_in_place",
+      "line": 7,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_slide_name.py::test_preview_heading_preserves_markup_attributes_and_session",
+      "line": 54,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_slide_name.py::test_cover_title_appears_once_and_saves",
+      "line": 85,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_page_counter_stays_centered_with_optional_steps",
+      "line": 10,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_wrapper_options_and_padding",
+      "line": 56,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_step_numbers_and_compaction",
+      "line": 84,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_step_choices_have_no_gap",
+      "line": 108,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_step_align_ui_and_undo",
+      "line": 124,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_figure_step_ui",
+      "line": 157,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_alignment_in_text_session",
+      "line": 170,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_alignment_cycles_without_menu",
+      "line": 184,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_list_incremental_menu",
+      "line": 204,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_badge_shape_state_and_click",
+      "line": 224,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_figure_badge_range_and_incremental",
+      "line": 268,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_badge_late_figure_load",
+      "line": 308,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_initial_figure_and_reverse_display_order",
+      "line": 335,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_simultaneous_figures_share_start_and_wait_for_longest",
+      "line": 359,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_pdf_step_checkbox_writes_heading",
+      "line": 391,
+      "fixtures": [
+        "gui",
+        "page",
+        "prefix"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_pdf_step_keeps_marks_after_edit_before_preview_refresh",
+      "line": 425,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_container_step_preserves_children",
+      "line": 464,
+      "fixtures": [
+        "gui",
+        "page",
+        "kind"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_step.py::test_container_step_ui_and_undo",
+      "line": 493,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_table_edit.py::test_edit_cells_on_the_slide_and_move_between_them",
+      "line": 52,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_table_edit.py::test_empty_cell_can_be_filled",
+      "line": 89,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_table_edit.py::test_table_size_bold_and_reset",
+      "line": 100,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_table_edit.py::test_column_widths_and_table_width_by_dragging",
+      "line": 139,
+      "fixtures": [
+        "gui",
+        "page",
+        "nested"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_table_edit.py::test_table_without_header_row_edits_the_right_row",
+      "line": 174,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_table_edit.py::test_first_click_selects_and_the_table_can_be_dragged_from_its_text",
+      "line": 189,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_table_edit.py::test_fixed_columns_wrap_even_if_the_deck_css_forbids_it",
+      "line": 208,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_text_format.py::test_format_bar_colors_size_and_close",
+      "line": 27,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_text_format.py::test_free_color_and_tooltip",
+      "line": 85,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_text_format.py::test_smaller_text_tightens_hard_break_spacing",
+      "line": 112,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_color_picker.py::test_color_picker_palette_drag_keyboard_and_undo",
+      "line": 14,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_color_picker.py::test_visual_heading_choices_and_compact_color_editor",
+      "line": 84,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_color_picker.py::test_heading_colors_follow_rendered_theme_and_mark_background",
+      "line": 124,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_theme_tab_allows_slide_content_editing",
+      "line": 18,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_save_edited_theme_on_reset",
+      "line": 46,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_switch_theme_without_reloading_frame_and_undo",
+      "line": 87,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_theme_strip_lists_recently_chosen_first",
+      "line": 116,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_theme_color_change_keeps_page_drag_available",
+      "line": 137,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_theme_save_finishes_when_preview_is_replaced",
+      "line": 158,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_gradient_point_color_saves_without_closing",
+      "line": 195,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_theme_tab_sample_marks_and_undo",
+      "line": 222,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_theme_font_samples_and_filtered_navigation",
+      "line": 271,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_font_change_keeps_content_page_and_marks_on_text",
+      "line": 299,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_heading_font_skips_hidden_headings",
+      "line": 340,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_theme_marks_stay_aligned_after_sample_navigation_and_resize",
+      "line": 363,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_heading_gradient_edit_save_reload_and_undo",
+      "line": 403,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_background_controls_are_removed_and_heading_toggle_still_opens",
+      "line": 439,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_theme_click_selects_color_and_block_without_changing_step",
+      "line": 461,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_gradient_popup_edges_and_heading_ink",
+      "line": 524,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_gradient_drag_and_narrow_viewport",
+      "line": 559,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_heading_gradient_sample_fallback",
+      "line": 595,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_heading_colors_and_links_are_independent",
+      "line": 610,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_gradient_heading_preview_is_inert_and_non_destructive",
+      "line": 679,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_gradient_templates_preserve_points_and_drag_undo",
+      "line": 716,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_gradient_hidden_heading_preserves_ink_and_single_color_returns",
+      "line": 768,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_controls.py::test_theme_change_restores_cover_positions_and_undo",
+      "line": 792,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_theme_table_math.py::test_table_math_colors_are_independent_and_persist",
+      "line": 7,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_toc_settings.py::test_toc_settings_and_hidden_source",
+      "line": 8,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_toc_settings.py::test_toc_switch_right_after_typing_in_cover",
+      "line": 54,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_toc_settings.py::test_toc_settings_preserve_reordered_attributes",
+      "line": 67,
+      "fixtures": [
+        "gui",
+        "page",
+        "indent"
+      ],
+      "parameterized": true,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_toc_settings.py::test_raw_projection_roundtrip_and_offsets",
+      "line": 91,
+      "fixtures": [
+        "gui",
+        "page"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_choose_existing_and_new_topic",
+      "line": 11,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_no_topics",
+      "line": 41,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_topic_navigation_and_initial_value",
+      "line": 57,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_topic_html_rows_and_bib",
+      "line": 73,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_home_card_sizes",
+      "line": 116,
+      "fixtures": [
+        "page",
+        "gui",
+        "tmp_path"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_add_buttons_hide_while_untouched",
+      "line": 130,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_remove_theme_from_home",
+      "line": 157,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_dialog_initial_values",
+      "line": 171,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_delete_unused_topic",
+      "line": 192,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_delete_used_topic_shows_reason",
+      "line": 209,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_topic_steps_selection_and_delete",
+      "line": 221,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    },
+    {
+      "id": "tests/e2e/test_topic_page.py::test_topic_preview_steps_and_long_press",
+      "line": 253,
+      "fixtures": [
+        "page",
+        "gui"
+      ],
+      "parameterized": false,
+      "status": "pending_electron_parity",
+      "replacement_test": null
+    }
+  ]
+}

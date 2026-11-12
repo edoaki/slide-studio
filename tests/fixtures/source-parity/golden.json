@@ -2073,5 +2073,430 @@
     "origin": [],
     "unsupported": [],
     "unchanged": "﻿## 題\n\n本文\n"
+  },
+  {
+    "name": "feff-math",
+    "source": "## A\n\n﻿$$\na\n\nb\n$$\n",
+    "doc": {
+      "front": [
+        0,
+        0
+      ],
+      "meta": {},
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "A",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 0,
+          "head_end": 4,
+          "end": 18,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "text",
+              "path": "0",
+              "start": 6,
+              "end": 11,
+              "text": "﻿$$\na"
+            },
+            {
+              "kind": "text",
+              "path": "1",
+              "start": 13,
+              "end": 17,
+              "text": "b\n$$"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "## A\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n﻿$$\na\n\n:::\n\n::: {.slide-studio-c data-slide-studio=\"p0/1\"}\n\nb\n$$\n\n:::\n\n",
+    "origin": [
+      1,
+      null,
+      null,
+      null,
+      3,
+      4,
+      null,
+      null,
+      null,
+      null,
+      null,
+      6,
+      7,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "## A\n\n﻿$$\na\n\nb\n$$\n"
+  },
+  {
+    "name": "empty-columns",
+    "source": "## A\n\n::: {.columns}\n:::\n",
+    "doc": {
+      "front": [
+        0,
+        0
+      ],
+      "meta": {},
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "A",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 0,
+          "head_end": 4,
+          "end": 25,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "opaque",
+              "path": "0",
+              "start": 6,
+              "end": 24,
+              "text": "::: {.columns}\n:::",
+              "attrs": {
+                "id": "",
+                "classes": [
+                  "columns"
+                ],
+                "kv": {}
+              },
+              "open": "::: {.columns}",
+              "close": ":::"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "## A\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n::: {.columns}\n:::\n\n:::\n\n",
+    "origin": [
+      1,
+      null,
+      null,
+      null,
+      3,
+      4,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "## A\n\n::: {.columns}\n:::\n"
+  },
+  {
+    "name": "proto-attribute",
+    "source": "## A\n\n::: {__proto__=x}\ntext\n:::\n",
+    "doc": {
+      "front": [
+        0,
+        0
+      ],
+      "meta": {},
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "A",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 0,
+          "head_end": 4,
+          "end": 33,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": [
+            {
+              "kind": "opaque",
+              "path": "0",
+              "start": 6,
+              "end": 32,
+              "text": "::: {__proto__=x}\ntext\n:::",
+              "attrs": {
+                "id": "",
+                "classes": [],
+                "kv": {
+                  "__proto__": "x"
+                }
+              },
+              "open": "::: {__proto__=x}",
+              "close": ":::"
+            }
+          ]
+        }
+      ]
+    },
+    "wrapped": "## A\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n::: {__proto__=x}\ntext\n:::\n\n:::\n\n",
+    "origin": [
+      1,
+      null,
+      null,
+      null,
+      3,
+      4,
+      5,
+      null,
+      null,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "## A\n\n::: {__proto__=x}\ntext\n:::\n"
+  },
+  {
+    "name": "yaml-bool-octal",
+    "source": "---\ntoc: yes\nother: off\nnumber: 010\nsexagesimal: 1:30\nexponent: 1e3\n---\n## A\n",
+    "doc": {
+      "front": [
+        0,
+        72
+      ],
+      "meta": {
+        "toc": true,
+        "other": false,
+        "number": 8,
+        "sexagesimal": 90,
+        "exponent": "1e3"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "A",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 72,
+          "head_end": 76,
+          "end": 77,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": []
+        }
+      ]
+    },
+    "wrapped": "---\ntoc: yes\nother: off\nnumber: 010\nsexagesimal: 1:30\nexponent: 1e3\n---\n\n## A\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      8,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntoc: yes\nother: off\nnumber: 010\nsexagesimal: 1:30\nexponent: 1e3\n---\n## A\n"
+  },
+  {
+    "name": "yaml-duplicate",
+    "source": "---\ntitle: old\ntitle: new\n---\n## A\n",
+    "doc": {
+      "front": [
+        0,
+        30
+      ],
+      "meta": {
+        "title": "new"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "A",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 30,
+          "head_end": 34,
+          "end": 35,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": []
+        }
+      ]
+    },
+    "wrapped": "---\ntitle: old\ntitle: new\n---\n\n## A\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      5,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ntitle: old\ntitle: new\n---\n## A\n"
+  },
+  {
+    "name": "yaml-merge",
+    "source": "---\nbase: &base\n  name: A\n  role: B\nperson:\n  <<: *base\n  name: C\n---\n## A\n",
+    "doc": {
+      "front": [
+        0,
+        70
+      ],
+      "meta": {
+        "base": {
+          "name": "A",
+          "role": "B"
+        },
+        "person": {
+          "name": "C",
+          "role": "B"
+        }
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "A",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 70,
+          "head_end": 74,
+          "end": 75,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": []
+        }
+      ]
+    },
+    "wrapped": "---\nbase: &base\n  name: A\n  role: B\nperson:\n  <<: *base\n  name: C\n---\n\n## A\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      9,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\nbase: &base\n  name: A\n  role: B\nperson:\n  <<: *base\n  name: C\n---\n## A\n"
+  },
+  {
+    "name": "yaml-date",
+    "source": "---\ndate: 2024-11-12\n---\n## A\n",
+    "doc": {
+      "front": [
+        0,
+        25
+      ],
+      "meta": {
+        "date": "2024-11-12"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "A",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 25,
+          "head_end": 29,
+          "end": 30,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": []
+        }
+      ]
+    },
+    "wrapped": "---\ndate: 2024-11-12\n---\n\n## A\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      4,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\ndate: 2024-11-12\n---\n## A\n"
+  },
+  {
+    "name": "yaml-proto",
+    "source": "---\n__proto__: own\n---\n## A\n",
+    "doc": {
+      "front": [
+        0,
+        23
+      ],
+      "meta": {
+        "__proto__": "own"
+      },
+      "meta_error": "",
+      "authors": [],
+      "pages": [
+        {
+          "index": 0,
+          "level": 2,
+          "title": "A",
+          "id": "",
+          "classes": [],
+          "kv": {},
+          "start": 23,
+          "head_end": 27,
+          "end": 28,
+          "generated": "",
+          "raw_only": false,
+          "unclosed": [],
+          "chunks": []
+        }
+      ]
+    },
+    "wrapped": "---\n__proto__: own\n---\n\n## A\n\n",
+    "origin": [
+      1,
+      2,
+      3,
+      4,
+      4,
+      null
+    ],
+    "unsupported": [],
+    "unchanged": "---\n__proto__: own\n---\n## A\n"
   }
 ]

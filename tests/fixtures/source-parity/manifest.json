@@ -1,11 +1,19 @@
 {
   "reference_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
   "generator": "legacy source.parse / wrapped_source / unsupported / rewrite executed in old checkout; no Python runtime added to new tree",
-  "cases": 23,
+  "cases": 31,
   "baseline_fixture_directory": "tests/fixtures/sync",
   "additional_cases": [
     "unicode-astral",
     "crlf",
-    "bom"
+    "bom",
+    "feff-math",
+    "empty-columns",
+    "proto-attribute",
+    "yaml-bool-octal",
+    "yaml-duplicate",
+    "yaml-merge",
+    "yaml-date",
+    "yaml-proto"
   ]
 }

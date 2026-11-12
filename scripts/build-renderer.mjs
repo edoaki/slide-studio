@@ -1,6 +1,7 @@
 import { cp, mkdir, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = resolve(root, "dist");
@@ -56,4 +57,20 @@ if (process.argv.includes("--clean")) {
 
 for (const entry of copies) {
   await copyAssets(entry);
+}
+
+// The content agent must execute before authored slide scripts. Keep the
+// preserved UI as ES modules and bundle only this first-head bootstrap.
+const frameAgent = resolve(root, "packages/web/bridge/frame-agent.js");
+if (!process.argv.includes("--clean") && await exists(frameAgent)) {
+  await build({
+    entryPoints: [frameAgent],
+    outfile: resolve(dist, "packages/web/bridge/frame-agent.classic.js"),
+    bundle: true,
+    format: "iife",
+    platform: "browser",
+    target: "chrome156",
+    sourcemap: false,
+    legalComments: "inline",
+  });
 }
