@@ -343,7 +343,7 @@ test("desktop slice: create, edit, preview, save, reopen, export", { skip: skipR
   const preview = await previewHandle!.contentFrame();
   assert.notEqual(preview, null);
   await preview!.locator("body").waitFor({ state: "attached", timeout: 30_000 });
-  const activeHeading = preview!.locator(".slide.active h1, .slide.active h2").filter({ hasText: title }).first();
+  const activeHeading = preview!.locator(".slide.active h1, .slide.active h2").filter({ hasText: "一枚目" }).first();
   await activeHeading.waitFor({ state: "visible", timeout: 30_000 });
   await waitForTestId(page, TESTIDS.previewStatus);
   await waitForTestId(page, TESTIDS.previousSlide);
