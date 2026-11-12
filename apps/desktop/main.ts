@@ -1,0 +1,689 @@
+import { existsSync, mkdirSync, realpathSync, statSync, type Stats } from "node:fs";
+import { mkdtemp, mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  Menu,
+  protocol,
+  session,
+  type OpenDialogOptions,
+  type OpenDialogReturnValue,
+  type SaveDialogOptions,
+  type SaveDialogReturnValue,
+  type Session,
+} from "electron";
+import type {
+  CoreErrorCode,
+  DesktopHost,
+  PreviewDocument,
+  WorkspaceService,
+} from "../../packages/contracts/src/desktop.js";
+import { atomicWriteFile } from "../../packages/renderer/src/output.js";
+import { STUDIO_RENDER_SCHEME } from "../../packages/renderer/src/protocol.js";
+import { startDesktopHost } from "../server/index.js";
+
+type ExportFormat = "html" | "pdf";
+
+interface CodedError extends Error {
+  code: CoreErrorCode;
+}
+
+/*
+ * Native main-process labels are centralized here. Renderer labels live in
+ * packages/web/strings.js; dialogs owned by Electron cannot import that module.
+ */
+const MAIN_STRINGS = Object.freeze({
+  unsavedTitle: "未保存の変更",
+  unsavedMessage: "保存していない変更があります。",
+  unsavedDetail: "変更を破棄して閉じますか？",
+  close: "閉じる",
+  cancel: "キャンセル",
+  exportHtml: "HTMLを書き出す",
+  exportPdf: "PDFを書き出す（試験的）",
+  chooseWorkspace: "保管フォルダを選ぶ",
+  startupError: "Slide Studio を起動できません",
+  pandocMissing: (path: string) =>
+    `Pandoc が見つかりません: ${path}。「npm run setup:pandoc」を実行してください。`,
+  pdfTimeout: (ms: number) => `PDF出力が ${ms}ms でタイムアウトしました`,
+});
+
+let mainWindow: BrowserWindow | undefined;
+let desktopHost: DesktopHost | undefined;
+let workspace: WorkspaceService | undefined;
+let appPath = "";
+let uiDirectory = "";
+let pandocPath = "";
+let hiddenWindow = false;
+let shuttingDown = false;
+let forceQuit = false;
+let pdfTail: Promise<void> = Promise.resolve();
+let activePdfDeadline: { abort(reason: string): void; dispose(): void } | undefined;
+let pdfTemporaryRoot = "";
+let credentialToken = "";
+let adminOriginValue = "";
+let bootstrapUrl = "";
+let uiSession: Session | undefined;
+const allowedOrigins = new Set<string>();
+
+function codedError(code: CoreErrorCode, message: string): CodedError {
+  const error = new Error(message) as CodedError;
+  error.code = code;
+  return error;
+}
+
+function argumentValue(argv: string[], name: string): string | undefined {
+  const flag = `--${name}`;
+  for (let index = 0; index < argv.length; index++) {
+    const argument = argv[index];
+    if (argument === flag) {
+      const value = argv[index + 1];
+      return value === undefined || value.startsWith("--") ? undefined : value;
+    }
+    if (argument?.startsWith(`${flag}=`)) {
+      const value = argument.slice(flag.length + 1);
+      return value.length === 0 ? undefined : value;
+    }
+  }
+  return undefined;
+}
+
+/** In source runs Electron may report the script directory; find the repo root from it. */
+function resolveSourceRoot(appDirectory: string): string {
+  let candidate = appDirectory;
+  for (let depth = 0; depth < 5; depth++) {
+    if (existsSync(join(candidate, "dist", "packages", "web", "index.html"))) return candidate;
+    const parent = dirname(candidate);
+    if (parent === candidate) break;
+    candidate = parent;
+  }
+  return appDirectory;
+}
+
+function canonicalPath(path: string): string {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+function installApplicationMenu(): void {
+  if (process.platform === "darwin") {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { role: "appMenu" },
+      { role: "editMenu" },
+    ]));
+  } else {
+    Menu.setApplicationMenu(null);
+  }
+}
+
+async function sweepPdfTemporaryDirectories(): Promise<void> {
+  try {
+    const entries = await readdir(pdfTemporaryRoot, { withFileTypes: true });
+    await Promise.all(entries
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith("slide-studio-pdf-"))
+      .map((entry) => rm(join(pdfTemporaryRoot, entry.name), {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      })));
+  } catch (error) {
+    console.error("[desktop] cannot sweep temporary PDF directories", error);
+  }
+}
+
+async function clearUiStorage(): Promise<void> {
+  try {
+    await uiSession?.clearStorageData();
+  } catch (error) {
+    console.error("[desktop] cannot clear preview storage", error);
+  }
+}
+
+function resolveWorkspaceRoot(userData: string): { root: string; sample: boolean } {
+  const argv = process.argv.slice(1);
+  const requested = argumentValue(argv, "root") ?? process.env.SLIDE_STUDIO_HOME;
+  if (requested !== undefined && requested.trim().length > 0) {
+    if (!isAbsolute(requested)) {
+      throw codedError("INVALID_INPUT", "--root/SLIDE_STUDIO_HOME must be an absolute path");
+    }
+    let stat: Stats;
+    try {
+      stat = statSync(requested);
+    } catch {
+      throw codedError("INVALID_INPUT", `workspace folder does not exist: ${requested}`);
+    }
+    if (!stat.isDirectory()) {
+      throw codedError("INVALID_INPUT", `workspace path is not a directory: ${requested}`);
+    }
+    return { root: requested, sample: false };
+  }
+  const root = join(userData, "trial-workspace");
+  mkdirSync(root, { recursive: true });
+  return { root, sample: true };
+}
+
+function resolvePandocPath(): string {
+  const binary = process.platform === "win32" ? "pandoc.exe" : "pandoc";
+  if (app.isPackaged) {
+    // Packaged builds always use the verified binary staged by electron-builder.
+    const resources = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+    if (resources === undefined) {
+      throw codedError("INVALID_INPUT", "Electron resources path is unavailable");
+    }
+    return join(resources, "pandoc", "bin", binary);
+  }
+  const explicit = process.env.SLIDE_STUDIO_PANDOC;
+  if (explicit !== undefined && explicit.length > 0) {
+    if (!isAbsolute(explicit)) {
+      throw codedError("INVALID_INPUT", "SLIDE_STUDIO_PANDOC must be an absolute path");
+    }
+    return explicit;
+  }
+  return join(appPath, "resources", "pandoc", "bin", binary);
+}
+
+function assertPandocAvailable(): void {
+  let stat: Stats;
+  try {
+    stat = statSync(pandocPath);
+  } catch {
+    throw codedError("INVALID_INPUT", MAIN_STRINGS.pandocMissing(pandocPath));
+  }
+  if (!stat.isFile()) throw codedError("INVALID_INPUT", "Pandoc path is not a file");
+}
+
+function isLoopbackOrInternal(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (["about:", "data:", "blob:", "devtools:"].includes(url.protocol)) return true;
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  return url.hostname === "127.0.0.1"
+    || url.hostname === "localhost"
+    || url.hostname === "::1"
+    || url.hostname === "[::1]";
+}
+
+function navigationUrl(args: unknown[]): string | undefined {
+  for (const value of args) {
+    if (typeof value === "string") return value;
+    if (value !== null && typeof value === "object" && "url" in value) {
+      const url = (value as { url?: unknown }).url;
+      if (typeof url === "string") return url;
+    }
+  }
+  return undefined;
+}
+
+function redactCredential(text: string): string {
+  return credentialToken.length === 0 ? text : text.replaceAll(credentialToken, "[redacted]");
+}
+
+function originAllowed(raw: string): boolean {
+  try {
+    return allowedOrigins.has(new URL(raw).origin);
+  } catch {
+    return false;
+  }
+}
+
+function mainNavigationAllowed(raw: string | undefined): boolean {
+  if (raw === undefined) return false;
+  if (raw === "about:blank") return true;
+  return adminOriginValue.length > 0 && originAllowed(raw) && new URL(raw).origin === adminOriginValue;
+}
+
+function frameNavigationAllowed(raw: string | undefined): boolean {
+  if (raw === undefined) return false;
+  if (raw === "about:blank" || raw === "about:srcdoc" || raw.startsWith("about:srcdoc:")) return true;
+  const lower = raw.toLowerCase();
+  if (lower.startsWith("data:") || lower.startsWith("blob:")) return true;
+  return originAllowed(raw);
+}
+
+function waitForPdfQueue(): Promise<void> {
+  return pdfTail;
+}
+
+function enqueuePdf<T>(task: () => Promise<T>): Promise<T> {
+  const result = pdfTail.then(task, task);
+  pdfTail = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+function safeFileStem(title: string): string {
+  const value = title
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+    .replace(/^\.+/, "")
+    .trim()
+    .slice(0, 80);
+  return value.length === 0 ? "slides" : value;
+}
+
+function applySessionPolicy(target: Session): void {
+  target.setPermissionRequestHandler((_contents, _permission, callback) => {
+    callback(false);
+  });
+  target.setPermissionCheckHandler(() => false);
+  target.on("will-download", (event) => {
+    event.preventDefault();
+  });
+  target.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, callback) => {
+    callback({ cancel: !isLoopbackOrInternal(details.url) });
+  });
+}
+
+function installSessionPolicy(): void {
+  uiSession = session.fromPartition("slide-studio-ui", { cache: false });
+  applySessionPolicy(uiSession);
+  applySessionPolicy(session.defaultSession);
+}
+
+function installWindowPolicy(window: BrowserWindow): void {
+  const contents = window.webContents;
+  contents.setWindowOpenHandler(({ url }) => {
+    console.error(`[desktop] blocked window.open: ${redactCredential(url)}`);
+    return { action: "deny" };
+  });
+  contents.on("will-attach-webview", (event) => {
+    event.preventDefault();
+  });
+  contents.on("before-input-event", (event, input) => {
+    const key = input.key.toLowerCase();
+    const reload = key === "f5" || ((input.control || input.meta) && key === "r");
+    if (reload) event.preventDefault();
+  });
+  contents.on("will-navigate", (...args: unknown[]) => {
+    const raw = navigationUrl(args);
+    const event = args.find(
+      (value) => value !== null && typeof value === "object" && "preventDefault" in value,
+    ) as { preventDefault?: () => void } | undefined;
+    if (
+      raw !== undefined
+      && adminOriginValue.length > 0
+      && raw.startsWith(`${adminOriginValue}/`)
+      && !raw.includes("#token=")
+    ) {
+      // The renderer strips the credential fragment at boot. Re-enter through the
+      // bootstrap URL instead of loading an admin page without the token.
+      event?.preventDefault?.();
+      if (!shuttingDown) void contents.loadURL(bootstrapUrl);
+      return;
+    }
+    if (!mainNavigationAllowed(raw)) {
+      event?.preventDefault?.();
+      console.error(`[desktop] blocked navigation: ${redactCredential(raw ?? "<unknown>")}`);
+    }
+  });
+  contents.on("will-redirect", (...args: unknown[]) => {
+    const raw = navigationUrl(args);
+    if (!mainNavigationAllowed(raw)) {
+      const event = args.find(
+        (value) => value !== null && typeof value === "object" && "preventDefault" in value,
+      ) as { preventDefault?: () => void } | undefined;
+      event?.preventDefault?.();
+      console.error(`[desktop] blocked redirect: ${redactCredential(raw ?? "<unknown>")}`);
+    }
+  });
+  contents.on("will-frame-navigate", (...args: unknown[]) => {
+    const raw = navigationUrl(args);
+    if (!frameNavigationAllowed(raw)) {
+      const event = args.find(
+        (value) => value !== null && typeof value === "object" && "preventDefault" in value,
+      ) as { preventDefault?: () => void } | undefined;
+      event?.preventDefault?.();
+      console.error(`[desktop] blocked frame navigation: ${redactCredential(raw ?? "<unknown>")}`);
+    }
+  });
+  contents.on("render-process-gone", () => {
+    console.error("[desktop] renderer process gone; reloading the admin UI");
+    if (shuttingDown) return;
+    setTimeout(() => {
+      if (!shuttingDown && mainWindow !== undefined && !mainWindow.isDestroyed()) {
+        void mainWindow.loadURL(bootstrapUrl);
+      }
+    }, 250);
+  });
+
+  contents.on("will-prevent-unload", (event) => {
+    const response = dialog.showMessageBoxSync(window, {
+      type: "warning",
+      buttons: [MAIN_STRINGS.close, MAIN_STRINGS.cancel],
+      defaultId: 1,
+      cancelId: 1,
+      title: MAIN_STRINGS.unsavedTitle,
+      message: MAIN_STRINGS.unsavedMessage,
+      detail: MAIN_STRINGS.unsavedDetail,
+    });
+    // Calling preventDefault() ignores beforeunload and lets the page unload.
+    if (response === 0) event.preventDefault();
+  });
+}
+
+function createMainWindow(adminOrigin: string, token: string): void {
+  credentialToken = token;
+  bootstrapUrl = `${adminOrigin}/#token=${encodeURIComponent(token)}`;
+  mainWindow = new BrowserWindow({
+    show: !hiddenWindow,
+    width: 1280,
+    height: 860,
+    minWidth: 900,
+    minHeight: 600,
+    title: "Slide Studio",
+    autoHideMenuBar: process.platform !== "darwin",
+    webPreferences: {
+      session: uiSession!,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webviewTag: false,
+      spellcheck: false,
+    },
+  });
+  installWindowPolicy(mainWindow);
+  mainWindow.on("closed", () => {
+    mainWindow = undefined;
+    void shutdown(0);
+  });
+  // The fragment carries the per-launch credential; it is never sent over HTTP.
+  void mainWindow.loadURL(bootstrapUrl).catch((error: unknown) => {
+    const detail = error instanceof Error ? error.message.replaceAll(token, "[redacted]") : "unknown error";
+    console.error(`[desktop] cannot load the admin UI: ${detail}`);
+  });
+}
+
+function defaultExportDirectory(): string {
+  try {
+    return app.getPath("documents");
+  } catch {
+    try {
+      return app.getPath("home");
+    } catch {
+      return tmpdir();
+    }
+  }
+}
+
+function showSaveDialog(options: SaveDialogOptions): Promise<SaveDialogReturnValue> {
+  return mainWindow === undefined || mainWindow.isDestroyed()
+    ? dialog.showSaveDialog(options)
+    : dialog.showSaveDialog(mainWindow as BrowserWindow, options);
+}
+
+function showOpenDialog(options: OpenDialogOptions): Promise<OpenDialogReturnValue> {
+  return mainWindow === undefined || mainWindow.isDestroyed()
+    ? dialog.showOpenDialog(options)
+    : dialog.showOpenDialog(mainWindow as BrowserWindow, options);
+}
+
+function outputWriteError(error: unknown): CodedError {
+  const message = error instanceof Error ? error.message : String(error);
+  return codedError("READ_ONLY", `出力先に書き込めません: ${message}`);
+}
+
+async function writeOutput(filePath: string, data: string | Uint8Array): Promise<void> {
+  try {
+    await atomicWriteFile(filePath, data);
+  } catch (error) {
+    throw outputWriteError(error);
+  }
+}
+
+async function exportDocument(
+  document: PreviewDocument,
+  format: ExportFormat,
+  title: string,
+): Promise<string | null> {
+  const extension = format === "html" ? ".html" : ".pdf";
+  const result = await showSaveDialog({
+    title: format === "html" ? MAIN_STRINGS.exportHtml : MAIN_STRINGS.exportPdf,
+    defaultPath: join(defaultExportDirectory(), `${safeFileStem(title)}${extension}`),
+    filters: format === "html"
+      ? [{ name: "HTML", extensions: ["html"] }]
+      : [{ name: "PDF", extensions: ["pdf"] }],
+  });
+  if (result.canceled || result.filePath === undefined || result.filePath.length === 0) {
+    return null;
+  }
+  if (shuttingDown) return null;
+  if (format === "html") {
+    await writeOutput(result.filePath, document.html);
+    return basename(result.filePath);
+  }
+  return enqueuePdf(async () => {
+    if (shuttingDown) return null;
+    return writePdf(document, result.filePath!);
+  });
+}
+
+async function writePdf(document: PreviewDocument, filePath: string): Promise<string> {
+  const [{ parseRenderJob }, { renderDeck, RenderFailure }, { JobDeadline }] = await Promise.all([
+    import("../../packages/renderer/src/job.js"),
+    import("../../packages/renderer/src/render.js"),
+    import("../../packages/renderer/src/deadline.js"),
+  ]);
+  if (pdfTemporaryRoot.length === 0) {
+    pdfTemporaryRoot = join(app.getPath("userData"), "tmp");
+  }
+  await mkdir(pdfTemporaryRoot, { recursive: true });
+  const temporary = await mkdtemp(join(pdfTemporaryRoot, "slide-studio-pdf-"));
+  const timeoutMs = 180_000;
+  const deadline = new JobDeadline(timeoutMs, MAIN_STRINGS.pdfTimeout(timeoutMs));
+  activePdfDeadline = deadline;
+  try {
+    const inputHtml = join(temporary, "input.html");
+    const outputDir = join(temporary, "output");
+    await writeOutput(inputHtml, document.html);
+    const job = parseRenderJob({
+      schemaVersion: 1,
+      inputHtml,
+      outputDir,
+      timeoutMs,
+      screenshots: false,
+    });
+    const result = await renderDeck(job, outputDir, deadline);
+    const pdf = await readFile(join(outputDir, result.pdfFile));
+    await writeOutput(filePath, pdf);
+    return basename(filePath);
+  } catch (error) {
+    if (deadline.aborted) {
+      throw codedError("RENDER_TIMEOUT", deadline.reason.message);
+    }
+    if (error instanceof RenderFailure) {
+      throw codedError("RENDER_FAILED", error.message);
+    }
+    throw error;
+  } finally {
+    if (activePdfDeadline === deadline) activePdfDeadline = undefined;
+    deadline.dispose();
+    await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(
+      (error: unknown) => {
+        console.error("[desktop] cannot remove the temporary PDF files", error);
+      },
+    );
+  }
+}
+
+async function selectWorkspace(): Promise<WorkspaceService | null> {
+  const result = await showOpenDialog({
+    title: MAIN_STRINGS.chooseWorkspace,
+    properties: ["openDirectory", "createDirectory"],
+  });
+  const selected = result.filePaths[0];
+  if (result.canceled || selected === undefined || selected.length === 0) return null;
+  if (shuttingDown) return null;
+  if (!isAbsolute(selected)) {
+    throw codedError("INVALID_INPUT", "selected workspace folder must be absolute");
+  }
+  if (workspace !== undefined && canonicalPath(selected) === canonicalPath(workspace.root)) {
+    return workspace;
+  }
+  const { openWorkspace } = await import("../../packages/core/src/index.js");
+  const next = await openWorkspace(selected, { pandocPath });
+  if (shuttingDown) {
+    await next.close().catch((error: unknown) => {
+      console.error("[desktop] cannot close a workspace opened during shutdown", error);
+    });
+    return null;
+  }
+  // The server closes the previous service after this callback returns, so keep
+  // the same pointer it will use for shutdown and later folder selections.
+  workspace = next;
+  await clearUiStorage();
+  return next;
+}
+
+async function start(): Promise<void> {
+  try {
+    const { openWorkspace } = await import("../../packages/core/src/index.js");
+    appPath = app.isPackaged ? app.getAppPath() : resolveSourceRoot(app.getAppPath());
+    uiDirectory = join(appPath, "dist", "packages", "web");
+    pdfTemporaryRoot = join(app.getPath("userData"), "tmp");
+    mkdirSync(pdfTemporaryRoot, { recursive: true });
+    await sweepPdfTemporaryDirectories();
+    const userData = app.getPath("userData");
+    const requested = resolveWorkspaceRoot(userData);
+    pandocPath = resolvePandocPath();
+    assertPandocAvailable();
+
+    workspace = await openWorkspace(requested.root, {
+      pandocPath,
+      sample: requested.sample,
+    });
+    if (shuttingDown) {
+      await workspace.close();
+      workspace = undefined;
+      app.exit(0);
+      return;
+    }
+
+    desktopHost = await startDesktopHost({
+      workspace,
+      uiDirectory,
+      selectWorkspace,
+      exportDocument,
+      onShutdown: waitForPdfQueue,
+    });
+    if (shuttingDown) {
+      await desktopHost.close();
+      desktopHost = undefined;
+      app.exit(0);
+      return;
+    }
+    allowedOrigins.add(desktopHost.adminOrigin);
+    allowedOrigins.add(desktopHost.contentOrigin);
+    adminOriginValue = desktopHost.adminOrigin;
+
+    installSessionPolicy();
+    createMainWindow(desktopHost.adminOrigin, desktopHost.token);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[desktop] startup failed", error);
+    try {
+      dialog.showErrorBox(MAIN_STRINGS.startupError, message);
+    } catch {
+      // The dialog module can be unavailable if Electron is still starting.
+    }
+    await shutdown(1);
+  }
+}
+
+async function shutdown(exitCode = 0): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  activePdfDeadline?.abort("quit requested");
+  try {
+    await desktopHost?.close();
+  } catch (error) {
+    console.error("[desktop] cannot close the desktop host", error);
+  }
+  desktopHost = undefined;
+  try {
+    await pdfTail;
+  } catch (error) {
+    console.error("[desktop] PDF queue did not settle cleanly", error);
+  }
+  try {
+    await workspace?.close();
+  } catch (error) {
+    console.error("[desktop] cannot close the workspace", error);
+  }
+  workspace = undefined;
+  forceQuit = true;
+  app.exit(exitCode);
+}
+
+// Everything below must be synchronous and must happen before app.whenReady().
+const userDataOverride = process.env.SLIDE_STUDIO_ELECTRON_HOME;
+const profileDirectory = userDataOverride !== undefined && userDataOverride.length > 0
+  ? (isAbsolute(userDataOverride) ? userDataOverride : resolve(process.cwd(), userDataOverride))
+  : join(app.getPath("appData"), app.isPackaged ? "Slide Studio" : "Slide Studio Dev");
+const logsDirectory = join(profileDirectory, "logs");
+const crashDumpsDirectory = join(profileDirectory, "crashDumps");
+const sessionDataDirectory = join(profileDirectory, "sessionData");
+mkdirSync(profileDirectory, { recursive: true });
+mkdirSync(logsDirectory, { recursive: true });
+mkdirSync(crashDumpsDirectory, { recursive: true });
+mkdirSync(sessionDataDirectory, { recursive: true });
+app.setPath("userData", profileDirectory);
+app.setPath("sessionData", sessionDataDirectory);
+app.setPath("logs", logsDirectory);
+app.setPath("crashDumps", crashDumpsDirectory);
+app.enableSandbox();
+app.commandLine.appendSwitch("dns-prefetch-disable");
+protocol.registerSchemesAsPrivileged([{
+  scheme: STUDIO_RENDER_SCHEME,
+  privileges: { standard: true, secure: true, supportFetchAPI: true },
+}]);
+installApplicationMenu();
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => {
+    void shutdown(130);
+  });
+}
+
+// requestSingleInstanceLock is scoped by the userData path above, so packaged
+// and source runs have separate single-instance domains.
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow === undefined) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+
+  app.on("before-quit", (event) => {
+    if (forceQuit || shuttingDown) return;
+    if (mainWindow === undefined || mainWindow.isDestroyed()) {
+      event.preventDefault();
+      void shutdown(0);
+      return;
+    }
+    event.preventDefault();
+    mainWindow.close();
+  });
+
+  app.on("window-all-closed", () => {
+    void shutdown(0);
+  });
+
+  app.whenReady().then(async () => {
+    hiddenWindow = process.argv.includes("--hidden");
+    await start();
+  }).catch((error: unknown) => {
+    console.error("[desktop] cannot start Electron", error);
+    void shutdown(1);
+  });
+}
