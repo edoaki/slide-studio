@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "generated_for": "M0 inventory (docs/electron-migration-plan.md)",
+  "scope": "Observed integration contracts of the current Python app, separated from proposed migration boundaries.",
+  "labels": {
+    "observed": "Grounded in repository source at the cited path:line. Shapes may omit fields not inspected.",
+    "proposed": "Design suggestion for the migration; not implemented and not evidence of current behavior."
+  },
+  "observed": {
+    "http": {
+      "notes": "JSON unless stated. Error bodies are generally {\"error\": <Japanese string>}. Route registration order matters. The generic POST /api/deck/{deck}/{action} route matches one segment only.",
+      "endpoints": [
+        {"method": "GET", "path": "/api/events", "app": "main", "request": null, "response": "text/event-stream (see sse.framing)", "source": "slide_studio/server.py:759,666-679"},
+        {"method": "GET", "path": "/api/env", "request": null, "response": "environment descriptor; shape not captured", "source": "slide_studio/server.py:739"},
+        {"method": "GET", "path": "/api/home", "request": null, "response": "home inventory; shape not captured", "source": "slide_studio/server.py:739"},
+        {"method": "POST", "path": "/api/home/manage", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/deck_manage.py:289"},
+        {"method": "POST", "path": "/api/setup", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/server.py:740"},
+        {"method": "POST", "path": "/api/open-external", "request": "{\"url\": string}", "response": "{\"ok\": bool}; 400 invalid URL, 403 wrong origin, 503 open failed", "source": "slide_studio/server.py:712-730"},
+        {"method": "GET", "path": "/api/deck/{deck}", "request": null, "response": "deck payload; shape not captured", "source": "slide_studio/server.py:742"},
+        {"method": "PUT", "path": "/api/deck/{deck}/source", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/server.py:742"},
+        {"method": "GET|POST", "path": "/api/deck/{deck}/chunks", "request": "POST body uses action: markdown|cell|html|delete|move|image (server.py:412-454)", "response": "{\"text\": string} or {\"markdown\": string} depending on action; not fully captured", "source": "slide_studio/server.py:398-459,743"},
+        {"method": "PUT", "path": "/api/deck/{deck}/style", "request": "{css?, css_base?, vars?, text?, base?}", "response": "{before, css, text, version, vars}", "source": "slide_studio/server.py:461-476", "notes": "Goes through history.style; no action string."},
+        {"method": "GET|PUT", "path": "/api/deck/{deck}/memo", "request": "PUT memo text; exact body not captured", "response": "memo payload; exact shape not captured", "source": "slide_studio/server.py:745"},
+        {"method": "GET|POST", "path": "/api/deck/{deck}/assets", "request": "POST multipart/JSON not captured", "response": "asset listing/mutation result; not captured", "source": "slide_studio/server.py:746"},
+        {"method": "POST", "path": "/api/deck/{deck}/assets/{op}", "request": "operation-specific", "response": "operation-specific; not captured", "source": "slide_studio/server.py:747"},
+        {"method": "GET|POST", "path": "/api/deck/{deck}/materials", "request": "operation-specific", "response": "not captured", "source": "slide_studio/server.py:748"},
+        {"method": "POST", "path": "/api/deck/{deck}/materials/{op}", "request": "operation-specific", "response": "not captured", "source": "slide_studio/server.py:749"},
+        {"method": "GET|POST", "path": "/api/deck/{deck}/library", "request": "operation-specific", "response": "not captured", "source": "slide_studio/server.py:750"},
+        {"method": "GET|POST|PATCH", "path": "/api/deck/{deck}/bib", "request": "PATCH update payload; not captured", "response": "bibliography listing/status; not captured", "source": "slide_studio/server.py:753"},
+        {"method": "POST", "path": "/api/topic/{shelf}/bib/verify", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/server.py:751"},
+        {"method": "PATCH", "path": "/api/topic/{shelf}/bib", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/server.py:752"},
+        {"method": "GET|DELETE", "path": "/api/topic/{shelf}", "request": null, "response": "topic payload / deletion result; not captured", "source": "slide_studio/server.py:735,737"},
+        {"method": "POST", "path": "/api/topic/{shelf}/html/delete", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/server.py:736"},
+        {"method": "POST", "path": "/api/math", "request": "unknown_not_captured", "response": "rendered math; not captured", "source": "slide_studio/server.py:754"},
+        {"method": "POST", "path": "/api/structure", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/server.py:756"},
+        {"method": "POST", "path": "/api/new", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/server.py:757"},
+        {"method": "POST", "path": "/api/topics", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/server.py:758"},
+        {"method": "POST", "path": "/api/deck/{deck}/{action}", "request": "action-specific; observed deck actions: check, build (single segment)", "response": "action-specific; build returns file list with urls/names (web/output.js:83); check returns check state", "source": "slide_studio/server.py:216-259,755"},
+        {"method": "GET", "path": "/files/decks/{deck}/__slide-studio_preview__.html", "request": "query v, optional hash route", "response": "HTML preview with injected edit CSS/JS and __slideStudio* globals", "source": "slide_studio/server.py:35,654-655,760"},
+        {"method": "GET", "path": "/api/deck/{deck}/download/{kind}", "request": null, "response": "file download", "source": "slide_studio/server.py:741"},
+        {"method": "GET", "path": "/api/deck/{deck}/checks", "request": null, "response": "current check state; exact shape not captured", "source": "slide_studio/background_check.py:150"},
+        {"method": "GET", "path": "/api/deck/{deck}/shots", "request": null, "response": "shot listing; exact shape not captured", "source": "slide_studio/shots.py:318"},
+        {"method": "POST", "path": "/api/deck/{deck}/shots/priority", "request": "{\"indices\": [int]}", "response": "{\"ok\": true}; 400 invalid indices; 404 missing deck", "source": "slide_studio/shots.py:305-315"},
+        {"method": "GET", "path": "/api/themes", "request": null, "response": "{\"themes\": [...], \"fonts\": ..., \"recent\": [...]}", "source": "slide_studio/themes.py:73-90", "notes": "GET and POST share the collection handler; GET is the branch at 87-88."},
+        {"method": "POST", "path": "/api/themes", "request": "{\"name\", \"from\", \"base\"}", "response": "theme detail (201); 400/409 with {\"error\"}", "source": "slide_studio/themes.py:73-90", "notes": "Shares the collection handler with GET."},
+        {"method": "POST", "path": "/api/themes/select", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/themes.py:168"},
+        {"method": "GET|PUT|DELETE", "path": "/api/themes/{name}", "request": "PUT body not captured", "response": "theme detail; 400/409 errors", "source": "slide_studio/themes.py:92-97,169"},
+        {"method": "GET", "path": "/files/decks/__theme-sample__/sample.html", "request": null, "response": "theme sample HTML", "source": "slide_studio/themes.py:15,166"},
+        {"method": "GET", "path": "/api/ai/status", "request": null, "response": "{\"providers\": [...]} plus defaults and saved limits", "source": "slide_studio/ai/chat.py:241-260,1360"},
+        {"method": "GET", "path": "/api/ai/roles", "request": null, "response": "{\"roles\": [{id, revision, skill, web, readonly, configurable, base, extra}], \"supported_providers\": [...], \"extra_limit\": int}", "source": "slide_studio/ai/chat.py:1344-1351"},
+        {"method": "PUT", "path": "/api/ai/roles/{role}/extra", "request": "{\"text\": string}", "response": "{\"extra\": string}", "source": "slide_studio/ai/chat.py:1353-1356"},
+        {"method": "GET", "path": "/api/ai/runtimes", "request": null, "response": "runtime listing; shape not captured", "source": "slide_studio/ai/chat.py:1363"},
+        {"method": "GET|POST", "path": "/api/ai/{provider}/login", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/ai/chat.py:1364"},
+        {"method": "POST", "path": "/api/ai/{provider}/runtime", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/ai/chat.py:1365"},
+        {"method": "PUT", "path": "/api/ai/favorites", "request": "{\"models\": [...]} (exact keys not captured)", "response": "unknown_not_captured", "source": "slide_studio/ai/chat.py:1366"},
+        {"method": "GET", "path": "/api/deck/{deck}/chat", "request": null, "response": "chat.public: {role_modes, role_defaults, role_providers, figure_users, deck, tabs, rounds, locked, lock, memo_locked, topic, ai}", "source": "slide_studio/ai/chat.py:204-209,1367"},
+        {"method": "POST", "path": "/api/deck/{deck}/chat/open", "request": "open view; body not required", "response": "same public shape", "source": "slide_studio/ai/chat.py:211-229,1368"},
+        {"method": "POST", "path": "/api/deck/{deck}/chat/tabs", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/ai/chat.py:1369"},
+        {"method": "PATCH", "path": "/api/deck/{deck}/chat/tabs/{tab}", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/ai/chat.py:1370"},
+        {"method": "POST", "path": "/api/deck/{deck}/chat/tabs/{tab}/send", "request": "send payload; shape not captured", "response": "round/state; shape not captured", "source": "slide_studio/ai/chat.py:1371"},
+        {"method": "POST", "path": "/api/deck/{deck}/chat/rounds/{round}/continue", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/ai/chat.py:1372"},
+        {"method": "POST", "path": "/api/deck/{deck}/chat/rounds/{round}/cancel", "request": "unknown_not_captured", "response": "unknown_not_captured", "source": "slide_studio/ai/chat.py:1373"},
+        {"method": "GET|POST", "path": "/api/deck/{deck}/chat/rounds/{round}/restore", "request": "unknown_not_captured", "response": "restore plan/files; shape not fully captured", "source": "slide_studio/ai/chat.py:1374"},
+        {"method": "POST", "path": "/api/deck/{deck}/chat/rounds/{round}/handoff", "request": "{\"base\": string, \"force\": bool, \"defer\": bool} (keys observed)", "response": "handoff result; shape not captured", "source": "slide_studio/ai/chat.py:1340-1342,1375"},
+        {"method": "GET", "path": "/", "app": "main", "request": null, "response": "HTML shell", "source": "slide_studio/server.py:738"},
+        {"method": "GET", "path": "/agents", "request": null, "response": "HTML shell", "source": "slide_studio/server.py:738"},
+        {"method": "GET", "path": "/deck/{deck}", "app": "main", "request": null, "response": "HTML shell", "source": "slide_studio/server.py:738"},
+        {"method": "GET", "path": "/figure/{rest:path}", "request": null, "response": "HTML figure page", "source": "slide_studio/server.py:738"},
+        {"method": "GET", "path": "/topic/{shelf}", "request": null, "response": "HTML topic page", "source": "slide_studio/server.py:734"},
+        {"method": "GET", "path": "/web/*", "request": null, "response": "static web assets (no-store)", "source": "slide_studio/server.py:761", "notes": "No dedicated /web/present route; present.js is served here as a static asset."},
+        {"method": "GET", "path": "/files/*", "request": null, "response": "workspace static files (no-store)", "source": "slide_studio/server.py:762"},
+        {"method": "GET", "path": "/", "app": "location", "request": null, "response": "location app HTML", "source": "slide_studio/location.py:112", "notes": "The location wrapper serves this until a workspace is selected; after selection it forwards non-/location, non-/api/location paths to the main app (location.py:118-124)."},
+        {"method": "GET", "path": "/location", "app": "location", "request": null, "response": "location app HTML", "source": "slide_studio/location.py:112"},
+        {"method": "GET", "path": "/deck/{deck}", "app": "location", "request": null, "response": "location app HTML", "source": "slide_studio/location.py:112"},
+        {"method": "GET", "path": "/api/location", "app": "location", "request": null, "response": "location state; shape not captured", "source": "slide_studio/location.py:112"},
+        {"method": "POST", "path": "/api/location", "app": "location", "request": "root/folder choice; exact body not captured", "response": "result; shape not captured", "source": "slide_studio/location.py:115"},
+        {"method": "GET", "path": "/api/location/folders", "app": "location", "request": null, "response": "folder listing; shape not captured", "source": "slide_studio/location.py:114"},
+        {"method": "GET", "path": "/api/events", "app": "location", "request": null, "response": "own SSE stream; no data events observed", "source": "slide_studio/location.py:113"}
+      ],
+      "operation_actions": {
+        "path_action": {
+          "route": "POST /api/deck/{deck}/{action}",
+          "observed": ["check", "build"],
+          "source": "slide_studio/server.py:216-259,755",
+          "notes": "Only a single path segment matches. The handler special-cases check/build."
+        },
+        "chunks_body_action": {
+          "route": "POST /api/deck/{deck}/chunks",
+          "observed": ["markdown", "cell", "html", "delete", "move", "image"],
+          "source": "slide_studio/server.py:412-454",
+          "notes": "These action strings are in the JSON body, not the URL path."
+        }
+      },
+      "precedence": {
+        "observations": [
+          "The catch-all is POST /api/deck/{deck}/{action} and matches one segment only (server.py:755).",
+          "POST /api/deck/{deck}/chunks, /assets, /materials, /library and /bib have the same method and one-segment shape as the catch-all; their earlier registration in the routes list (server.py:743-755) protects them.",
+          "POST /api/deck/{deck}/assets/{op} and /materials/{op} have two segments and do not collide with the catch-all.",
+          "GET /api/deck/{deck}/shots, GET /api/deck/{deck}/checks and GET /api/deck/{deck}/chat do not share the POST catch-all's method.",
+          "POST /api/deck/{deck}/shots/priority, /chat/open and /chat/tabs have two segments and do not collide with the single-segment catch-all.",
+          "POST /api/home/manage and /api/themes/select have different prefixes.",
+          "The preview route (server.py:760) is listed before the /files mount (762); the theme sample route is inserted at position 0 (themes.py:166). Both therefore match before the mount.",
+          "The location wrapper and the main app both serve /, /deck/{deck} and /api/events. The wrapper keeps /location and /api/location, and after a workspace is selected it forwards other paths to the activated main app (location.py:118-124)."
+        ],
+        "insertion_order": {
+          "mechanism": "Several extensions insert at position 0. Relative order of those inserts is the reverse of the EXTENSIONS install order in server.py:781-807.",
+          "install_order_observed": ["ai.chat", "deck_manage", "shots", "themes", "theme_shots", "background_check"],
+          "resulting_front_order_observed": ["background_check", "themes", "shots", "deck_manage", "ai.chat"],
+          "no_route_install": "theme_shots registers only a starter/hook, not routes (theme_shots.py:88-121), so it does not appear in the route order.",
+          "source": "slide_studio/server.py:781-807; slide_studio/ai/chat.py:1359; slide_studio/themes.py:166; slide_studio/shots.py:318; slide_studio/deck_manage.py:289; slide_studio/background_check.py:150",
+          "caveat": "The source shows the mechanism and order, but the current path list does not demonstrate a same-method, same-shape conflict for the inserted GET / two-segment routes. Treat position-0 insertion as observed registration behavior, not as proof that each insertion is required."
+        }
+      }
+    },
+    "sse": {
+      "transport": "Main app: single GET /api/events stream. The location app has a separate GET /api/events stream (location.py:113) before the main app is built.",
+      "framing": {"retry": "retry: 1000\\n\\n", "event": "data: <json>\\n\\n", "keepalive": ": ping\\n\\n every 15s", "media_type": "text/event-stream", "source": "slide_studio/server.py:666-679"},
+      "event_catalog": [
+        {"type": "render-start", "payload": {"type": "render-start", "deck": "string", "version": "string|number"}, "source": "slide_studio/server.py:94"},
+        {"type": "render", "payload": {"type": "render", "deck": "string", "ok": "bool", "version": "string|number", "...": "error on failure"}, "source": "slide_studio/server.py:103-110"},
+        {"type": "files", "payload": {"type": "files", "paths": ["relative/path"]}, "source": "slide_studio/server.py:165"},
+        {"type": "export-progress", "payload": {"type": "export-progress", "deck": "string", "...": "additional keys not captured"}, "source": "slide_studio/server.py:226"},
+        {"type": "checks", "payload": {"type": "checks", "deck": "string", "...state fields": "from self.states[deck]", "result?": "present when a run finishes"}, "source": "slide_studio/background_check.py:88,113,124,131"},
+        {"type": "shots", "payload": {"type": "shots", "...": "shape not captured"}, "source": "slide_studio/shots.py:150"},
+        {"type": "theme-shots", "payload": {"type": "theme-shots", "theme": "string"}, "source": "slide_studio/theme_shots.py:109"},
+        {"type": "theme-lock", "payload": {"type": "theme-lock"}, "source": "slide_studio/ai/chat.py:233"},
+        {"type": "chat", "payload": {"type": "chat", "deck": "string", "state": "chat.public(...)"}, "source": "slide_studio/ai/chat.py:238"},
+        {"type": "chat-round", "payload": {"type": "chat-round", "deck": "string", "round": "object", "locked": "bool", "lock": "slide scope", "memo_locked": "bool"}, "source": "slide_studio/ai/chat.py:234-236"},
+        {"type": "ai-limits", "payload": {"type": "ai-limits", "limits": "saved limits object"}, "source": "slide_studio/ai/chat.py:738-750", "notes": "Emitted when _save_limits stores provider limits; no dedicated HTTP route sets limits."}
+      ],
+      "unknowns": [
+        "SSE event ordering and reconnection semantics beyond retry: 1000 were not inspected.",
+        "Payload fields marked 'not captured' must be confirmed before implementing a typed client."
+      ]
+    },
+    "bridge": {
+      "kind": "Filesystem request/response channel used when the CLI runs inside the AI sandbox and cannot start Chromium/HTTP.",
+      "directory": "<workspace.state>/requests",
+      "files": {"request": "<rid>.req.json", "accepted": "<rid>.run", "response": "<rid>.res.json"},
+      "requests": [
+        {"operation": "check", "body": {"deck": "string|null", "page": "string|null", "figure": "string|null"}, "source": "slide_studio/ai/bridge.py:34-35"},
+        {"operation": "audit_run", "body": {"operation": "audit_run", "deck": "string"}, "source": "slide_studio/ai/bridge.py:38-39"},
+        {"operation": "consult", "body": {"operation": "consult", "tab": "string", "question": "string"}, "source": "slide_studio/ai/bridge.py:42-43"}
+      ],
+      "responses": [
+        {"case": "check", "body": {"summary": "string", "errors": "int"}, "source": "slide_studio/ai/bridge.py:117"},
+        {"case": "audit_run", "body": {"result": "object"}, "source": "slide_studio/ai/bridge.py:110"},
+        {"case": "consult", "body": {"answer": "string"}, "source": "slide_studio/ai/bridge.py:114"},
+        {"case": "error", "body": {"summary": "string", "errors": 1}, "source": "slide_studio/ai/bridge.py:118-119"}
+      ],
+      "waits": {"accept_seconds": 5.0, "result_seconds": 900.0, "poll_seconds": 0.25, "source": "slide_studio/ai/bridge.py:19-21"},
+      "unknowns": [
+        "The app-side runner wiring (which handlers are passed to serve) was not fully traced in this pass.",
+        "Failure modes when multiple requests share a workspace were not tested."
+      ]
+    },
+    "iframe_dom_dependencies": {
+      "preview_url": "/files/decks/<deck>/__slide-studio_preview__.html?v=<version>#<page>/<step>",
+      "injected_globals": ["window.__slideStudioDeck", "window.__slideStudioVersion", "window.__slideStudioNoHash", "window.__slideStudioFill", "window.__slideStudioNoOverview"],
+      "injected_globals_source": "slide_studio/server.py:654",
+      "injected_assets": ["/web/inject/edit.css", "/web/inject/edit.js"],
+      "injected_assets_source": "slide_studio/server.py:655",
+      "runtime_contract": [
+        {"subject": "window.deck", "detail": "Runtime exports the deck API object.", "source": "slide_studio/runtime/player.js:449"},
+        {"subject": "deckReady", "detail": "Runtime sets the ready flag and dispatches the deckready event.", "source": "slide_studio/runtime/player.js:461-463"},
+        {"subject": "postMessage ready", "detail": "{channel: 'slide-studio-deck', type: 'ready'}", "source": "slide_studio/runtime/player.js:463"},
+        {"subject": "figure channel", "detail": "{channel: 'slide-studio-figure', type: 'ratio' | 'navigate'}", "source": "slide_studio/runtime/figure.mjs:7,105"},
+        {"subject": "window.animation", "detail": "Figure/player animation API exposed to injected code.", "source": "slide_studio/runtime/figure.mjs:165-187"}
+      ],
+      "consumers": [
+        {"file": "slide_studio/web/preview.js", "lines": "3,16,21,24-25,45,51-63,68-96", "dependency": "Reads iframe window.deck, injected globals, version/query/hash; sends postMessage and matches channel 'slide-studio-deck' type 'ready' (preview.js:16)."},
+        {"file": "slide_studio/web/present.js", "lines": "38-45,84,89-109", "dependency": "Presentation iframe navigation. Ready is detected via w.deckReady or the deckready event (present.js:92); no other present event type was confirmed."},
+        {"file": "slide_studio/web/app.js", "lines": "23-27", "dependency": "Top-level iframe access / event wiring."},
+        {"file": "slide_studio/web/blocks.js", "lines": "49,58-75,138-178,201-240,352-366,499-526,575-632,682-714", "dependency": "Block selection, geometry, and DOM mutation inside the preview iframe."},
+        {"file": "slide_studio/web/block-handles.js", "lines": "16-28,145,182-183,232-235,290,321-325", "dependency": "Handle overlays computed from iframe element rectangles."},
+        {"file": "slide_studio/web/block-drag.js", "lines": "16-26,132-133", "dependency": "Pointer/drag coordinates relative to iframe content."},
+        {"file": "slide_studio/web/text-format.js", "lines": "15-17,60-61,88-98", "dependency": "Text selection and formatting through iframe DOM access."},
+        {"file": "slide_studio/web/step-badge.js", "lines": "6-11", "dependency": "Step badge reads iframe slide/step state."},
+        {"file": "slide_studio/web/theme-tab.js", "lines": "193,213,235,552-556,596,602,619,625-661,705", "dependency": "Theme preview/iframe messaging and theme sample access."},
+        {"file": "slide_studio/web/checks.js", "lines": "12,26-30", "dependency": "Reads checks payload attached to preview/runtime."},
+        {"file": "slide_studio/web/layout-lint.js", "lines": "40-41", "dependency": "Layout lint DOM measurements."},
+        {"file": "slide_studio/web/inject/lint.js", "lines": "3,34,65-72", "dependency": "Injected lint reads/writes preview DOM. It is a web/inject helper, not listed as a separate script in server.py:655; exact import path from edit.js was not verified."},
+        {"file": "slide_studio/web/inject/edit.js", "lines": "injection entry (no line number)", "dependency": "Injected direct-edit API; loaded by server.py:655 together with /web/inject/edit.css."},
+        {"file": "slide_studio/web/assets.js", "lines": "81-83,151", "dependency": "Asset preview iframe/DOM access."},
+        {"file": "slide_studio/web/topic.js", "lines": "94-100", "dependency": "Topic page iframe/content access."},
+        {"file": "slide_studio/web/asset-preview.js", "lines": "42-50", "dependency": "Asset preview rendering."},
+        {"file": "slide_studio/runtime/player.js", "lines": "432", "dependency": "Receives channel 'slide-studio-figure' messages (the consumer counterpart of figure.mjs)."},
+        {"file": "slide_studio/runtime/figure.mjs", "lines": "7,105", "dependency": "Sends slide-studio-figure messages (ratio/navigate) to the parent runtime."}
+      ],
+      "unknowns": [
+        "Exact message schemas for every postMessage direction were not exhaustively enumerated.",
+        "Present.js was not confirmed to consume event types other than ready/deckready.",
+        "Direct DOM dependencies outside the listed files may exist; this list is a bounded inventory, not exhaustive."
+      ]
+    },
+    "ai": {
+      "roles": ["chat", "theme", "draft", "review", "consult"],
+      "role_source": "slide_studio/ai/roles.py:40-52",
+      "role_response_schemas": "slide_studio/ai/roles.py:187-210",
+      "providers": ["codex", "claude", "agy"],
+      "provider_source": "slide_studio/ai/providers.py:656",
+      "detect_result": "provider/model detection result consumed by /api/ai/status; exact field set not captured in this pass.",
+      "limits": {"stored_in": "workspace prefs key ai_limits", "source": "slide_studio/ai/chat.py:738-750", "http_route": "none observed; status exposes saved limits"}
+    },
+    "portable": {
+      "bundled_modules": "slide_studio/portable.py:7-12",
+      "ensure_portable": "slide_studio/portable.py:15-42",
+      "note": "Portable compiler bundles modules for standalone operation; file list is observed, behavior not re-verified here."
+    }
+  },
+  "proposed": {
+    "note": "These are migration boundaries only. Nothing below exists yet. The target_module names in feature-map.json resolve to these areas.",
+    "boundaries": [
+      {"area": "core", "owner_modules": ["workspace", "config", "doctor", "importer", "decks", "chunks", "topics", "structure", "memo", "assets", "materials", "library", "bibliography", "themes", "history", "snapshot", "portable", "figures"], "current_sources": ["slide_studio/workspace.py", "slide_studio/doctor.py", "slide_studio/importer.py", "slide_studio/source.py", "slide_studio/memo.py", "slide_studio/assets.py", "slide_studio/materials.py", "slide_studio/library.py", "slide_studio/bibliography.py", "slide_studio/themes.py", "slide_studio/history.py", "slide_studio/snapshot.py", "slide_studio/portable.py", "slide_studio/figures.py"], "proposed_boundary": "Pure domain/file operations independent of Starlette routing; preserve Japanese error strings only at the UI boundary."},
+      {"area": "server", "owner_modules": ["launch", "location", "events", "files", "operations"], "current_sources": ["slide_studio/server.py", "slide_studio/location.py"], "proposed_boundary": "HTTP/SSE transport adapters; keep route precedence and SSE framing compatible or version the contract."},
+      {"area": "render", "owner_modules": ["preview", "export", "shots", "checks", "math"], "current_sources": ["slide_studio/render.py", "slide_studio/export.py", "slide_studio/shots.py", "slide_studio/background_check.py", "slide_studio/server.py:35,654-655,760"], "proposed_boundary": "Headless rendering/compilation; avoid leaking Playwright/Chromium handles into the desktop shell."},
+      {"area": "ai", "owner_modules": ["status", "roles", "providers", "runtimes", "chat", "consult", "audit", "bridge"], "current_sources": ["slide_studio/ai/chat.py", "slide_studio/ai/roles.py", "slide_studio/ai/providers.py", "slide_studio/ai/bridge.py", "slide_studio/ai/tools/audit.py"], "proposed_boundary": "Provider adapters plus round/tab state machine; keep sandbox bridge semantics for CLI delegation."},
+      {"area": "web", "owner_modules": ["shell", "home", "preview-bridge", "edit-bridge", "present", "themes", "checks"], "current_sources": ["slide_studio/web/*.js", "slide_studio/web/inject/*.js"], "proposed_boundary": "Renderer/editor UI must consume an explicit iframe message contract instead of reaching into iframe DOM where feasible."},
+      {"area": "runtime", "owner_modules": ["player", "figure"], "current_sources": ["slide_studio/runtime/player.js", "slide_studio/runtime/figure.mjs"], "proposed_boundary": "Keep window.deck/deckReady/postMessage channel names stable during migration; version if changed."},
+      {"area": "desktop", "owner_modules": ["window", "external-links", "shell"], "current_sources": ["slide_studio/server.py:823-842", "slide_studio/server.py:712-730"], "proposed_boundary": "Electron owns window creation and external URL opening; remove OS-specific Chrome window launching from the server."}
+    ]
+  },
+  "validation": {
+    "reference_check": {
+      "run_by": "integrator after the first inventory draft",
+      "occurrences_checked": 396,
+      "scope": "Path existence for all counted occurrences, plus numeric line-range bounds only where a line number/range was present. It did not verify that each cited line semantically supports the associated claim.",
+      "not_covered": "References without line numbers could only be checked for file existence, not line bounds: slide_studio/export.py (output_path), slide_studio/portable.py (ensure_portable), slide_studio/web/inject/edit.js (injection entry), and bare file paths such as slide_studio/memo.py. If any of these were included in the 396 count, that count does not imply a line-bound check for them."
+    },
+    "performed": [
+      "Read source files and recorded references during M0 inventory.",
+      "Separated observed contracts from proposed boundaries.",
+      "Marked fields that were not captured instead of guessing.",
+      "Integrator ran an automated existence + line-bounds check over 396 path occurrences (scope above)."
+    ],
+    "not_performed": [
+      "Semantic verification that each cited line supports the claim.",
+      "JSON schema validation by tooling inside this inventory pass.",
+      "Test execution or pass/fail claims.",
+      "Network/SSE runtime probing."
+    ]
+  }
+}
