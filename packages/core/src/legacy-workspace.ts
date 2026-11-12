@@ -252,7 +252,7 @@ function sameJson(left: Record<string, unknown>, right: Record<string, unknown>)
 const RETRYABLE_RENAME = new Set(["EPERM", "EACCES", "EBUSY", "ENOTEMPTY"]);
 const sleepBuffer = new Int32Array(new SharedArrayBuffer(4));
 
-function renameWithRetry(from: string, to: string): void {
+export function renameWithRetry(from: string, to: string): void {
   const delays = process.platform === "win32" ? [0, 10, 20, 40, 80, 120, 200] : [0];
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     try {
@@ -359,7 +359,8 @@ function checkLookupName(value: unknown, what: string): string {
     || value === "."
     || value === ".."
     || isAbsolute(value)
-    || /[\\/]/u.test(value)
+    || value.includes("/")
+    || (process.platform === "win32" && value.includes("\\"))
     || CONTROL_CHARACTER.test(value)
   ) {
     throw new StudioError(`${what}が正しくありません: ${JSON.stringify(value)}`);
@@ -577,19 +578,6 @@ interface MigrationPreparationMessages {
   bibFix: string;
 }
 
-const FALLBACK_THEME_PREPARATION: ThemePreparationMessages = {
-  name: "テーマの準備",
-  detail: "同梱テーマの default.css が古い形式のままです。",
-  fix: "テーマを現在の版に戻すか、発表ごとの styles/slides.css に調整を移してください。",
-};
-const FALLBACK_MIGRATION_PREPARATION: MigrationPreparationMessages = {
-  topics: "トピックの移行",
-  folders: "旧 figures/ と新しい topics/ が同じ置き場にあります。",
-  folderFix: "figures/ の中身を topics/<トピック>/html/ へ移してください。",
-  bib: "文献の移行",
-  bibFix: "発表ごとの reference.bib とトピックの reference.bib を確認してください。",
-};
-
 let STRINGS_FILE: string | null = null;
 
 /** Integration/tests can point at the renderer's canonical strings module. */
@@ -599,13 +587,17 @@ export function set_strings_file(path: string | null): void {
 
 function stringsCandidates(): string[] {
   const values = STRINGS_FILE ? [STRINGS_FILE] : [];
-  values.push(join(process.cwd(), "packages", "web", "strings.js"));
-  values.push(join(dirname(fileURLToPath(import.meta.url)), "../../../web/strings.js"));
+  // The canonical module lives at <repo>/packages/web/strings.js next to
+  // <repo>/packages/core/src/legacy-workspace.ts (or the dist/ mirror). The
+  // packaged copy is a build asset, so it is the last resort rather than the
+  // only source.
+  values.push(join(dirname(fileURLToPath(import.meta.url)), "../../web/strings.js"));
   try {
     values.push(assetPath("strings.js"));
   } catch {
     // Assets may be unavailable in a pure unit test.
   }
+  values.push(join(process.cwd(), "packages", "web", "strings.js"));
   return values;
 }
 
@@ -630,23 +622,46 @@ function readStringsConstant(name: string): Record<string, string> | null {
   return null;
 }
 
+function requireStringsConstant(name: string): Record<string, string> {
+  const found = readStringsConstant(name);
+  if (!found) {
+    throw new StudioError(
+      `UI 文言（${name}）を読み込めません。strings.js の配置を確認してください。`,
+      "INVALID_INPUT",
+    );
+  }
+  return found;
+}
+
 function themePreparationMessages(): ThemePreparationMessages {
-  const found = readStringsConstant("THEME_PREPARATION");
-  return {
-    name: typeof found?.name === "string" ? found.name : FALLBACK_THEME_PREPARATION.name,
-    detail: typeof found?.detail === "string" ? found.detail : FALLBACK_THEME_PREPARATION.detail,
-    fix: typeof found?.fix === "string" ? found.fix : FALLBACK_THEME_PREPARATION.fix,
-  };
+  const found = requireStringsConstant("THEME_PREPARATION");
+  if (
+    typeof found.name !== "string"
+    || typeof found.detail !== "string"
+    || typeof found.fix !== "string"
+  ) {
+    throw new StudioError("UI 文言（THEME_PREPARATION）が不完全です。", "INVALID_INPUT");
+  }
+  return { name: found.name, detail: found.detail, fix: found.fix };
 }
 
 function migrationPreparationMessages(): MigrationPreparationMessages {
-  const found = readStringsConstant("MIGRATION_PREPARATION");
+  const found = requireStringsConstant("MIGRATION_PREPARATION");
+  if (
+    typeof found.topics !== "string"
+    || typeof found.folders !== "string"
+    || typeof found.folderFix !== "string"
+    || typeof found.bib !== "string"
+    || typeof found.bibFix !== "string"
+  ) {
+    throw new StudioError("UI 文言（MIGRATION_PREPARATION）が不完全です。", "INVALID_INPUT");
+  }
   return {
-    topics: typeof found?.topics === "string" ? found.topics : FALLBACK_MIGRATION_PREPARATION.topics,
-    folders: typeof found?.folders === "string" ? found.folders : FALLBACK_MIGRATION_PREPARATION.folders,
-    folderFix: typeof found?.folderFix === "string" ? found.folderFix : FALLBACK_MIGRATION_PREPARATION.folderFix,
-    bib: typeof found?.bib === "string" ? found.bib : FALLBACK_MIGRATION_PREPARATION.bib,
-    bibFix: typeof found?.bibFix === "string" ? found.bibFix : FALLBACK_MIGRATION_PREPARATION.bibFix,
+    topics: found.topics,
+    folders: found.folders,
+    folderFix: found.folderFix,
+    bib: found.bib,
+    bibFix: found.bibFix,
   };
 }
 
@@ -668,6 +683,7 @@ export class Workspace {
   readonly #runtimeAssets: string;
   readonly #version: string;
   readonly #themeVariables: string[];
+  readonly #migrationWarnings: string[] = [];
 
   constructor(root: string, options: WorkspaceOptions = {}) {
     const expanded = expandUser(root);
@@ -840,7 +856,10 @@ export class Workspace {
       const destination = join(this.runtime, name);
       const data = readFileSync(source);
       const current = readIfFile(destination);
-      if (!current || !current.equals(data)) this.#write(destination, data);
+      if (!current || !current.equals(data)) {
+        if (lstatOrNull(destination)?.isSymbolicLink()) this.#unlinkOptional(destination);
+        this.#write(destination, data);
+      }
     }
 
     this.#migrateBibliography();
@@ -979,6 +998,14 @@ export class Workspace {
         fix: messages.bibFix,
       });
     }
+    for (const detail of this.#migrationWarnings) {
+      output.push({
+        name: messages.bib,
+        ok: false,
+        detail,
+        fix: messages.bibFix,
+      });
+    }
     return output;
   }
 
@@ -989,6 +1016,11 @@ export class Workspace {
     const output: string[] = [];
     for (const entry of this.#listEntries(directory)) {
       if (entry.name.startsWith("_") || entry.name.startsWith(".")) continue;
+      try {
+        checkLookupName(entry.name, "発表名");
+      } catch {
+        continue;
+      }
       const deckPath = join(directory, entry.name);
       const deckLink = lstatOrNull(deckPath);
       if (!deckLink) continue;
@@ -1111,14 +1143,51 @@ export class Workspace {
     }
 
     this.#ensureDirectory(this.decks, "decks");
+
+    // The topic folders are part of the same user-visible commit as the deck.
+    // Create them before copying so `images_dir(deck)` does not need the deck
+    // to exist yet, and remember exactly which paths this run created so a
+    // failure can remove only those.
+    const topicHtml = this.shelf_dir(shelf);
+    const topicImages = join(this.topic_dir(shelf), "images");
+    const createdTopicPaths = new Set<string>();
+    for (const path of [topicHtml, topicImages]) {
+      let current = path;
+      while (current !== this.root && !existsNoFollow(current)) {
+        if (!isInsideRoot(this.root, resolve(current))) break;
+        createdTopicPaths.add(current);
+        const parent = dirname(current);
+        if (parent === current) break;
+        current = parent;
+      }
+    }
+    try {
+      this.#ensureDirectory(topicHtml, "topic html");
+      this.#ensureDirectory(topicImages, "topic images");
+    } catch (error) {
+      this.#cleanupCreated(createdTopicPaths);
+      throw error;
+    }
+
+    const created = [...createdTopicPaths];
     const temporary = join(this.decks, `.new-${randomUUID()}`);
     try {
       if (source_deck) {
         const source = this.require_deck(source_deck);
-        const ignore = (directory: string, names: string[]): string[] => [
-          ...names.filter((name) => isIgnoredDeckFile(name)),
-          ...(resolve(directory) === resolve(source) ? ["materials"] : []),
-        ];
+        const ignore = (directory: string, names: string[]): string[] => {
+          let sameDirectory = resolve(directory) === resolve(source);
+          if (!sameDirectory) {
+            try {
+              sameDirectory = realpathSync.native(directory) === realpathSync.native(source);
+            } catch {
+              sameDirectory = false;
+            }
+          }
+          return [
+            ...names.filter((name) => isIgnoredDeckFile(name)),
+            ...(sameDirectory ? ["materials"] : []),
+          ];
+        };
         this.#copyTree(source, temporary, { ignore });
         const qmd = join(temporary, "slides.qmd");
         const sourceBib = this.bib(source_deck);
@@ -1131,6 +1200,7 @@ export class Workspace {
           deck,
           shelf,
           this.#readText(qmd, "slides.qmd"),
+          created,
         );
         text = set_front(text, { topic: shelf, theme });
         if (title) text = set_front(text, { title: JSON.stringify(title) });
@@ -1143,15 +1213,40 @@ export class Workspace {
       }
       renameWithRetry(temporary, destination);
     } catch (error) {
-      this.#removeTree(temporary);
+      try {
+        this.#removeTree(temporary);
+      } catch {
+        // Keep the original copy/rename failure visible.
+      }
+      this.#cleanupCreated(created);
       throw error;
     }
 
-    this.#ensureDirectory(this.shelf_dir(shelf), "topic html");
-    this.#ensureDirectory(this.images_dir(deck), "topic images");
-    this.#migrateBibliography();
-    this.touch_recent(deck);
-    this.set_prefs({ shelf, theme });
+    // The deck is now visible. Auxiliary work must not make a successful
+    // creation look like a failed one (a retry would hit 既にあります).
+    const warnings: string[] = [];
+    try {
+      this.#migrateBibliography();
+    } catch (error) {
+      warnings.push(
+        `文献の移行: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    try {
+      this.touch_recent(deck);
+    } catch (error) {
+      warnings.push(
+        `最近の発表: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    try {
+      this.set_prefs({ shelf, theme });
+    } catch (error) {
+      warnings.push(
+        `設定の保存: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    this.#migrationWarnings.push(...warnings);
     return destination;
   }
 
@@ -1577,7 +1672,22 @@ export class Workspace {
       unlinkSync(target);
       return;
     }
-    rmSync(target, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  }
+
+  #cleanupCreated(paths: Iterable<string>): void {
+    const unique = [...new Set(paths)].sort((left, right) => {
+      const depth = right.split(sep).length - left.split(sep).length;
+      return depth !== 0 ? depth : (left < right ? 1 : left > right ? -1 : 0);
+    });
+    for (const path of unique) {
+      if (resolve(path) === this.root) continue;
+      try {
+        this.#removeTree(path);
+      } catch {
+        // Best-effort rollback; never hide the original failure.
+      }
+    }
   }
 
   #renameWithinRoot(from: string, to: string): void {
@@ -1657,7 +1767,9 @@ export class Workspace {
 
     this.#ensureDirectory(destination, basename(destination));
     const entries = this.#listEntries(source);
-    const names = entries.filter((entry) => !entry.isSymbolicLink()).map((entry) => entry.name).sort();
+    // Python's copytree passes every name to the ignore callback, including
+    // symlinks. Filtering them out would follow a linked materials/ or PDF.
+    const names = entries.map((entry) => entry.name).sort();
     const ignored = new Set(options.ignore?.(source, names) ?? []);
     for (const entry of entries) {
       if (ignored.has(entry.name)) continue;
@@ -1869,15 +1981,32 @@ export class Workspace {
       const parts = relativePath.split("/");
       if (parts[2]) skills.add(parts[2]);
     }
-    const links = join(this.root, ".claude", "skills");
+    const claude = join(this.root, ".claude");
+    const links = join(claude, "skills");
     const linksLink = lstatOrNull(links);
+    const claudeLink = lstatOrNull(claude);
     let agentsSafe = true;
     try {
       this.#assertParentRealInside(join(this.root, ".agents", "skills", ".probe"), ".agents");
     } catch {
       agentsSafe = false;
     }
-    if (linksLink?.isSymbolicLink() || !agentsSafe) {
+    let linksSafe = true;
+    try {
+      // `.claude` itself may be a symlink even when the `skills` child is not
+      // itself a link. Probe the parent chain the same way as `.agents`.
+      this.#assertParentRealInside(join(links, ".probe"), ".claude/skills");
+    } catch {
+      linksSafe = false;
+    }
+    if (
+      claudeLink?.isSymbolicLink()
+      || linksLink?.isSymbolicLink()
+      || (claudeLink !== null && !claudeLink.isDirectory())
+      || (linksLink !== null && !linksLink.isDirectory())
+      || !agentsSafe
+      || !linksSafe
+    ) {
       // Never create or clean links through a symlinked `.claude/skills` or
       // `.agents` directory.
       known["_version"] = this.#version;
@@ -1937,6 +2066,8 @@ export class Workspace {
     this.#ensureDirectory(compiler, "compiler");
     for (const readme of [join(this.root, "README.md"), join(compiler, "README.md")]) {
       const current = readIfFile(readme);
+      // A symlink or directory is neither our README nor safe to overwrite.
+      if (existsNoFollow(readme) && !current) continue;
       const untouchedOld = Boolean(current && OLD_PORTABLE_READMES.has(sha256Bytes(current)));
       if (current && !untouchedOld) continue;
       if (current) this.#backupToTrash(`portable/${timeNs()}/${basename(readme)}`, current);
@@ -1949,7 +2080,11 @@ export class Workspace {
     const parts = relativePath.split("/");
     if (parts.some((part) => part === "" || part === "." || part === "..")) return null;
     const candidate = join(this.root, ...parts);
-    this.#assertLexicalInside(candidate, relativePath);
+    try {
+      this.#assertLexicalInside(candidate, relativePath);
+    } catch {
+      return null;
+    }
     return candidate;
   }
 }

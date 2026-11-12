@@ -1,8 +1,11 @@
 /**
  * Faithful port of the copying/rewrite helpers in
  * `.reference/parity/topic_migrate.py`. The migration itself stages every
- * byte, verifies the copies, and only then replaces `topics/`. Originals are
- * moved to `.slide-studio/trash/topics-v1/` instead of being deleted.
+ * byte, verifies the copies, writes a manifest, and only then replaces
+ * `topics/`. Originals are moved to a per-run
+ * `.slide-studio/trash/topics-v1/<timeNs>/` directory instead of being
+ * deleted, and an interrupted run resumes from the manifest before the
+ * `topics/` guard is considered.
  */
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -15,7 +18,6 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
-  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -25,7 +27,6 @@ import {
   basename,
   dirname,
   extname,
-  isAbsolute,
   join,
   relative,
   resolve,
@@ -33,7 +34,7 @@ import {
 } from "node:path";
 import { fig_args } from "./legacy-source.js";
 import { isInsideRoot } from "./paths.js";
-import { StudioError } from "./legacy-workspace.js";
+import { renameWithRetry, StudioError } from "./legacy-workspace.js";
 import type { Workspace } from "./legacy-workspace.js";
 
 type SetFront = (text: string, values: Record<string, unknown>) => string;
@@ -51,6 +52,25 @@ type WorkspaceView = Pick<
   | "figure_dir"
 >;
 
+interface QmdPlan {
+  before: string;
+  after: string;
+}
+
+interface Manifest {
+  phase: "prepared" | "done";
+  trash: string;
+  all_before: Record<string, string>;
+  before: Record<string, string>;
+  after: Record<string, string>;
+  mapping: Record<string, string>;
+  originals: string[];
+  qmd: Record<string, QmdPlan>;
+  source_hashes: Record<string, string>;
+  result_hashes: Record<string, string>;
+  all_after?: Record<string, string>;
+}
+
 const TEXT_EXTENSIONS = new Set([".html", ".htm", ".css", ".js", ".mjs", ".svg"]);
 
 function sha256(data: Buffer | string): string {
@@ -61,6 +81,10 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
+function timeNs(): string {
+  return (BigInt(Date.now()) * 1_000_000n + process.hrtime.bigint() % 1_000_000n).toString();
+}
+
 function lstatOrNull(path: string): Stats | null {
   try {
     return lstatSync(path);
@@ -69,14 +93,83 @@ function lstatOrNull(path: string): Stats | null {
   }
 }
 
+function pathExists(path: string): boolean {
+  return lstatOrNull(path) !== null;
+}
+
 function isDirectory(path: string): boolean {
   const link = lstatOrNull(path);
   return Boolean(link && !link.isSymbolicLink() && link.isDirectory());
 }
 
-function writeAtomic(path: string, data: string | Uint8Array): void {
+function outsideRoot(label: string): StudioError {
+  return new StudioError(`workspace の外を指しています: ${label}`, "OUTSIDE_ROOT");
+}
+
+/**
+ * Validate the destination before creating anything. The nearest existing
+ * ancestor is resolved first, so a symlinked parent cannot move the write
+ * outside the root even for a path that does not exist yet.
+ */
+function ensureDirectory(root: string, path: string, label: string): void {
+  if (!isInsideRoot(root, resolve(path))) throw outsideRoot(label);
+  let ancestor = path;
+  while (!pathExists(ancestor)) {
+    const parent = dirname(ancestor);
+    if (parent === ancestor) break;
+    ancestor = parent;
+  }
+  let ancestorReal: string;
+  try {
+    ancestorReal = realpathSync.native(ancestor);
+  } catch {
+    throw outsideRoot(label);
+  }
+  if (!isInsideRoot(root, ancestorReal)) throw outsideRoot(label);
+  if (!statSync(ancestorReal).isDirectory()) {
+    throw new StudioError(`${label} is not a directory`, "CONFLICT");
+  }
+
+  if (pathExists(path)) {
+    let real: string;
+    try {
+      real = realpathSync.native(path);
+    } catch {
+      throw outsideRoot(label);
+    }
+    if (!isInsideRoot(root, real)) throw outsideRoot(label);
+    if (!statSync(real).isDirectory()) {
+      throw new StudioError(`${label} is not a directory`, "CONFLICT");
+    }
+    return;
+  }
+
+  mkdirSync(path, { recursive: true });
+  let real: string;
+  try {
+    real = realpathSync.native(path);
+  } catch {
+    throw outsideRoot(label);
+  }
+  if (!isInsideRoot(root, real)) throw outsideRoot(label);
+  if (!statSync(real).isDirectory()) {
+    throw new StudioError(`${label} is not a directory`, "CONFLICT");
+  }
+}
+
+function writeAtomic(root: string, path: string, data: string | Uint8Array): void {
+  ensureDirectory(root, dirname(path), relative(root, path));
+  const existing = lstatOrNull(path);
+  if (existing?.isSymbolicLink()) {
+    let real: string;
+    try {
+      real = realpathSync.native(path);
+    } catch {
+      throw outsideRoot(relative(root, path));
+    }
+    if (!isInsideRoot(root, real)) throw outsideRoot(relative(root, path));
+  }
   const directory = dirname(path);
-  mkdirSync(directory, { recursive: true });
   const temporary = join(directory, `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`);
   let descriptor: number | undefined;
   try {
@@ -85,7 +178,7 @@ function writeAtomic(path: string, data: string | Uint8Array): void {
     fsyncSync(descriptor);
     closeSync(descriptor);
     descriptor = undefined;
-    renameSync(temporary, path);
+    renameWithRetry(temporary, path);
   } catch (error) {
     if (descriptor !== undefined) {
       try {
@@ -105,24 +198,11 @@ function writeAtomic(path: string, data: string | Uint8Array): void {
 
 function assertInside(root: string, path: string, label: string): void {
   const real = existsSync(path) ? realpathSync.native(path) : path;
-  if (!isInsideRoot(root, real)) {
-    throw new StudioError(`workspace の外を指しています: ${label}`, "OUTSIDE_ROOT");
-  }
+  if (!isInsideRoot(root, real)) throw outsideRoot(label);
 }
 
 function safeMkdir(root: string, path: string): void {
-  if (resolve(path) === resolve(root)) {
-    mkdirSync(path, { recursive: true });
-    return;
-  }
-  const parent = dirname(path);
-  if (parent !== path) {
-    let ancestor = parent;
-    while (!existsSync(ancestor) && dirname(ancestor) !== ancestor) ancestor = dirname(ancestor);
-    assertInside(root, ancestor, relative(root, path));
-  }
-  mkdirSync(path, { recursive: true });
-  assertInside(root, path, relative(root, path));
+  ensureDirectory(root, path, relative(root, path) || ".");
 }
 
 function safeRemove(root: string, path: string): void {
@@ -144,7 +224,7 @@ function safeRename(root: string, from: string, to: string): void {
   assertInside(root, dirname(from), relative(root, from));
   safeMkdir(root, dirname(to));
   assertInside(root, dirname(to), relative(root, to));
-  renameSync(from, to);
+  renameWithRetry(from, to);
 }
 
 function assertNoSymlinks(root: string, path: string): void {
@@ -274,31 +354,52 @@ function sameSignature(left: string, right: string): boolean {
   return true;
 }
 
+export interface ReservedPath {
+  path: string;
+  created: boolean;
+}
+
 export function reserve(
   source: string,
   target: string,
+  root: string,
   original?: (candidate: string) => string,
-): string {
+  created?: string[],
+): ReservedPath {
   let candidate = target;
   let suffix = 2;
-  while (existsSync(candidate)) {
+  while (pathExists(candidate)) {
+    // Reusing a destination must never follow a link outside the workspace.
+    let real: string;
+    try {
+      real = realpathSync.native(candidate);
+    } catch {
+      throw outsideRoot(relative(root, candidate));
+    }
+    if (!isInsideRoot(root, real)) throw outsideRoot(relative(root, candidate));
     const sourceDirectory = isDirectory(source);
     const candidateDirectory = isDirectory(candidate);
     const comparison = original ? original(candidate) : candidate;
-    if (sourceDirectory === candidateDirectory && sameSignature(source, comparison)) return candidate;
+    if (sourceDirectory === candidateDirectory && sameSignature(source, comparison)) {
+      return { path: candidate, created: false };
+    }
     const extension = extname(target);
     candidate = join(dirname(target), `${basename(target, extension)}-${suffix}${extension}`);
     suffix += 1;
   }
   if (isDirectory(source)) {
-    mkdirSync(candidate, { recursive: true });
+    safeMkdir(root, candidate);
+    // Record the directory before writing any file: a partial reserve still
+    // needs to be removed by new_deck's rollback.
+    created?.push(candidate);
     for (const file of filesUnder(source)) {
-      writeAtomic(join(candidate, file.relative), readFileSync(file.absolute));
+      writeAtomic(root, join(candidate, file.relative), readFileSync(file.absolute));
     }
   } else {
-    writeAtomic(candidate, readFileSync(source));
+    created?.push(candidate);
+    writeAtomic(root, candidate, readFileSync(source));
   }
-  return candidate;
+  return { path: candidate, created: true };
 }
 
 export function copy_group(
@@ -307,10 +408,13 @@ export function copy_group(
   target: string,
   mapping: Map<string, string>,
   final?: string,
+  created?: string[],
 ): void {
   if (!isDirectory(source)) return;
   const destinationRoot = final ?? target;
-  mkdirSync(target, { recursive: true });
+  const targetExisted = pathExists(target);
+  safeMkdir(ws.root, target);
+  if (!targetExisted && created) created.push(target);
   const original = (candidate: string): string => {
     const destination = join(destinationRoot, relative(target, candidate));
     for (const [owner, placed] of mapping) {
@@ -332,16 +436,16 @@ export function copy_group(
       const files = item.isDirectory() ? filesUnder(itemPath) : [{ relative: "", absolute: itemPath }];
       for (const file of files) {
         const rel = item.isDirectory() ? `${item.name}/${file.relative}` : item.name;
-        const out = reserve(file.absolute, join(target, rel), original);
-        mapping.set(realpathSync.native(file.absolute), resolve(destinationRoot, relative(target, out)));
+        const out = reserve(file.absolute, join(target, rel), ws.root, original, created);
+        mapping.set(realpathSync.native(file.absolute), resolve(destinationRoot, relative(target, out.path)));
       }
     } else {
-      const out = reserve(itemPath, join(target, item.name), original);
+      const out = reserve(itemPath, join(target, item.name), ws.root, original, created);
       const files = item.isDirectory() ? filesUnder(itemPath) : [{ relative: "", absolute: itemPath }];
       for (const file of files) {
         const placed = item.isDirectory()
-          ? join(destinationRoot, relative(target, out), file.relative)
-          : resolve(destinationRoot, relative(target, out));
+          ? join(destinationRoot, relative(target, out.path), file.relative)
+          : resolve(destinationRoot, relative(target, out.path));
         mapping.set(realpathSync.native(file.absolute), placed);
       }
     }
@@ -395,12 +499,21 @@ export function replaceFigureRefs(text: string, replace: (ref: string) => string
   });
 }
 
+function wasCreated(created: string[], path: string): boolean {
+  const target = resolve(path);
+  return created.some((entry) => {
+    const candidate = resolve(entry);
+    return target === candidate || isInsideRoot(candidate, target);
+  });
+}
+
 export function copy_topic_assets(
   ws: WorkspaceView,
   sourceDeck: string,
   _deck: string,
   shelf: string,
   text: string,
+  created?: string[],
 ): string {
   const previous = ws.deck_shelf(sourceDeck);
   if (previous === shelf) return text;
@@ -408,14 +521,26 @@ export function copy_topic_assets(
     const source = join(ws.topic_dir(previous), kind);
     if (existsSync(source)) assertNoSymlinks(ws.root, source);
   }
+  const createdPaths = created ?? [];
   const mapping = new Map<string, string>();
   for (const kind of ["html", "images"]) {
-    copy_group(ws, join(ws.topic_dir(previous), kind), join(ws.topic_dir(shelf), kind), mapping);
+    copy_group(
+      ws,
+      join(ws.topic_dir(previous), kind),
+      join(ws.topic_dir(shelf), kind),
+      mapping,
+      undefined,
+      createdPaths,
+    );
   }
   for (const [source, destination] of mapping) {
     if (!TEXT_EXTENSIONS.has(extname(source).toLowerCase())) continue;
+    // Never rewrite a file that was reused from an existing topic: it may be
+    // shared with another deck and has no trash copy.
+    if (!wasCreated(createdPaths, destination)) continue;
     if (!existsSync(destination)) continue;
     writeAtomic(
+      ws.root,
       destination,
       rewrite(readFileSync(source, "utf8"), source, destination, mapping, ws.root),
     );
@@ -457,37 +582,183 @@ export function copy_topic_assets(
     .split(`topics/${previous}/images/`).join(`topics/${shelf}/images/`);
 }
 
+function sameHashes(left: Record<string, string>, right: Record<string, string>): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) if (left[key] !== right[key]) return false;
+  return true;
+}
+
+function expectedFor(before: Record<string, string>, rel: string): Record<string, string> {
+  const output: Record<string, string> = {};
+  const prefix = `${rel}/`;
+  for (const [path, digest] of Object.entries(before)) {
+    if (path.startsWith(prefix)) output[path.slice(prefix.length)] = digest;
+  }
+  return output;
+}
+
+function recordPath(journal: string): string {
+  return join(journal, "manifest.json");
+}
+
+function writeManifest(root: string, record: string, plan: Manifest): void {
+  writeAtomic(root, record, JSON.stringify(plan, null, 2));
+}
+
+function uniqueTrashDirectory(root: string, state: string): string {
+  const base = join(state, "trash", "topics-v1");
+  const stamp = timeNs();
+  let candidate = join(base, stamp);
+  let suffix = 2;
+  while (pathExists(candidate)) {
+    candidate = join(base, `${stamp}-${suffix}`);
+    suffix += 1;
+  }
+  return relative(root, candidate).replaceAll(sep, "/");
+}
+
+function finish(ws: WorkspaceView, journal: string, plan: Manifest): void {
+  const root = ws.root;
+  const stage = join(journal, "stage", "topics");
+  const trash = plan.trash
+    ? join(root, plan.trash)
+    : join(ws.state, "trash", "topics-v1");
+
+  for (const rel of plan.originals) {
+    const source = join(root, rel);
+    const original = existsSync(source) ? source : join(trash, rel);
+    if (!sameHashes(hashes(original), expectedFor(plan.before, rel))) {
+      throw new StudioError(`移行中に元ファイルが変更されました: ${rel}`, "CONFLICT");
+    }
+  }
+  for (const [rel, values] of Object.entries(plan.qmd)) {
+    let text: string;
+    try {
+      text = readFileSync(join(root, rel), "utf8");
+    } catch {
+      throw new StudioError(`移行中に原稿が変更されました: ${rel}`, "CONFLICT");
+    }
+    if (text !== values.before && text !== values.after) {
+      throw new StudioError(`移行中に原稿が変更されました: ${rel}`, "CONFLICT");
+    }
+  }
+
+  const copied = existsSync(ws.topics) ? ws.topics : stage;
+  if (!sameHashes(hashes(copied), plan.after)) {
+    throw new StudioError(
+      "トピックの移行コピーが変わっています。.slide-studio/migrate/topics-v1/ を確認してください",
+      "CONFLICT",
+    );
+  }
+  if (!existsSync(ws.topics)) {
+    if (!pathExists(stage)) {
+      throw new StudioError(
+        "トピックの移行コピーがありません。.slide-studio/migrate/topics-v1/ を確認してください",
+        "CONFLICT",
+      );
+    }
+    safeRename(root, stage, ws.topics);
+  }
+
+  // Back up the qmd before changing it, and rewrite the decks before moving
+  // the originals. An interrupted run then leaves figures/ in place.
+  for (const [rel, values] of Object.entries(plan.qmd)) {
+    const path = join(root, rel);
+    let text: string;
+    try {
+      text = readFileSync(path, "utf8");
+    } catch {
+      throw new StudioError(`移行中に原稿が変更されました: ${rel}`, "CONFLICT");
+    }
+    if (text !== values.before && text !== values.after) {
+      throw new StudioError(`移行中に原稿が変更されました: ${rel}`, "CONFLICT");
+    }
+    const backup = join(trash, rel);
+    if (!pathExists(backup)) writeAtomic(root, backup, values.before);
+    if (text !== values.after) writeAtomic(root, path, values.after);
+  }
+
+  for (const rel of plan.originals) {
+    const source = join(root, rel);
+    const destination = join(trash, rel);
+    if (!existsSync(source)) continue;
+    if (!sameHashes(hashes(source), expectedFor(plan.before, rel))) {
+      throw new StudioError(`移行中に元ファイルが変更されました: ${rel}`, "CONFLICT");
+    }
+    safeMkdir(root, dirname(destination));
+    renameWithRetry(source, destination);
+  }
+
+  plan.all_after = inventory(root);
+  plan.phase = "done";
+  writeManifest(root, recordPath(journal), plan);
+}
+
 export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
+  const journal = join(ws.state, "migrate", "topics-v1");
+  const record = recordPath(journal);
+  if (lstatOrNull(record)?.isFile()) {
+    const plan = JSON.parse(readFileSync(record, "utf8")) as Manifest;
+    if (plan.phase === "done") return;
+    // Resume before the topics/ guard: an interrupted commit may already have
+    // renamed stage -> topics but still have originals and decks to finish.
+    finish(ws, journal, plan);
+    return;
+  }
+
   const legacy = join(ws.root, "figures");
-  if (!isDirectory(legacy) || existsSync(ws.topics)) return;
+  let legacyIsDirectory = false;
+  try {
+    // Follow the link here, like Python's Path.is_dir(), so a symlinked
+    // figures/ is rejected by assertNoSymlinks instead of being ignored.
+    legacyIsDirectory = statSync(legacy).isDirectory();
+  } catch {
+    legacyIsDirectory = false;
+  }
+  if (!legacyIsDirectory || existsSync(ws.topics)) return;
   assertNoSymlinks(ws.root, legacy);
 
-  const journal = join(ws.state, "migrate", "topics-v1");
+  const allBefore = inventory(ws.root);
   const stage = join(journal, "stage", "topics");
   safeRemove(ws.root, stage);
   safeMkdir(ws.root, stage);
 
   const mapping = new Map<string, string>();
-  const originals: string[] = [];
-  const movedTopics = new Set<string>();
+  const originals: string[] = [relative(ws.root, legacy).replaceAll(sep, "/")];
+  const decks = ws.list_decks();
+  for (const deck of decks) {
+    const folder = ws.deck_dir(deck);
+    for (const name of ["images", "html", "figures"]) {
+      const source = join(folder, name);
+      if (pathExists(source)) originals.push(relative(ws.root, source).replaceAll(sep, "/"));
+    }
+  }
+
+  const before: Record<string, string> = {};
+  for (const rel of originals) {
+    const source = join(ws.root, rel);
+    assertNoSymlinks(ws.root, source);
+    for (const [inner, digest] of Object.entries(hashes(source))) {
+      before[inner ? `${rel}/${inner}` : rel] = digest;
+    }
+  }
+
   const entries = readdirSync(legacy, { withFileTypes: true }).sort((a, b) =>
     a.name < b.name ? -1 : a.name > b.name ? 1 : 0
   );
+  const movedTopics = new Set<string>();
   for (const entry of entries) {
     const source = join(legacy, entry.name);
     if (entry.isDirectory()) {
       movedTopics.add(entry.name);
       copy_group(ws, source, join(stage, entry.name, "html"), mapping, join(ws.topic_dir(entry.name), "html"));
     } else if (entry.isFile()) {
-      writeAtomic(join(stage, entry.name), readFileSync(source));
+      writeAtomic(ws.root, join(stage, entry.name), readFileSync(source));
       mapping.set(realpathSync.native(source), join(ws.topics, entry.name));
     }
   }
-  // The whole legacy folder is moved to trash after the staged copy is
-  // verified, exactly like topic_migrate.finish().
-  originals.push(relative(ws.root, legacy).replaceAll(sep, "/"));
 
-  for (const deck of ws.list_decks()) {
+  for (const deck of decks) {
     const shelf = ws.deck_shelf(deck);
     const folder = ws.deck_dir(deck);
     for (const name of ["images", "html", "figures"]) {
@@ -496,12 +767,11 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
       assertNoSymlinks(ws.root, source);
       const kind = name === "images" ? "images" : "html";
       copy_group(ws, source, join(stage, shelf, kind), mapping, join(ws.topic_dir(shelf), kind));
-      originals.push(relative(ws.root, source).replaceAll(sep, "/"));
     }
   }
 
   const qmds: Array<{ path: string; relative: string; before: string; after: string }> = [];
-  for (const deck of ws.list_decks()) {
+  for (const deck of decks) {
     const shelf = ws.deck_shelf(deck);
     const folder = ws.deck_dir(deck);
     const path = ws.qmd(deck);
@@ -544,8 +814,6 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
         `../../topics/${relative(ws.topics, destination).replaceAll(sep, "/")}`,
       );
     }
-    // Only topics that actually moved in this run are rewritten. If topics/
-    // already existed the migration returned before reaching this point.
     for (const topic of movedTopics) {
       updated = updated.replace(
         new RegExp(`(^|["'(])figures/${escapeRegExp(topic)}/`, "gmu"),
@@ -565,7 +833,8 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
   for (const [source, destination] of mapping) {
     const copied = join(stage, relative(ws.topics, destination));
     const link = lstatOrNull(copied);
-    if (!link?.isFile() || sha256(readFileSync(copied)) !== sha256(readFileSync(source))) {
+    const key = relative(ws.root, source).replaceAll(sep, "/");
+    if (!link?.isFile() || sha256(readFileSync(copied)) !== before[key]) {
       throw new StudioError(`コピーを確認できませんでした: ${relative(ws.root, source)}`, "CONFLICT");
     }
   }
@@ -581,24 +850,46 @@ export function migrateTopics(ws: WorkspaceView, setFront: SetFront): void {
       continue;
     }
     writeAtomic(
+      ws.root,
       join(stage, relative(ws.topics, destination)),
       rewrite(text, source, destination, mapping, ws.root),
     );
   }
 
-  if (existsSync(ws.topics)) {
-    throw new StudioError("topics/ が移行中に作られました", "CONFLICT");
-  }
-  safeRename(ws.root, stage, ws.topics);
-
-  const trash = join(ws.state, "trash", "topics-v1");
-  for (const rel of originals) {
-    const source = join(ws.root, rel);
-    if (!existsSync(source)) continue;
-    safeRename(ws.root, source, join(trash, rel));
-  }
+  const after = hashes(stage);
+  const qmdPlan: Record<string, QmdPlan> = {};
   for (const qmd of qmds) {
-    writeAtomic(join(trash, qmd.relative), qmd.before);
-    writeAtomic(qmd.path, qmd.after);
+    qmdPlan[qmd.relative] = { before: qmd.before, after: qmd.after };
   }
+  const mappingPlan: Record<string, string> = {};
+  for (const [source, destination] of mapping) {
+    mappingPlan[relative(ws.root, source).replaceAll(sep, "/")] =
+      relative(ws.root, destination).replaceAll(sep, "/");
+  }
+  const plan: Manifest = {
+    phase: "prepared",
+    trash: uniqueTrashDirectory(ws.root, ws.state),
+    all_before: allBefore,
+    before,
+    after,
+    mapping: mappingPlan,
+    originals,
+    qmd: qmdPlan,
+    source_hashes: {
+      ...before,
+      ...Object.fromEntries(
+        Object.entries(qmdPlan).map(([path, values]) => [path, sha256(values.before)]),
+      ),
+    },
+    result_hashes: {
+      ...Object.fromEntries(
+        Object.entries(after).map(([path, digest]) => [`topics/${path}`, digest]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(qmdPlan).map(([path, values]) => [path, sha256(values.after)]),
+      ),
+    },
+  };
+  writeManifest(ws.root, record, plan);
+  finish(ws, journal, plan);
 }

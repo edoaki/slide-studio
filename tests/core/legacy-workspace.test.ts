@@ -9,6 +9,7 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
@@ -21,6 +22,7 @@ import {
   OLD_DEFAULT_THEMES,
   OLD_PORTABLE_READMES,
   OLD_THEMES,
+  RUNTIME,
   RUNTIME_FILES,
   StudioError,
   TEMPLATES,
@@ -43,6 +45,7 @@ import {
   theme_variables,
 } from "../../packages/core/src/legacy-workspace.js";
 import { parse } from "../../packages/core/src/legacy-source.js";
+import { assetPath } from "../../packages/core/src/assets.js";
 import {
   drop_cover_layout,
   preserve_title_header,
@@ -726,6 +729,386 @@ test("figure helpers and quote stripping match Python code-point semantics", asy
   );
   assert.deepEqual(ws.decks_using("demo/route"), []);
   assert.deepEqual(ws.decks_using("'demo/route'"), ["talk"]);
+});
+
+test("topic migration resumes a commit interrupted after topics/ is renamed", async (t) => {
+  const root = await scratch(t);
+  const figure = join(root, "figures", "alpha", "demo");
+  mkdirSync(figure, { recursive: true });
+  const figureBytes = Buffer.from("export default { title: 'Old', steps: ['one'] };\n");
+  writeFileSync(join(figure, "figure.mjs"), figureBytes);
+  mkdirSync(join(root, "decks", "old"), { recursive: true });
+  const qmd = join(root, "decks", "old", "slides.qmd");
+  const qmdBytes = [
+    "---",
+    "topic: alpha",
+    "theme: default",
+    "---",
+    "",
+    "## Cover",
+    "",
+    "![x](figures/alpha/demo/index.html)",
+    "",
+  ].join("\n");
+  writeFileSync(qmd, qmdBytes);
+
+  // A file where the trash directory belongs makes the first run fail after
+  // stage -> topics has already happened.
+  mkdirSync(join(root, ".slide-studio"), { recursive: true });
+  writeFileSync(join(root, ".slide-studio", "trash"), "not a directory");
+
+  assert.throws(() => Workspace.open(root), StudioError);
+  assert.equal(existsSync(join(root, "topics", "alpha", "html", "demo", "figure.mjs")), true);
+  assert.equal(readFileSync(join(root, "figures", "alpha", "demo", "figure.mjs")).equals(figureBytes), true);
+  assert.equal(readFileSync(qmd, "utf8"), qmdBytes);
+  const manifest = join(root, ".slide-studio", "migrate", "topics-v1", "manifest.json");
+  assert.equal(readJson(manifest).phase, "prepared");
+
+  rmSync(join(root, ".slide-studio", "trash"), { force: true });
+  const ws = Workspace.open(root);
+  assert.equal(existsSync(join(root, "figures")), false);
+  assert.match(readFileSync(ws.qmd("old"), "utf8"), /topics\/alpha\/html\/demo\/index\.html/u);
+  assert.equal(readJson(manifest).phase, "done");
+
+  const trashRoot = join(ws.state, "trash", "topics-v1");
+  const runs = readdirSync(trashRoot);
+  assert.equal(runs.length, 1);
+  const run = join(trashRoot, runs[0]!);
+  assert.equal(
+    readFileSync(join(run, "figures", "alpha", "demo", "figure.mjs")).equals(figureBytes),
+    true,
+  );
+  assert.equal(readFileSync(join(run, "decks", "old", "slides.qmd"), "utf8"), qmdBytes);
+});
+
+test("topic migration uses a fresh trash directory beside an existing one", async (t) => {
+  const root = await scratch(t);
+  const figure = join(root, "figures", "alpha", "demo");
+  mkdirSync(figure, { recursive: true });
+  writeFileSync(join(figure, "figure.mjs"), "export default {};\n");
+  mkdirSync(join(root, "decks", "old"), { recursive: true });
+  writeFileSync(
+    join(root, "decks", "old", "slides.qmd"),
+    "---\ntopic: alpha\ntheme: default\n---\n\n## A\n",
+  );
+  const existing = join(root, ".slide-studio", "trash", "topics-v1");
+  const oldBackup = join(existing, "figures", "alpha", "demo", "figure.mjs");
+  mkdirSync(dirname(oldBackup), { recursive: true });
+  writeFileSync(oldBackup, "old backup");
+  writeFileSync(join(existing, "sentinel.txt"), "keep");
+
+  const ws = Workspace.open(root);
+  assert.equal(readFileSync(join(existing, "sentinel.txt"), "utf8"), "keep");
+  assert.equal(readFileSync(oldBackup, "utf8"), "old backup");
+  const runs = readdirSync(existing);
+  assert.equal(runs.includes("sentinel.txt"), true);
+  assert.equal(
+    runs.some((name) => existsSync(join(existing, name, "figures", "alpha", "demo", "figure.mjs"))),
+    true,
+  );
+});
+
+test("new_deck refuses a symlinked destination topic html", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("source", "alpha");
+  const outside = join(root, "..", `topic-html-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  writeFileSync(join(outside, "sentinel.txt"), "keep");
+  mkdirSync(ws.topic_dir("beta"), { recursive: true });
+  try {
+    symlinkSync(outside, join(ws.topic_dir("beta"), "html"), "dir");
+  } catch {
+    return;
+  }
+
+  assert.throws(() => ws.new_deck("copy", "beta", "default", "source"), StudioError);
+  assert.equal(existsSync(ws.deck_dir("copy")), false);
+  assert.equal(readFileSync(join(outside, "sentinel.txt"), "utf8"), "keep");
+  assert.deepEqual(readdirSync(outside), ["sentinel.txt"]);
+});
+
+test("new_deck refuses a symlinked destination topic", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("source", "alpha");
+  const outside = join(root, "..", `topic-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  writeFileSync(join(outside, "sentinel.txt"), "keep");
+  try {
+    symlinkSync(outside, ws.topic_dir("beta"), "dir");
+  } catch {
+    return;
+  }
+
+  assert.throws(() => ws.new_deck("copy", "beta", "default", "source"), StudioError);
+  assert.equal(existsSync(ws.deck_dir("copy")), false);
+  assert.equal(readFileSync(join(outside, "sentinel.txt"), "utf8"), "keep");
+  assert.deepEqual(readdirSync(outside), ["sentinel.txt"]);
+});
+
+test("new_deck rolls back topic assets copied before a mid-copy failure", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("source", "alpha");
+  const first = join(ws.shelf_dir("alpha"), "A");
+  mkdirSync(first, { recursive: true });
+  writeFileSync(join(first, "index.html"), "<!doctype html>\n");
+  const library = join(ws.shelf_dir("alpha"), "_lib");
+  mkdirSync(library, { recursive: true });
+  writeFileSync(join(library, "draw.mjs"), "export {};\n");
+
+  const outside = join(root, "..", `topic-lib-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  writeFileSync(join(outside, "sentinel.txt"), "keep");
+  const betaHtml = join(ws.topic_dir("beta"), "html");
+  mkdirSync(betaHtml, { recursive: true });
+  writeFileSync(join(betaHtml, "keep.txt"), "keep");
+  try {
+    symlinkSync(outside, join(betaHtml, "_lib"), "dir");
+  } catch {
+    return;
+  }
+
+  assert.throws(() => ws.new_deck("copy", "beta", "default", "source"), StudioError);
+  assert.equal(existsSync(ws.deck_dir("copy")), false);
+  // The first figure was copied before _lib failed; it must be rolled back.
+  assert.equal(existsSync(join(betaHtml, "A")), false);
+  assert.equal(readFileSync(join(betaHtml, "keep.txt"), "utf8"), "keep");
+  assert.equal(existsSync(join(ws.topic_dir("beta"), "images")), false);
+  assert.equal(lstatSync(join(betaHtml, "_lib")).isSymbolicLink(), true);
+  assert.deepEqual(readdirSync(outside), ["sentinel.txt"]);
+
+  unlinkSync(join(betaHtml, "_lib"));
+  ws.new_deck("copy", "beta", "default", "source");
+  assert.equal(existsSync(join(betaHtml, "A", "index.html")), true);
+  assert.equal(existsSync(join(betaHtml, "A-2")), false);
+  assert.equal(existsSync(join(ws.topic_dir("beta"), "images")), true);
+});
+
+test("new_deck removes a new topic folder when copying fails", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("source", "alpha");
+  const outside = join(root, "..", `fresh-topic-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  writeFileSync(join(outside, "secret.txt"), "secret");
+  try {
+    symlinkSync(join(outside, "secret.txt"), join(ws.deck_dir("source"), "external.txt"));
+  } catch {
+    return;
+  }
+
+  assert.throws(() => ws.new_deck("bad", "fresh", "default", "source"), StudioError);
+  assert.equal(existsSync(ws.deck_dir("bad")), false);
+  assert.equal(existsSync(ws.topic_dir("fresh")), false);
+  assert.equal(readFileSync(join(outside, "secret.txt"), "utf8"), "secret");
+});
+
+test("new_deck leaves reused shared topic files untouched", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("source", "alpha");
+  const sourceFigure = join(ws.shelf_dir("alpha"), "demo");
+  mkdirSync(sourceFigure, { recursive: true });
+  writeFileSync(join(sourceFigure, "figure.mjs"), "export default { title: 'Demo' };\n");
+  const sourceIndex = "<!doctype html>\n<script type=\"module\" src=\"./figure.mjs\"></script>\n";
+  writeFileSync(join(sourceFigure, "index.html"), sourceIndex);
+
+  const betaFigure = join(ws.shelf_dir("beta"), "demo");
+  mkdirSync(betaFigure, { recursive: true });
+  writeFileSync(join(betaFigure, "figure.mjs"), "export default { title: 'Demo' };\n");
+  writeFileSync(join(betaFigure, "index.html"), sourceIndex);
+  const before = statSync(join(betaFigure, "index.html"));
+
+  ws.new_deck("copy", "beta", "default", "source");
+  const after = statSync(join(betaFigure, "index.html"));
+  assert.equal(readFileSync(join(betaFigure, "index.html"), "utf8"), sourceIndex);
+  // A rewrite would replace the file through the atomic temp+rename path.
+  assert.equal(after.ino, before.ino);
+});
+
+test("new_deck reports post-commit auxiliary failures without failing creation", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  const prefs = join(ws.state, "prefs.json");
+  rmSync(prefs, { force: true });
+  mkdirSync(prefs);
+
+  const directory = ws.new_deck("talk", "alpha");
+  assert.equal(directory, ws.deck_dir("talk"));
+  assert.equal(existsSync(ws.qmd("talk")), true);
+  const warning = ws.migration_preparation().find((item) =>
+    String(item.detail).startsWith("設定の保存:")
+  );
+  assert.equal(typeof warning?.detail, "string");
+});
+
+test("new_deck ignores symlinked materials and PDFs like Python copytree", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("source", "alpha");
+  const outside = join(root, "..", `deck-ignore-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  writeFileSync(join(outside, "secret.pdf"), "secret");
+  try {
+    symlinkSync(outside, join(ws.deck_dir("source"), "materials"), "dir");
+    symlinkSync(join(outside, "secret.pdf"), join(ws.deck_dir("source"), "linked.pdf"), "file");
+  } catch {
+    return;
+  }
+
+  ws.new_deck("copy", "beta", "default", "source");
+  assert.equal(existsSync(join(ws.deck_dir("copy"), "materials")), false);
+  assert.equal(existsSync(join(ws.deck_dir("copy"), "linked.pdf")), false);
+  assert.equal(readFileSync(join(outside, "secret.pdf"), "utf8"), "secret");
+
+  ws.new_deck("source2", "alpha");
+  mkdirSync(join(ws.deck_dir("source2"), "materials"), { recursive: true });
+  writeFileSync(join(ws.deck_dir("source2"), "materials", "large.pdf"), "large");
+  try {
+    symlinkSync(ws.deck_dir("source2"), join(ws.decks, "source2-link"), "dir");
+  } catch {
+    return;
+  }
+  ws.new_deck("copy2", "beta", "default", "source2-link");
+  assert.equal(existsSync(join(ws.deck_dir("copy2"), "materials")), false);
+});
+
+test("ensure survives symlinked agent, portable and runtime entries", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  const outside = join(root, "..", `ensure-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+
+  rmSync(join(root, ".claude"), { recursive: true, force: true });
+  try {
+    symlinkSync(outside, join(root, ".claude"), "dir");
+  } catch {
+    return;
+  }
+  assert.doesNotThrow(() => ws.ensure());
+  assert.equal(existsSync(join(outside, "skills")), false);
+
+  // Also cover a real .claude whose skills child resolves outside.
+  rmSync(join(root, ".claude"), { recursive: true, force: true });
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  symlinkSync(outside, join(root, ".claude", "skills"), "dir");
+  assert.doesNotThrow(() => ws.ensure());
+  assert.equal(existsSync(join(outside, "skills")), false);
+
+  const readme = join(root, "README.md");
+  const outsideReadme = join(outside, "README.md");
+  writeFileSync(outsideReadme, "outside readme");
+  rmSync(readme, { force: true });
+  symlinkSync(outsideReadme, readme);
+  assert.doesNotThrow(() => ws.ensure());
+  assert.equal(readFileSync(outsideReadme, "utf8"), "outside readme");
+  assert.equal(lstatSync(readme).isSymbolicLink(), true);
+
+  rmSync(readme, { force: true });
+  mkdirSync(readme);
+  assert.doesNotThrow(() => ws.ensure());
+  assert.equal(lstatSync(readme).isDirectory(), true);
+
+  const runtimeFile = join(ws.runtime, "figure.mjs");
+  const outsideRuntime = join(outside, "figure.mjs");
+  writeFileSync(outsideRuntime, "outside runtime");
+  rmSync(runtimeFile, { force: true });
+  symlinkSync(outsideRuntime, runtimeFile);
+  assert.doesNotThrow(() => ws.ensure());
+  assert.equal(readFileSync(outsideRuntime, "utf8"), "outside runtime");
+  assert.equal(lstatSync(runtimeFile).isSymbolicLink(), false);
+  assert.equal(
+    readFileSync(runtimeFile, "utf8"),
+    readFileSync(join(RUNTIME, "figure.mjs"), "utf8"),
+  );
+});
+
+test("list_decks skips names that cannot be looked up safely", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  if (process.platform !== "win32") {
+    const control = "bad\u0001name";
+    const backslash = "bad\\name";
+    for (const name of [control, backslash]) {
+      mkdirSync(join(ws.decks, name), { recursive: true });
+      writeFileSync(
+        join(ws.decks, name, "slides.qmd"),
+        "---\ntopic: alpha\ntheme: default\n---\n\n## A\n",
+      );
+    }
+    assert.doesNotThrow(() => ws.ensure());
+    assert.equal(ws.list_decks().includes(control), false);
+    // A backslash is a legal POSIX filename; only Windows treats it as a
+    // separator for lookup rejection.
+    assert.equal(ws.list_decks().includes(backslash), true);
+    assert.equal(ws.deck_shelf(backslash), "alpha");
+  } else {
+    // Windows treats a stamp key such as ..\x as escaping when joined;
+    // #relativeToRoot must drop it instead of aborting the whole ensure.
+    const stampPath = join(ws.state, "agent-files.json");
+    const stamp = readJson(stampPath);
+    stamp["..\\x"] = sha("outside");
+    writeJson(stampPath, stamp);
+    assert.doesNotThrow(() => ws.ensure());
+  }
+});
+
+test("preparation messages load canonical strings without set_strings_file from another cwd", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  writeFileSync(join(ws.themes, "default.css"), "/* old */\n");
+  mkdirSync(join(root, "figures", "alpha"), { recursive: true });
+  writeFileSync(join(root, "figures", "alpha", "figure.mjs"), "export default {};\n");
+
+  const temp = realpathSync.native(mkdtempSync(join(tmpdir(), "slide-studio-cwd-")));
+  t.after(() => rmSync(temp, { recursive: true, force: true }));
+  const previous = process.cwd();
+  set_strings_file(null);
+  process.chdir(temp);
+  try {
+    const theme = ws.theme_preparation();
+    assert.equal(theme[0]?.name, "テーマ default");
+    assert.equal(
+      theme[0]?.detail,
+      "編集済みの旧テーマを保護しました。テーマの型への移行が必要です。",
+    );
+    assert.equal(
+      theme[0]?.fix,
+      "themes/default.css を控え、テーマの型にある必須の変数を補ってください。図高や表など発表固有の指定は、その発表の styles/slides.css に移してください。",
+    );
+
+    const topic = ws.migration_preparation().find((item) => item.name === "トピックの移行");
+    assert.equal(topic?.detail, "figures/ と topics/ が両方あります。自動移行を停止しました。");
+    assert.equal(
+      topic?.fix,
+      "内容を確認して topics/ にまとめ、旧 figures/ を別の場所に保管して再起動してください。",
+    );
+
+    // When the build provides the packaged asset, it must be the same source
+    // of truth as the canonical module.
+    try {
+      const packaged = assetPath("strings.js");
+      if (existsSync(packaged)) {
+        assert.equal(
+          sha(readFileSync(packaged)),
+          sha(readFileSync(join(repositoryRoot(), "packages", "web", "strings.js"))),
+        );
+      }
+    } catch {
+      // Assets are unavailable in an asset-less source test.
+    }
+  } finally {
+    process.chdir(previous);
+    set_strings_file(null);
+  }
 });
 
 test("theme helpers match the original Python golden outputs", async () => {
