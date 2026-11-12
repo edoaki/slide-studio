@@ -80,7 +80,9 @@ print("x")
 ~~~
 `;
 
-test("renders with fixed Pandoc arguments, slides, footers, bundled assets, and diagnostics", async (t) => {
+test("renders with fixed Pandoc arguments, slides, footers, bundled assets, and diagnostics", {
+  skip: process.platform === "win32",
+}, async (t) => {
   const root = await scratch(t);
   const logPath = join(root, "pandoc-args.log");
   const pandoc = join(root, "fake-pandoc");
@@ -153,7 +155,9 @@ test("renders with fixed Pandoc arguments, slides, footers, bundled assets, and 
   assert.ok(args.some((argument) => argument.startsWith("title=")));
 });
 
-test("render failure preserves the raw QMD and reports RENDER_FAILED", async (t) => {
+test("render failure preserves the raw QMD and reports RENDER_FAILED", {
+  skip: process.platform === "win32",
+}, async (t) => {
   const root = await scratch(t);
   const failing = join(root, "failing-pandoc");
   await writeExecutable(failing, "#!/bin/sh\ncat >/dev/null\necho 'line 2: boom' >&2\nexit 1\n");

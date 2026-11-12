@@ -320,7 +320,7 @@ test("removes crash-leftover Pandoc temp directories after acquiring the lock", 
 test("rejects a relative workspace root and relative Pandoc path", async (t) => {
   const root = await scratch(t);
   await assert.rejects(
-    openWorkspace("relative-root", { pandocPath: "/bin/echo" }),
+    openWorkspace("relative-root", { pandocPath: process.execPath }),
     (error: unknown) => codeOf(error) === "INVALID_INPUT",
   );
   await assert.rejects(
