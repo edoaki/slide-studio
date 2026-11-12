@@ -10,6 +10,7 @@ import {
   copyFile,
   mkdir,
   mkdtemp,
+  lstat,
   readFile,
   readdir,
   rename,
@@ -142,21 +143,28 @@ async function download(url, destination) {
   throw new Error(`too many redirects while downloading ${url}`);
 }
 
-async function assertNoSymlinks(directory) {
-  const entries = await readdir(directory, { withFileTypes: true, recursive: true });
-  for (const entry of entries) {
-    if (entry.isSymbolicLink()) {
-      throw new Error(`extracted archive contains a symbolic link: ${entry.name}`);
-    }
-  }
-}
-
 async function findPandoc(directory, binaryName) {
-  const entries = await readdir(directory, { withFileTypes: true, recursive: true });
+  const pending = [directory];
   const matches = [];
-  for (const entry of entries) {
-    if (!entry.isFile() || entry.name !== binaryName) continue;
-    matches.push(join(entry.parentPath, entry.name));
+  while (pending.length > 0) {
+    const current = pending.shift();
+    if (current === undefined) continue;
+    let entries;
+    try {
+      entries = await readdir(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const path = join(current, entry.name);
+      // Ignore unrelated symlinks (e.g. pandoc-lua) without traversing them.
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) {
+        pending.push(path);
+      } else if (entry.isFile() && entry.name === binaryName) {
+        matches.push(path);
+      }
+    }
   }
   return matches.find((path) => basename(dirname(path)) === "bin") ?? matches[0];
 }
@@ -187,10 +195,13 @@ async function installFromZip(zip, binDirectory, binaryName, native) {
   const extraction = await mkdtemp(join(tmpdir(), "slide-studio-pandoc-"));
   try {
     await extract(zip, { dir: extraction });
-    await assertNoSymlinks(extraction);
     const found = await findPandoc(extraction, binaryName);
     if (found === undefined) {
       throw new Error(`the archive does not contain ${binaryName}`);
+    }
+    const foundStat = await lstat(found);
+    if (!foundStat.isFile() || foundStat.isSymbolicLink()) {
+      throw new Error(`selected ${binaryName} is not a regular file`);
     }
     await mkdir(binDirectory, { recursive: true });
     const binary = join(binDirectory, binaryName);
@@ -240,7 +251,7 @@ export async function ensurePandoc(options = {}) {
   const platform = normalizePlatform(options.platform ?? process.platform);
   const arch = options.arch ?? process.arch;
   const key = `${platform}-${arch}`;
-  const destination = resolve(options.destination ?? localBinDirectory);
+  const destination = resolve(options.destination ?? pandocRoot);
   const manifestPath = resolve(options.manifestPath ?? defaultManifest);
   const binDirectory = join(destination, "bin");
   const binaryName = platform === "win32" ? "pandoc.exe" : "pandoc";
@@ -275,7 +286,7 @@ export async function ensurePandoc(options = {}) {
     return { binary, version: PANDOC_VERSION, platform, arch, downloaded: false, native };
   }
 
-  const cacheDirectory = destination === localBinDirectory
+  const cacheDirectory = destination === pandocRoot
     ? join(localBinDirectory, ".cache")
     : join(tmpdir(), "slide-studio-pandoc-cache");
   await mkdir(cacheDirectory, { recursive: true });

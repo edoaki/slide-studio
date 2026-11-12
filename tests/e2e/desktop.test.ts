@@ -65,19 +65,6 @@ async function waitForTestId(page: Page, id: string): Promise<Locator> {
   return element;
 }
 
-async function reloadBootstrap(
-  application: ElectronApplication,
-  page: Page,
-  bootstrapUrl: string,
-): Promise<void> {
-  await application.evaluate(async ({ BrowserWindow }, target) => {
-    const window = BrowserWindow.getAllWindows()[0];
-    if (window !== undefined) await window.loadURL(target);
-  }, bootstrapUrl);
-  await page.waitForLoadState("domcontentloaded");
-  await waitForTestId(page, TESTIDS.app);
-}
-
 async function waitForStatus(page: Page, id: string, pattern: RegExp): Promise<void> {
   await page.waitForFunction(
     ({ selector, source }) => {
@@ -242,6 +229,7 @@ test("desktop slice: create, edit, preview, save, reopen, export", { skip: skipR
   ]);
 
   const title = "デスクトップ試験";
+  const secondTitle = "二つ目のデッキ";
   const source = `# ${title}\n\n- 一つ目\n- 二つ目\n\n## 二枚目\n\n本文\n`;
   const htmlPath = join(scratch, "export.html");
   const pdfPath = join(scratch, "export.pdf");
@@ -326,19 +314,6 @@ test("desktop slice: create, edit, preview, save, reopen, export", { skip: skipR
   }
 
   page = await application.firstWindow();
-  let bootstrapUrl = page.url();
-  if (!bootstrapUrl.includes("#token=")) {
-    try {
-      await page.waitForURL((url) => {
-        if (!url.hash.includes("token=")) return false;
-        bootstrapUrl = url.toString();
-        return true;
-      }, { timeout: 5_000 });
-    } catch {
-      // Keep the URL we have; the assertion below reports the failure.
-    }
-  }
-  assert.ok(bootstrapUrl.includes("#token="), "capture the bootstrap URL before the UI strips it");
   await page.waitForLoadState("domcontentloaded");
   await createDeck(page, title);
   let editor = await waitForTestId(page, TESTIDS.sourceEditor);
@@ -395,18 +370,18 @@ test("desktop slice: create, edit, preview, save, reopen, export", { skip: skipR
   }, adminOrigin);
   assert.notEqual(adminApiResult, 200);
 
-  // Reopen through a fresh page load and verify the saved source is read back.
+  // Reopen by switching decks and verify the saved source is read back.
   await application.evaluate(({ dialog }) => {
     dialog.showMessageBoxSync = () => 0;
   });
-  await reloadBootstrap(application, page, bootstrapUrl);
+  await createDeck(page, secondTitle);
   editor = await openDeck(page, title);
   assert.match(await editor.inputValue(), /二枚目/);
 
   // A CRLF file keeps its EOL style when the textarea is saved with an edit.
   const crlfSource = (await readFile(deckFile, "utf8")).replace(/\n/g, "\r\n");
   await writeFile(deckFile, crlfSource, "utf8");
-  await reloadBootstrap(application, page, bootstrapUrl);
+  await openDeck(page, secondTitle);
   editor = await openDeck(page, title);
   const crlfSave = trackSave(page);
   await editor.fill(`${source}\nCRLF追加\n`);
@@ -435,7 +410,10 @@ test("desktop slice: create, edit, preview, save, reopen, export", { skip: skipR
 
   // Reopen the externally edited file before exporting so the export starts from
   // the on-disk version rather than the conflicted editor buffer.
-  await reloadBootstrap(application, page, bootstrapUrl);
+  await application.evaluate(({ dialog }) => {
+    dialog.showMessageBoxSync = () => 0;
+  });
+  await openDeck(page, secondTitle);
   editor = await openDeck(page, title);
   assert.match(await editor.inputValue(), /外部で追加/);
 
