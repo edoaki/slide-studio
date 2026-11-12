@@ -65,6 +65,7 @@ import {
   set_front,
   type Workspace,
 } from "../../packages/core/src/legacy-workspace.js";
+import { LegacyThemes } from "./legacy-themes.js";
 import * as memo from "./legacy-memo.js";
 import * as history from "./legacy-history.js";
 
@@ -284,8 +285,9 @@ interface FeatureRoute {
   bodyLimit?: number;
 }
 
-/** The 69 restored legacy web assets. Unknown files are never served. */
+/** Restored UI assets and its private bridge client. Unknown files are never served. */
 export const LEGACY_WEB_FILES: readonly string[] = Object.freeze([
+  "bridge/agent-client.js", "bridge/protocol.js",
   "agents.js", "ai-model.js", "api.js", "app.css", "app.html", "app.js",
   "asset-preview.js", "assets.js", "bib-view.js", "bibliography.js",
   "block-design.js", "block-drag.js", "block-handles.js", "block-nav.js",
@@ -297,7 +299,7 @@ export const LEGACY_WEB_FILES: readonly string[] = Object.freeze([
   "inject/step-badges.js", "insert.js", "layout-lint.js", "left-tabs.js",
   "link-input.js", "location.css", "location.html", "location.js",
   "materials.js", "memo.js", "overview.js", "output.js", "page-reorder.js",
-  "page-strip.js", "page-templates.js", "pdf-step.js", "preview.js",
+  "page-strip.js", "page-templates.js", "pdf-step.js", "present.js", "preview.js",
   "qmd-blocks.js", "qmd-editor.js", "scroll-anchor.js", "shared.css",
   "shot-thumbs.js", "step-badge.js", "structure.js", "strings.js",
   "table-tools.js", "text-format.js", "text-tools.js", "theme-tab.js",
@@ -305,7 +307,7 @@ export const LEGACY_WEB_FILES: readonly string[] = Object.freeze([
 ]);
 
 const PENDING_FEATURES: readonly string[] = Object.freeze([
-  "assets", "materials", "library", "bibliography", "bib", "themes", "ai",
+  "assets", "materials", "library", "bibliography", "bib", "theme-shots", "ai",
   "chat", "checks", "shots", "math", "setup", "home-manage",
   "export", "download", "topic", "location",
   "inject", "hooks/locks", "edit-scope",
@@ -317,7 +319,7 @@ const IMPLEMENTED_FEATURES: readonly string[] = Object.freeze([
   "home", "env", "new-deck", "new-topic", "deck-read", "deck-source",
   "memo", "style", "structure", "events", "preview", "theme-preview",
   "open-external", "chunks", "warning-issues", "merge3",
-  "block-design-migrate",
+  "block-design-migrate", "themes",
 ]);
 
 const FEATURE_ROUTES: readonly FeatureRoute[] = Object.freeze([
@@ -797,8 +799,10 @@ function injectPreview(
       + ` data-studio-deck="${escapeAttribute(input.deck)}"`
       + ` data-studio-version="${escapeAttribute(input.version)}"`
       + ` data-studio-generation="${escapeAttribute(input.generation)}"`
+      + ` data-studio-mode="${input.mode}"`
       + ` src="${escapeAttribute(input.contentOrigin)}/bridge/frame-agent.classic.js"></script>`,
     `<script>${flags.join("")}</script>`,
+    ...(input.mode === "edit" ? [`<link rel="stylesheet" href="${escapeAttribute(input.contentOrigin)}/bridge/edit.css">`] : []),
   ].join("");
 
   // parse5 has already normalized malformed input (including scripts before
@@ -1195,6 +1199,15 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   let epoch = 0;
   let shutdownPromise: Promise<void> | undefined;
 
+  const themes = new LegacyThemes({
+    contentOrigin: () => contentOrigin,
+    changed: (ws, name) => {
+      if (ws !== workspace) return;
+      const paths = [`themes/${name}.css`];
+      broadcast({ type: "files", paths });
+      for (const deck of affectedDecks(ws, paths)) scheduleRender(ws, deck, true, true);
+    },
+  });
   const pending = [...PENDING_FEATURES];
   const handoff: LegacyHostHandoff = {
     status: "in_progress",
@@ -1206,7 +1219,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       "The caller owns the workspace lock; close() drains accepted writes and listeners but not the workspace.",
       "Chunk GET/POST includes markdown/cell/html/delete/move/image conversion with a four-version render cache keyed by raw source bytes.",
       "Deck reads migrate legacy block styles under the per-deck lock and preserve BOM/CRLF bytes; raw byte hashes remain the source revision.",
-      "Legacy themes, assets, AI, checks, shots and export handlers remain pending integration.",
+      "Legacy assets, AI, checks, shots and export handlers remain pending integration; theme management is connected.",
       "Content origin authentication (Electron secret header) and non-loopback frame navigation blocking belong to desktop integration and are not enabled here.",
       "Content CSP is stricter than the legacy service: remote images/fonts/frames are blocked pending a parity decision.",
       "Desktop download handling and the full output/export bridge remain pending.",
@@ -1632,6 +1645,11 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       route: feature.name,
       ...extras,
     } as LegacyFeatureRequest & { route: string; deck?: string; op?: string };
+    const themeResult = await themes.handle(workspace as Workspace, featureRequest);
+    if (themeResult !== null) {
+      sendFeatureResponse(response, themeResult, contentOrigin);
+      return;
+    }
     for (const handler of options.featureHandlers ?? []) {
       const result = await handler(featureRequest);
       if (result !== null) {
@@ -2900,7 +2918,8 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         return;
       }
 
-      const shotMatch = /^\/shots\/([^/]+)\/([^/]+\.png)$/u.exec(pathname);
+      const themeShotMatch = /^\/theme-shots\/([^/]+)\/([0-3]\.png)$/u.exec(pathname);
+      const shotMatch = themeShotMatch ?? /^\/shots\/([^/]+)\/([^/]+\.png)$/u.exec(pathname);
       if (shotMatch) {
         let deck: string;
         let file: string;
@@ -2916,7 +2935,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
           return;
         }
         const rootReal = await realpath(resolve(ws.root));
-        const shotRoot = resolve(rootReal, ".slide-studio", "shots", deck);
+        const shotRoot = resolve(rootReal, ".slide-studio", themeShotMatch ? "themes" : "shots", deck);
         let shotReal: string;
         let rootScopeReal: string;
         try {
@@ -2948,6 +2967,16 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         return;
       }
 
+      if (pathname === "/bridge/edit.css") {
+        const bytes = await readFile(join(options.uiDirectory, "inject", "edit.css"));
+        response.writeHead(200, {
+          "content-type": "text/css; charset=utf-8",
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+        });
+        response.end(request.method === "HEAD" ? undefined : bytes);
+        return;
+      }
       if (pathname === "/bridge/frame-agent.classic.js") {
         let bytes: Buffer;
         try {

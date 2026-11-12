@@ -10,6 +10,7 @@ import type {
   LegacyRenderText,
   LegacyRendered,
 } from "../../packages/contracts/src/legacy.js";
+import { reset_cover_positions } from "../../apps/server/legacy-themes.js";
 import { parse } from "../../packages/core/src/legacy-source.js";
 import { sha256 } from "../../packages/core/src/source.js";
 import { Workspace } from "../../packages/core/src/legacy-workspace.js";
@@ -921,4 +922,70 @@ test("matches legacy route precedence for wrong methods", async (t) => {
   const head = await adminRequest(host, "/api/deck/deck-1/assets", { method: "HEAD" });
   assert.equal(head.status, 200);
   assert.deepEqual(calls, ["HEAD /api/deck/deck-1/assets"]);
+});
+
+test('theme API preserves original create, edit, conflict, undo, select and delete operations', async t => {
+  const {host, workspace} = await launch(t);
+  const listing = await adminRequest(host, '/api/themes');
+  assert.equal(listing.status, 200);
+  const listed = listing.json as {themes: Array<{name:string;version:string}>;fonts:unknown[]};
+  assert.ok(listed.fonts.length > 0);
+  const original = listed.themes.find(theme=>theme.name==='default')!;
+  assert.ok(original.version);
+  const created = await adminRequest(host, '/api/themes', {method:'POST',json:{name:'custom',from:'default',base:original.version}});
+  assert.equal(created.status,201);
+  const before = created.json as {version:string};
+  const edited = await adminRequest(host, '/api/themes/custom', {method:'PUT',json:{base:before.version,vars:{'--ink':'#123456'}}});
+  assert.equal(edited.status,200);
+  const updated = edited.json as {version:string;css:string;before:string;vars:Record<string,string>};
+  assert.equal(updated.vars['--ink'],'#123456');
+  assert.equal(await readFile(join(workspace.themes,'custom.css'),'utf8'),updated.css);
+  const conflict = await adminRequest(host, '/api/themes/custom', {method:'PUT',json:{base:before.version,vars:{'--ink':'#abcdef'}}});
+  assert.equal(conflict.status,409);
+  const undo = await adminRequest(host, '/api/themes/custom', {method:'PUT',json:{base:updated.version,css:updated.before}});
+  assert.equal(undo.status,200);
+  assert.equal((undo.json as {version:string}).version,before.version);
+  const selected = await adminRequest(host, '/api/themes/select', {method:'POST',json:{theme:'custom',text:'---\ntheme: default\n---\n\n# Hello\n'}});
+  assert.equal(selected.status,200);
+  assert.match((selected.json as {text:string}).text,/theme: custom/);
+  assert.deepEqual(workspace.prefs().recent_themes,['custom']);
+  const removed = await adminRequest(host, '/api/themes/custom', {method:'DELETE'});
+  assert.equal(removed.status,200);
+  assert.equal(workspace.themes_list().includes('custom'),false);
+  assert.equal((await adminRequest(host,'/api/themes/default',{method:'DELETE'})).status,400);
+});
+
+test('serves the complete original UI import graph and editing stylesheet', async t => {
+  const workspace = await createWorkspace(t);
+  const host = await startLegacyHost({workspace, uiDirectory:join(process.cwd(),'dist/packages/web'),pandocPath:'/bin/pandoc',watch:false,renderText:async (_ws,_deck,text)=>renderedFrom(text)});
+  t.after(()=>host.close());
+  const pending = ['/web/app.js','/web/location.js'];
+  const visited = new Set<string>();
+  while(pending.length) {
+    const path = pending.pop()!;
+    if(visited.has(path)) continue;
+    visited.add(path);
+    const result = await adminRequest(host,path);
+    assert.equal(result.status,200,`UI module must be served: ${path}`);
+    for(const match of result.text.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)["'](\.\.?\/[^"']+)["']/gu)) {
+      pending.push(new URL(match[1]!,`${host.adminOrigin}${path}`).pathname);
+    }
+  }
+  assert.ok(visited.has('/web/present.js'));
+  assert.ok(visited.has('/web/bridge/agent-client.js'));
+  const css = await request(host.contentOrigin,'/bridge/edit.css');
+  assert.equal(css.status,200);
+  assert.match(String(css.headers['content-type']),/text\/css/);
+  assert.ok(css.text.length>100);
+});
+
+
+test('theme switching resets positions while preserving author metadata and Unicode offsets', () => {
+  const source = '---\ntitle: 日本語🎤\ncover-authors-layout: {"x": 10, "y": 20, "labels": ["a,b", "name\\\":value", "日本語"], "align": "left"}\n---\n\n## Title {.cover}\n\n::: {.cover-title style="left:10px;top:20px;color:red"}\nTitle\n:::\n';
+  const changed = reset_cover_positions(source);
+  const layout = parse(changed).meta['cover-authors-layout'];
+  assert.deepEqual(layout,{labels:['a,b','name":value','日本語'],align:'left'});
+  assert.match(changed,/style="color:red"/);
+  assert.match(changed,/title: 日本語🎤/);
+  assert.equal(reset_cover_positions(changed),changed);
 });

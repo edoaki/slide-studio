@@ -115,23 +115,68 @@
     "review": "pending: Opus quota returned 429 usage_limit_reached; reset at 22:40 JST"
   },
   "integrated_legacy_tests": {
-    "tests": 149,
-    "passed": 149,
+    "tests": 178,
+    "passed": 178,
     "skipped": 0,
-    "command": "npm run build && node --test dist/tests/core/legacy-*.test.js"
+    "command": "npm run build && node --test dist/tests/core/legacy-*.test.js dist/tests/desktop/legacy-server.test.js"
   },
   "workspace_integrity_followup": {
-    "commit": "509f742",
-    "tests": 34,
-    "review_remaining": [
-      "fatal UTF8/raw backup preservation",
-      "remove whole-workspace inventory",
-      "deduplicate alias deck migration",
-      "validate root before migration commit",
-      "ignore nondirectory migration inputs"
-    ],
-    "status": "followup fixes queued"
+    "commit": "ad9fdaf",
+    "tests": 44,
+    "passed": 44,
+    "skipped": 0,
+    "status": "five final data-integrity review findings repaired and validated"
   },
-  "render_review_status": "concrete review fixes in progress; render parity pass does not imply review closure",
-  "distribution_status": "Previous installed app and release artifacts are superseded reduced UI. Do not distribute; rebuild after complete parity."
+  "render_review_status": {
+    "commit": "b5f6fb3",
+    "tests": 54,
+    "status": "review repairs pass native tests; seven extra old render goldens find raw-tags/cover-authors differences queued for repair"
+  },
+  "distribution_status": "Previous installed app and release artifacts are superseded reduced UI. Do not distribute; rebuild after complete parity.",
+  "bridge_and_api_tests": {
+    "tests": 23,
+    "passed": 23,
+    "skipped": 0,
+    "command": "node scripts/test-bridge.mjs",
+    "includes": "real sandboxed Electron Stage1; reload authentication; authenticated uploads and fetch SSE",
+    "full_direct_edit": "pending"
+  },
+  "legacy_host": {
+    "commit": "0669b1c",
+    "tests": 15,
+    "status": "foundation integrated; full feature extensions and desktop entry wiring in progress"
+  },
+  "api_adapter": {
+    "commit": "c597f50",
+    "tests": 16,
+    "auth": "startup token retained in admin-origin sessionStorage for reload, content origin cannot access; no token in asset URLs",
+    "uploads": "assets/materials/chat use explicit authenticated wrapper"
+  },
+  "implementation_mode": {
+    "mode": "direct_primary_agent",
+    "reason": "User explicitly discontinued DeepSeek and requested direct implementation",
+    "external_implementation_processes": "stopped; partial changes preserved and inspected"
+  },
+  "desktop_connect": {
+    "commit": "6c985dc",
+    "tests": 22,
+    "status": "original UI loads in actual Electron; themes connected; assets, materials, AI, checks and shots still report explicit 501"
+  },
+  "theme_management": {
+    "status": "management API connected; automatic theme thumbnail generation pending",
+    "validation": "npm run build; node --test dist/tests/core/legacy-theme-edit.test.js dist/tests/desktop/legacy-server.test.js",
+    "tests": 64,
+    "reference_cases": 45,
+    "verified": [
+      "exact old CSS after mutation and reapplication",
+      "create, edit, conflict, undo, select, delete",
+      "cover position reset preserves author metadata",
+      "all original UI static imports served",
+      "actual Electron home and editor load without page errors"
+    ],
+    "remaining": [
+      "automatic theme thumbnails",
+      "AI theme locks with AI integration"
+    ]
+  }
 }

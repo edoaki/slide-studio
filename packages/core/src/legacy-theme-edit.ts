@@ -8,6 +8,8 @@
 // Same required-variable set as `workspace.THEME_VARIABLES` for the bundled
 // `_base.css`. `legacy-workspace` passes its instance-scoped list explicitly;
 // this default keeps direct helper calls faithful to the Python module.
+import { PY_WS } from "./legacy-cover.js";
+
 const DEFAULT_THEME_VARIABLES = [
   "--ink",
   "--accent",
@@ -59,7 +61,7 @@ function escapeRegExp(value: string): string {
 }
 
 const TITLE_RE = new RegExp(
-  escapeRegExp(TITLE_TEMPLATE).replace("%s", "([0-9a-fA-F]{3,8})"),
+  escapeRegExp(TITLE_TEMPLATE).replace("%s", "(#[0-9a-fA-F]{3,8})"),
   "u",
 );
 
@@ -300,3 +302,144 @@ export function drop_cover_layout(css: string): string {
 }
 
 export { HEADING_OPTIONS, BG_RE };
+
+export const FONTS = ['"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif', '"Hiragino Mincho ProN","Yu Mincho",serif', '"Menlo",monospace'];
+const CONTENT_COLORS: Record<string, [string, string]> = {
+  '--table-header-bg': ['#stage table th', 'background'],
+  '--table-header-ink': ['#stage table th, #stage table th *', 'color'],
+  '--table-ink': ['#stage table td, #stage table td *', 'color'],
+  '--math-ink': ['#stage :is(.math, math), #stage :is(.math, math) *', 'color'],
+};
+function contentOverride(key: string, value: string): string {
+  const [selector, property] = CONTENT_COLORS[key]!;
+  return `\n/* slide-studio ${key.slice(2)} */\n:root { ${key}: ${value}; }\n${selector} { ${property}: var(${key}); }\n`;
+}
+const CONTENT_RES = Object.fromEntries(Object.keys(CONTENT_COLORS).map(key => [key, new RegExp(escapeRegExp(contentOverride(key, 'VALUE')).replace('VALUE', '(#[0-9a-fA-F]{6})'), 'u')]));
+const TABLE_HEADER_TEMPLATE = '\n/* slide-studio table header */\n#stage table { --header: %s; }\n';
+const TABLE_HEADER_RE = new RegExp(escapeRegExp(TABLE_HEADER_TEMPLATE).replace('%s', '(#[0-9a-fA-F]{3,8})'), 'u');
+const INK_OVERRIDE = '\n/* slide-studio heading ink */\n#stage h2, #stage h2 * { color: var(--header-ink); }\n';
+const RULE_OVERRIDE = '\n/* slide-studio heading rule */\n#stage h2 { border-color: var(--rule); } #stage h2::after { background-color: var(--rule); }\n';
+const INK_RE = new RegExp(escapeRegExp(INK_OVERRIDE), 'u');
+const RULE_RE = new RegExp(escapeRegExp(RULE_OVERRIDE), 'u');
+const LINK_RE = /\n\/\* slide-studio link ink \*\/\n:root \{ --link: [^;{}]+; \}\n/u;
+const ANGLE = '(?:[0-9]|[1-9][0-9]|[12][0-9]{2}|3[0-5][0-9])';
+const STOP = '(?: (?:100|[0-9]{1,2})%)?';
+const HEX = '#[0-9a-fA-F]{6}';
+const POS = '-?(?:150|1[0-4][0-9]|[1-9]?[0-9])%';
+const SIZE = '(?:200|1[0-9]{2}|[1-9][0-9]?)%';
+const SPOT = String.raw`radial-gradient\(ellipse (?:${SIZE} ${SIZE} )?at ${POS} ${POS}, color-mix\(in srgb, ${HEX} (?:100|[0-9]{1,2})%, transparent\), transparent (?:1[0-4][0-9]|150|[1-9][0-9]?)%\)`;
+const GROUND = String.raw`linear-gradient\(${ANGLE}deg, ${HEX}${STOP}, ${HEX}${STOP}\), `;
+const BG_VALUE = new RegExp(String.raw`^(?:var\(--paper\)|${HEX}|linear-gradient\(${ANGLE}deg, var\(--paper\)${STOP}, ${HEX}${STOP}\)|(?:${SPOT}, ){1,8}(?:${GROUND})?var\(--paper\))$`, 'u');
+const GRADIENT = new RegExp(String.raw`^linear-gradient\(${ANGLE}deg, var\(--header\)${STOP}, ${HEX}${STOP}\)$`, 'u');
+const HEADING_POINTS = new RegExp(String.raw`^(?:${SPOT}, ){1,8}var\(--header\)$`, 'u');
+const KNOWN = new Set([...DEFAULT_THEME_VARIABLES, ...CONTENT_KEYS, '--link', FILL, ...Object.keys(KINDS), ...Object.keys(BLOCK_KEYS), ...Object.keys(HEADING_OPTIONS)]);
+const FONT_VALUE = new RegExp(`^[\\p{L}\\p{N}_${PY_WS},"'-]+$`, 'u');
+const COLOR_VALUE = new RegExp(String.raw`^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[a-zA-Z]+|(?:rgba?|hsla?|var)\([\p{L}\p{N}_${PY_WS}.,%#+/-]+\))$`, 'u');
+function strip(css: string, regex: RegExp): string { return css.replace(new RegExp(regex.source, regex.flags.replace('g', '') + 'g'), ''); }
+export function valid_heading(value: unknown): value is string {
+  return typeof value === 'string' && (value === 'theme' || value === 'var(--header)' || GRADIENT.test(value) || HEADING_POINTS.test(value));
+}
+export function valid_background(value: unknown): value is string {
+  return typeof value === 'string' && (value === 'theme' || BG_VALUE.test(value));
+}
+export function valid_block(key: string, value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  if (value === 'theme') return true;
+  if (BLOCK_RADII.has(key)) return /^(?:[0-9]|[1-3][0-9]|40)px$/u.test(value);
+  if (BLOCK_SHADOWS.has(key)) return /^(?:0(?:\.[0-9]{1,2})?|1(?:\.0{1,2})?)$/u.test(value);
+  if (BLOCK_LINES.has(key)) return value === 'none' || /^(?:(?:[1-9]|1[0-9])(?:\.5)?|20)px (?:solid|dashed|dotted|double) #[0-9a-fA-F]{8}$/u.test(value);
+  return value === 'transparent' || /^#[0-9a-fA-F]{8}$/u.test(value);
+}
+export function set_vars(css: string, input: unknown): string {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('テーマの値が正しくありません');
+  const values: Record<string, unknown> = { ...input };
+  const has = (key: string) => Object.hasOwn(values, key);
+  if (has('--header')) {
+    const before = read_vars(css)['--header'] ?? '';
+    if (!TABLE_HEADER_RE.test(css) && /^#[0-9a-fA-F]{3,8}$/u.test(before)) css += TABLE_HEADER_TEMPLATE.replace('%s', before);
+    css = preserve_title_header(css);
+  }
+  for (const [key, regex] of Object.entries(CONTENT_RES)) {
+    if (!has(key)) continue;
+    const value = values[key]; delete values[key];
+    if (typeof value !== 'string' || !/^#[0-9a-fA-F]{6}$/u.test(value)) throw new Error('表・数式の色が正しくありません');
+    css = strip(css, regex) + contentOverride(key, value);
+  }
+  const current = read_vars(css);
+  const options = Object.fromEntries(Object.keys(HEADING_OPTIONS).map(key => [key, current[key]!]));
+  if (values[FILL] === 'theme' && !has('--heading-mode')) options['--heading-mode'] = 'theme';
+  let changed = Object.keys(HEADING_OPTIONS).some(has);
+  for (const [key, choices] of Object.entries(HEADING_OPTIONS)) {
+    if (!has(key)) continue;
+    const value = values[key]; delete values[key];
+    if (typeof value !== 'string' || !choices.includes(value)) throw new Error('見出しの装飾が正しくありません');
+    options[key] = value;
+  }
+  if (has('--header') || (has(FILL) ? values[FILL] : 'theme') !== 'theme') { options['--heading-mode'] = 'fill'; changed = true; }
+  else if (has('--rule')) { options['--heading-mode'] = 'rule'; changed = true; }
+  if (values[FILL] === 'theme' && options['--heading-mode'] === 'theme') { changed = false; css = strip(css, HEADING_RE); }
+  if (changed) css = strip(css, HEADING_RE) + headingOptions(options);
+  for (const [key, regex] of Object.entries(BLOCK_RES)) {
+    if (!has(key)) continue;
+    const value = values[key]; delete values[key];
+    if (!valid_block(key, value)) throw new Error('ブロックの装飾が正しくありません');
+    css = strip(css, regex);
+    if (value !== 'theme') css += blockOverride(key, value);
+  }
+  if (Object.keys(KINDS).some(has)) {
+    const legacy = BG_RE.test(css);
+    const backgrounds = Object.fromEntries(Object.keys(KINDS).map(key => [key, kindFill(css, key)]));
+    css = strip(css, BG_RE);
+    for (const [key, regex] of Object.entries(KIND_RES)) {
+      if (!has(key) && !legacy) continue;
+      const value = has(key) ? values[key] : backgrounds[key]; delete values[key];
+      if (!valid_background(value)) throw new Error('背景のグラデーションが正しくありません');
+      css = strip(css, regex);
+      if (value !== 'theme') css += kindOverride(key, value);
+    }
+  }
+  if (has(FILL) && values[FILL] === null) throw new Error('見出しのグラデーションが正しくありません');
+  let fill = values[FILL]; delete values[FILL];
+  if (fill !== undefined && !valid_heading(fill)) throw new Error('見出しのグラデーションが正しくありません');
+  if (fill !== undefined || has('--header') || has('--header-ink')) {
+    fill = fill || headingFill(css);
+    if (fill === 'theme' && has('--header')) fill = 'var(--header)';
+    css = strip(css, OVERRIDE_RE);
+    if (fill !== 'theme') css += OVERRIDE.replace('%s', String(fill));
+  }
+  if (has('--rule')) css = strip(css, RULE_RE) + RULE_OVERRIDE;
+  if (has('--header-ink')) css = strip(css, INK_RE) + INK_OVERRIDE;
+  for (const [key, value] of Object.entries(values)) {
+    if (!(DEFAULT_THEME_VARIABLES as readonly string[]).includes(key) && key !== '--link' || typeof value !== 'string' || !(key.startsWith('--font-') ? FONT_VALUE : COLOR_VALUE).test(value)) throw new Error(`テーマの値が正しくありません: ${key}`);
+  }
+  if (has('--link') && !declarations(css, KNOWN).some(([key]) => key === '--link')) css += `\n/* slide-studio link ink */\n:root { --link: ${values['--link']}; }\n`;
+  const spans = declarations(css, KNOWN);
+  if (Object.keys(values).some(key => !spans.some(([name]) => name === key))) throw new Error('テーマの :root に変数がありません');
+  for (const [key, start, end] of spans.reverse()) if (has(key)) css = css.slice(0, start) + String(values[key]) + css.slice(end);
+  return css;
+}
+export function restore(css: string, previous: unknown): string {
+  if (typeof previous !== 'string') throw new Error('テーマの値が正しくありません');
+  for (const [key, regex] of Object.entries(BLOCK_RES)) {
+    const match = regex.exec(previous);
+    if (match && !valid_block(key, match[1])) throw new Error('ブロックの装飾が正しくありません');
+  }
+  const optionMatch = HEADING_RE.exec(previous);
+  if (optionMatch) {
+    const all = read_vars(previous), options = Object.fromEntries(Object.keys(HEADING_OPTIONS).map(key => [key, all[key]!]));
+    if (Object.entries(options).some(([key, value]) => !HEADING_OPTIONS[key]!.includes(value)) || headingOptions(options) !== optionMatch[0]) throw new Error('見出しの装飾が正しくありません');
+  }
+  for (const regex of [BG_RE, ...Object.values(KIND_RES)]) {
+    const match = regex.exec(previous);
+    if (match && !BG_VALUE.test(match[1]!)) throw new Error('背景のグラデーションが正しくありません');
+  }
+  const fill = OVERRIDE_RE.exec(previous);
+  if (fill && !valid_heading(fill[1])) throw new Error('見出しのグラデーションが正しくありません');
+  function skeleton(text: string): string {
+    for (const regex of [TITLE_RE, TABLE_HEADER_RE, ...Object.values(CONTENT_RES), HEADING_RE, OVERRIDE_RE, BG_RE, INK_RE, LINK_RE, RULE_RE, ...Object.values(BLOCK_RES), ...Object.values(KIND_RES)]) text = strip(text, regex);
+    for (const [, start, end] of declarations(text, KNOWN).reverse()) text = text.slice(0, start) + '\0' + text.slice(end);
+    return text;
+  }
+  if (skeleton(css) !== skeleton(previous)) throw new Error('テーマの変数以外は変更できません');
+  return previous;
+}
