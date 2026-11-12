@@ -1,0 +1,10 @@
+{
+  "reference_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
+  "pandoc": "3.9",
+  "chunk_cases": 20,
+  "conversion_cases": 9,
+  "source_html": "../render-parity/golden.json matched by name",
+  "generation": "Original edit.chunk_info on reference HTML/source, to_markdown and cell_markdown executed in old checkout",
+  "merge_cases": 240,
+  "merge_generation": "Original edit_scope.merge3; deterministic random seed 4133; duplicate lines, insert/delete/replace, LF/CRLF/CR/Unicode line breaks"
+}

@@ -1,0 +1,360 @@
+{
+  "chunks": [
+    {
+      "name": "callout.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">前の段落。</p>"
+        },
+        "p0/1": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/2": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/2\">後の段落。</p>"
+        }
+      }
+    },
+    {
+      "name": "chapter.qmd",
+      "chunks": {
+        "p1/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p1/0\">本文1。</p>"
+        },
+        "p3/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p3/0\">本文2。</p>"
+        }
+      }
+    },
+    {
+      "name": "cite-multi.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">二つの文献を引く <span class=\"citation\" contenteditable=\"false\" data-cites=\"alpha beta\" data-slide-studio-atom=\"[@alpha; @beta]\">[<strong>alpha?</strong>, <strong>beta?</strong>]</span>。文中の引用 <span class=\"citation\" contenteditable=\"false\" data-cites=\"alpha\" data-slide-studio-atom=\"@alpha\">[<strong>alpha?</strong>]</span> も。</p>"
+        }
+      }
+    },
+    {
+      "name": "code-heading.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">説明の段落。</p>"
+        },
+        "p0/1": {
+          "direct": true,
+          "html": "<div class=\"sourceCode\" data-slide-studio=\"p0/1\" id=\"cb1\"><pre class=\"sourceCode python\"><code class=\"sourceCode python\"><span id=\"cb1-1\"><a aria-hidden=\"true\" href=\"#cb1-1\" tabindex=\"-1\"></a><span class=\"co\">## これは見出しではない</span></span>\n<span id=\"cb1-2\"><a aria-hidden=\"true\" href=\"#cb1-2\" tabindex=\"-1\"></a>x <span class=\"op\">=</span> <span class=\"dv\">1</span></span>\n<span id=\"cb1-3\"><a aria-hidden=\"true\" href=\"#cb1-3\" tabindex=\"-1\"></a></span>\n<span id=\"cb1-4\"><a aria-hidden=\"true\" href=\"#cb1-4\" tabindex=\"-1\"></a><span class=\"co\"># これも見出しではない</span></span></code></pre></div>"
+        },
+        "p1/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p1/0\">本文。</p>"
+        }
+      }
+    },
+    {
+      "name": "data-step.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">最初から見える段落。</p>"
+        },
+        "p0/1": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/1.0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/1.0\">step 1 から見える段落。</p>"
+        },
+        "p0/2": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/2\"><span class=\"highlight\" data-highlight-step=\"2\">強調する語</span> を含む段落。</p>"
+        }
+      }
+    },
+    {
+      "name": "duplicate-id.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">本文1。</p>"
+        },
+        "p1/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p1/0\">本文2。</p>"
+        }
+      }
+    },
+    {
+      "name": "fig-width.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/1": {
+          "direct": false,
+          "html": ""
+        }
+      }
+    },
+    {
+      "name": "footnote-def.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">本文に脚注がある<sup contenteditable=\"false\" data-slide-studio-atom=\"[^a]\" data-slide-studio-footnote=\"#fn1\">1</sup>。</p>"
+        },
+        "p0/1": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/2": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/2\">次の段落。</p>"
+        }
+      }
+    },
+    {
+      "name": "formatting.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\"><strong>太字</strong> と <em>斜体</em> と <code>コード</code>。</p>"
+        },
+        "p0/1": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/1\"><span style=\"color: #c00;\">色付き</span> の文字。</p>"
+        }
+      }
+    },
+    {
+      "name": "letter-spacing.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\"><span style=\"letter-spacing: 0.2em;\">字間を広げた見出し</span></p>"
+        },
+        "p0/1": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/1\">普通の段落。</p>"
+        }
+      }
+    },
+    {
+      "name": "link-def.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\"><a href=\"https://example.com/doc\" rel=\"noopener\" target=\"_blank\">説明のリンク</a> を含む段落。</p>"
+        },
+        "p0/1": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/2": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/2\">後の段落。</p>"
+        }
+      }
+    },
+    {
+      "name": "math-blank.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">前の段落。</p>"
+        },
+        "p0/1": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/2": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/2\">後の段落。</p>"
+        }
+      }
+    },
+    {
+      "name": "math.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">分数 <math contenteditable=\"false\" data-slide-studio-atom=\"$\\frac{a}{b}$\" display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mfrac><mi>a</mi><mi>b</mi></mfrac><annotation encoding=\"application/x-tex\">\\frac{a}{b}</annotation></semantics></math> を含む段落。</p>"
+        },
+        "p0/1": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/2": {
+          "direct": false,
+          "html": ""
+        }
+      }
+    },
+    {
+      "name": "mid-paragraph-hash.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">この行のあとに<br/>\n# 見出しのような行<br/>\nが続くが、段落の途中なので見出しではない。</p>"
+        },
+        "p0/1": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/1\">次の段落。</p>"
+        }
+      }
+    },
+    {
+      "name": "nested-columns.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/0.0": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/0.0.0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0.0.0\">左の列。</p>"
+        },
+        "p0/0.0.1": {
+          "direct": true,
+          "html": "<ul data-slide-studio=\"p0/0.0.1\">\n<li>項目1</li>\n<li>項目2</li>\n</ul>"
+        },
+        "p0/0.1": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/0.1.0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0.1.0\">右の列の段落。</p>"
+        },
+        "p0/0.1.1": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/0.1.1.0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0.1.1.0\">箱の中の段落。</p>"
+        },
+        "p0/0.1.1.1": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0.1.1.1\">箱の中の2段落目。</p>"
+        },
+        "p0/1": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/1\">列の後の段落。</p>"
+        }
+      }
+    },
+    {
+      "name": "no-id.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">本文。</p>"
+        },
+        "p1/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p1/0\">本文。</p>"
+        }
+      }
+    },
+    {
+      "name": "raw-html.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": false,
+          "html": ""
+        },
+        "p0/1": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/1\">普通の段落。</p>"
+        }
+      }
+    },
+    {
+      "name": "two-footnotes.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">一つ目<sup contenteditable=\"false\" data-slide-studio-atom=\"[^fn-1]\" data-slide-studio-footnote=\"#fn1\">1</sup>と二つ目<sup contenteditable=\"false\" data-slide-studio-atom=\"[^fn-2]\" data-slide-studio-footnote=\"#fn2\">2</sup>の脚注。</p>"
+        },
+        "p0/1": {
+          "direct": false,
+          "html": ""
+        }
+      }
+    },
+    {
+      "name": "unclosed-div.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">ここは編集できる。</p>"
+        }
+      }
+    },
+    {
+      "name": "unknown-attrs.qmd",
+      "chunks": {
+        "p0/0": {
+          "direct": true,
+          "html": "<p data-slide-studio=\"p0/0\">本文。</p>"
+        }
+      }
+    }
+  ],
+  "markdown": [
+    {
+      "html": "<p>日本語 <strong>太字</strong>と<em>斜体</em></p>",
+      "original": "",
+      "markdown": "日本語 **太字**と*斜体*"
+    },
+    {
+      "html": "<p>改行<br>本文</p>",
+      "original": "before  ",
+      "markdown": "改行\\\n本文  "
+    },
+    {
+      "html": "<p>リンク <a href=\"https://example.com\">例</a></p>",
+      "original": "",
+      "markdown": "リンク [例](https://example.com)"
+    },
+    {
+      "html": "<ul><li>一</li><li>二</li></ul>",
+      "original": "",
+      "markdown": "- 一\n- 二"
+    }
+  ],
+  "cells": [
+    {
+      "html": "<td>一<br>二</td>",
+      "markdown": "一<br>二"
+    },
+    {
+      "html": "<td>改行<br></td>",
+      "markdown": "改行"
+    },
+    {
+      "html": "<td>A | B</td>",
+      "markdown": "A \\| B"
+    },
+    {
+      "html": "<td><strong>太字</strong></td>",
+      "markdown": "**太字**"
+    },
+    {
+      "html": "<td><p>A</p><p>B</p></td>",
+      "markdown": "A<br>B"
+    }
+  ]
+}

@@ -1,0 +1,1442 @@
+[
+  {
+    "base": "😀\n同じ\n同じ\n本文\n",
+    "mine": "😀\n同じ\n本文\n",
+    "theirs": "😀\n同じ\n同じ\n本文\n",
+    "result": "😀\n同じ\n本文\n"
+  },
+  {
+    "base": "同じ\r\nA\r\n😀\r\nA\r\nA\r\n本文\r\n",
+    "mine": "同じ\r\nA\r\n😀\r\nA\r\nA\r\n変更\r\n",
+    "theirs": "同じ\r\n変更\r\n😀\r\nA\r\nA\r\n本文\r\n",
+    "result": "同じ\r\n変更\r\n😀\r\nA\r\nA\r\n変更\r\n"
+  },
+  {
+    "base": "😀\r😀\r同じ\r同じ\r\r同じ\rA\r",
+    "mine": "😀\rA\r同じ\r同じ\r\r同じ\r",
+    "theirs": "😀\r😀\r同じ\r\r変更\rA\r",
+    "result": "😀\rA\r同じ\r\r変更\r"
+  },
+  {
+    "base": "本文 本文 同じ 同じ 同じ A ",
+    "mine": "本文 本文 同じ 同じ 同じ ",
+    "theirs": "本文 本文 同じ 変更 同じ A ",
+    "result": "本文 本文 同じ 変更 同じ "
+  },
+  {
+    "base": "😀同じA同じ",
+    "mine": "😀同じA同じ",
+    "theirs": "A😀同じA同じ追記",
+    "result": "A😀同じA同じ追記"
+  },
+  {
+    "base": "\u001c\u001c\u001c😀\u001c",
+    "mine": "\u001c\u001c\u001c😀\u001c",
+    "theirs": "\u001c\u001c追記\u001c\u001c😀\u001c",
+    "result": "\u001c\u001c追記\u001c\u001c😀\u001c"
+  },
+  {
+    "base": "同じ\nA\n同じ\n同じ\n本文\n",
+    "mine": "同じ\nA\nA\n同じ\n同じ\n本文\n",
+    "theirs": "同じ\nA\n同じ\n本文\n",
+    "result": "同じ\nA\nA\n同じ\n本文\n"
+  },
+  {
+    "base": "",
+    "mine": "\r\n追記\r\nA\r\n",
+    "theirs": "A\r\n",
+    "result": null
+  },
+  {
+    "base": "\r😀\r\r\rA\r\r",
+    "mine": "変更\r😀\r同じ\r\r同じ\r\r",
+    "theirs": "\r\r😀\r\r\rA\r\r",
+    "result": null
+  },
+  {
+    "base": "同じ  同じ  A 同じ 本文 ",
+    "mine": "  A 同じ 本文 ",
+    "theirs": "同じ  同じ  A A 同じ  ",
+    "result": "  A A 同じ  "
+  },
+  {
+    "base": "AA",
+    "mine": "A",
+    "theirs": "AA",
+    "result": "A"
+  },
+  {
+    "base": "同じ\u001c\u001c",
+    "mine": "同じ\u001c",
+    "theirs": "同じ\u001c\u001c",
+    "result": "同じ\u001c"
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "",
+    "result": ""
+  },
+  {
+    "base": "\r\n",
+    "mine": "\r\n追記\r\n",
+    "theirs": "\r\n\r\n",
+    "result": null
+  },
+  {
+    "base": "同じ\r本文\r",
+    "mine": "同じ\r本文\r",
+    "theirs": "A\r",
+    "result": "A\r"
+  },
+  {
+    "base": " A 同じ ",
+    "mine": "追記 A A A 同じ ",
+    "theirs": " A 同じ ",
+    "result": "追記 A A A 同じ "
+  },
+  {
+    "base": "😀本文本文本文",
+    "mine": "追記😀本文本文本文A",
+    "theirs": "本文本文追記本文",
+    "result": "追記本文本文追記本文A"
+  },
+  {
+    "base": "😀\u001c😀\u001c😀\u001c😀\u001c\u001c",
+    "mine": "A\u001c😀\u001c\u001c😀\u001c😀\u001c\u001c",
+    "theirs": "😀\u001c😀\u001c😀\u001cA\u001c😀\u001c追記\u001c\u001c",
+    "result": "A\u001c😀\u001c\u001c😀\u001cA\u001c😀\u001c追記\u001c\u001c"
+  },
+  {
+    "base": "A\n",
+    "mine": "A\n",
+    "theirs": "追記\nA\n",
+    "result": "追記\nA\n"
+  },
+  {
+    "base": "\r\n\r\n",
+    "mine": "\r\n\r\nA\r\n",
+    "theirs": "\r\n\r\n",
+    "result": "\r\n\r\nA\r\n"
+  },
+  {
+    "base": "\r😀\r同じ\r\rA\r",
+    "mine": "\r😀\r同じ\r\r\r\rA\r",
+    "theirs": "変更\r😀\r同じ\r同じ\rA\r\r",
+    "result": "変更\r😀\r同じ\r同じ\rA\r\r\r\r"
+  },
+  {
+    "base": "A  😀 ",
+    "mine": "",
+    "theirs": "同じ 😀 ",
+    "result": null
+  },
+  {
+    "base": "A😀A",
+    "mine": "A😀A",
+    "theirs": "😀A",
+    "result": "😀A"
+  },
+  {
+    "base": "",
+    "mine": "追記\u001c\u001cA\u001c",
+    "theirs": "",
+    "result": "追記\u001c\u001cA\u001c"
+  },
+  {
+    "base": "😀\n同じ\n😀\n本文\n",
+    "mine": "A\n同じ\n",
+    "theirs": "😀\n変更\n😀\n本文\n",
+    "result": "A\n変更\n"
+  },
+  {
+    "base": "\r\n",
+    "mine": "\r\n変更\r\n",
+    "theirs": "変更\r\n",
+    "result": "変更\r\n変更\r\n"
+  },
+  {
+    "base": "A\r\r同じ\r本文\rA\r😀\r",
+    "mine": "A\r\r同じ\r本文\rA\rA\r",
+    "theirs": "A\r\r同じ\r本文\rA\r😀\r",
+    "result": "A\r\r同じ\r本文\rA\rA\r"
+  },
+  {
+    "base": "😀 A ",
+    "mine": "追記 😀 A ",
+    "theirs": "😀 A ",
+    "result": "追記 😀 A "
+  },
+  {
+    "base": "A",
+    "mine": "",
+    "theirs": "A",
+    "result": ""
+  },
+  {
+    "base": "A\u001cA\u001c",
+    "mine": "A\u001cA\u001cA\u001c変更\u001c",
+    "theirs": "\u001c追記\u001cA\u001cA\u001c",
+    "result": "\u001c追記\u001cA\u001cA\u001cA\u001c変更\u001c"
+  },
+  {
+    "base": "同じ\n😀\n",
+    "mine": "同じ\n😀\n",
+    "theirs": "同じ\nA\n",
+    "result": "同じ\nA\n"
+  },
+  {
+    "base": "\r\n😀\r\n本文\r\n😀\r\n",
+    "mine": "\r\n😀\r\n本文\r\n😀\r\n",
+    "theirs": "\r\n😀\r\n本文\r\n",
+    "result": "\r\n😀\r\n本文\r\n"
+  },
+  {
+    "base": "本文\r\r同じ\r",
+    "mine": "本文\r\r同じ\r",
+    "theirs": "A\r\r追記\r",
+    "result": "A\r\r追記\r"
+  },
+  {
+    "base": "A  同じ A 😀 同じ  ",
+    "mine": "A  同じ A 同じ  ",
+    "theirs": "A  追記 同じ A 同じ  ",
+    "result": "A  追記 同じ A 同じ  "
+  },
+  {
+    "base": "本文😀😀本文",
+    "mine": "本文😀同じ本文",
+    "theirs": "追記本文😀😀同じ本文",
+    "result": "追記本文😀同じ同じ本文"
+  },
+  {
+    "base": "本文\u001c",
+    "mine": "本文\u001c追記\u001c追記\u001c",
+    "theirs": "A\u001c追記\u001c",
+    "result": "A\u001c追記\u001c追記\u001c追記\u001c"
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "同じ\n",
+    "result": "同じ\n"
+  },
+  {
+    "base": "A\r\n😀\r\n😀\r\n",
+    "mine": "A\r\n😀\r\n😀\r\n",
+    "theirs": "A\r\n😀\r\n",
+    "result": "A\r\n😀\r\n"
+  },
+  {
+    "base": "本文\rA\r",
+    "mine": "同じ\r",
+    "theirs": "本文\r追記\rA\rA\r",
+    "result": null
+  },
+  {
+    "base": "😀 😀 同じ 本文 ",
+    "mine": "😀 😀 本文 ",
+    "theirs": "😀 同じ 本文 ",
+    "result": "😀 本文 "
+  },
+  {
+    "base": "本文本文AA",
+    "mine": "本文本文AA同じ",
+    "theirs": "本文本文AAA",
+    "result": null
+  },
+  {
+    "base": "\u001c",
+    "mine": "\u001c",
+    "theirs": "",
+    "result": ""
+  },
+  {
+    "base": "😀\n本文\n\n\nA\nA\n同じ\n",
+    "mine": "本文\n追記\n\n\nA\nA\n同じ\n",
+    "theirs": "😀\n本文\n\n\n\nA\nA\nA\nA\n",
+    "result": "本文\n追記\n\n\n\nA\nA\nA\nA\n"
+  },
+  {
+    "base": "\r\nA\r\n😀\r\nA\r\n本文\r\n本文\r\n同じ\r\n",
+    "mine": "\r\nA\r\n😀\r\nA\r\n本文\r\n本文\r\n同じ\r\n",
+    "theirs": "\r\nA\r\nA\r\n😀\r\n\r\nA\r\n本文\r\n本文\r\n同じ\r\n",
+    "result": "\r\nA\r\nA\r\n😀\r\n\r\nA\r\n本文\r\n本文\r\n同じ\r\n"
+  },
+  {
+    "base": "😀\r",
+    "mine": "\rA\r",
+    "theirs": "A\r",
+    "result": null
+  },
+  {
+    "base": "同じ 😀 ",
+    "mine": "追記 同じ 😀 ",
+    "theirs": "変更 ",
+    "result": "追記 変更 "
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "",
+    "result": ""
+  },
+  {
+    "base": "\u001c",
+    "mine": "\u001cA\u001c",
+    "theirs": "A\u001c",
+    "result": "A\u001cA\u001c"
+  },
+  {
+    "base": "",
+    "mine": "追記\nA\n",
+    "theirs": "同じ\n同じ\n",
+    "result": null
+  },
+  {
+    "base": "😀\r\nA\r\n\r\nA\r\n\r\n",
+    "mine": "😀\r\nA\r\n\r\nA\r\n\r\n",
+    "theirs": "😀\r\nA\r\n\r\nA\r\n\r\n追記\r\n",
+    "result": "😀\r\nA\r\n\r\nA\r\n\r\n追記\r\n"
+  },
+  {
+    "base": "😀\r",
+    "mine": "A\r😀\r同じ\r",
+    "theirs": "😀\r",
+    "result": "A\r😀\r同じ\r"
+  },
+  {
+    "base": "本文 A  同じ ",
+    "mine": "本文  同じ ",
+    "theirs": "変更 A 同じ 変更 ",
+    "result": "変更 同じ 変更 "
+  },
+  {
+    "base": "本文A😀A本文本文😀",
+    "mine": "A😀A本文本文変更",
+    "theirs": "本文A😀AA本文本文😀",
+    "result": "A😀AA本文本文変更"
+  },
+  {
+    "base": "同じ\u001c\u001c本文\u001cA\u001cA\u001c本文\u001c本文\u001c",
+    "mine": "同じ\u001c\u001c本文\u001cA\u001cA\u001cA\u001c本文\u001cA\u001c",
+    "theirs": "同じ\u001cA\u001c本文\u001cA\u001cA\u001c本文\u001c本文\u001c",
+    "result": "同じ\u001cA\u001c本文\u001cA\u001cA\u001cA\u001c本文\u001cA\u001c"
+  },
+  {
+    "base": "A\n本文\n",
+    "mine": "",
+    "theirs": "A\n本文\n",
+    "result": ""
+  },
+  {
+    "base": "本文\r\n",
+    "mine": "本文\r\n",
+    "theirs": "本文\r\nA\r\n",
+    "result": "本文\r\nA\r\n"
+  },
+  {
+    "base": "本文\r同じ\rA\r",
+    "mine": "本文\rA\r",
+    "theirs": "本文\rA\r同じ\r変更\r",
+    "result": "本文\rA\r変更\r"
+  },
+  {
+    "base": "本文 😀 😀 A ",
+    "mine": "😀 ",
+    "theirs": "同じ 本文 😀 A ",
+    "result": null
+  },
+  {
+    "base": "本文本文同じAA",
+    "mine": "本文同じ同じA",
+    "theirs": "本文本文同じAA",
+    "result": "本文同じ同じA"
+  },
+  {
+    "base": "😀\u001cA\u001c同じ\u001c\u001c",
+    "mine": "😀\u001cA\u001c同じ\u001c\u001c",
+    "theirs": "変更\u001cA\u001c追記\u001c同じ\u001c\u001c",
+    "result": "変更\u001cA\u001c追記\u001c同じ\u001c\u001c"
+  },
+  {
+    "base": "",
+    "mine": "変更\n",
+    "theirs": "追記\n",
+    "result": null
+  },
+  {
+    "base": "😀\r\nA\r\n\r\n",
+    "mine": "😀\r\n\r\nA\r\n変更\r\n",
+    "theirs": "😀\r\nA\r\nA\r\nA\r\n",
+    "result": null
+  },
+  {
+    "base": "😀\r同じ\r本文\r",
+    "mine": "変更\r😀\r同じ\r本文\r",
+    "theirs": "A\r同じ\r",
+    "result": "変更\rA\r同じ\r"
+  },
+  {
+    "base": "本文 A 本文 A ",
+    "mine": "変更 A A 本文 A ",
+    "theirs": "本文 A 本文 A ",
+    "result": "変更 A A 本文 A "
+  },
+  {
+    "base": "同じ😀A本文",
+    "mine": "同じ😀A本文",
+    "theirs": "同じ😀A本文A",
+    "result": "同じ😀A本文A"
+  },
+  {
+    "base": "同じ\u001c本文\u001c😀\u001c本文\u001c😀\u001c本文\u001c",
+    "mine": "同じ\u001c本文\u001c同じ\u001c😀\u001c本文\u001c",
+    "theirs": "同じ\u001c本文\u001c😀\u001c本文\u001c😀\u001c本文\u001c",
+    "result": "同じ\u001c本文\u001c同じ\u001c😀\u001c本文\u001c"
+  },
+  {
+    "base": "😀\n本文\n\n同じ\nA\nA\n\n",
+    "mine": "😀\n本文\nA\n\n同じ\nA\nA\n\n\n",
+    "theirs": "😀\n本文\n\n\n同じ\n変更\nA\n\n",
+    "result": "😀\n本文\nA\n\n\n同じ\n変更\nA\n\n\n"
+  },
+  {
+    "base": "本文\r\n同じ\r\n",
+    "mine": "A\r\n本文\r\n同じ\r\n",
+    "theirs": "本文\r\n同じ\r\n",
+    "result": "A\r\n本文\r\n同じ\r\n"
+  },
+  {
+    "base": "😀\r😀\rA\r😀\r",
+    "mine": "😀\r😀\rA\r😀\r",
+    "theirs": "😀\rA\r",
+    "result": "😀\rA\r"
+  },
+  {
+    "base": "本文    A 本文 ",
+    "mine": "本文  A   A 本文 ",
+    "theirs": "本文    A 本文 ",
+    "result": "本文  A   A 本文 "
+  },
+  {
+    "base": "本文本文",
+    "mine": "本文本文",
+    "theirs": "本文",
+    "result": "本文"
+  },
+  {
+    "base": "😀\u001c本文\u001c",
+    "mine": "😀\u001c本文\u001c",
+    "theirs": "😀\u001c本文\u001c追記\u001c",
+    "result": "😀\u001c本文\u001c追記\u001c"
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "",
+    "result": ""
+  },
+  {
+    "base": "😀\r\nA\r\nA\r\n\r\nA\r\n😀\r\n",
+    "mine": "😀\r\nA\r\nA\r\n\r\nA\r\n😀\r\n",
+    "theirs": "😀\r\nA\r\nA\r\n\r\nA\r\n同じ\r\n",
+    "result": "😀\r\nA\r\nA\r\n\r\nA\r\n同じ\r\n"
+  },
+  {
+    "base": "A\r本文\r\rA\rA\r同じ\r",
+    "mine": "A\r本文\r\rA\rA\rA\rA\r",
+    "theirs": "A\r\rA\rA\r同じ\r",
+    "result": "A\r\rA\rA\rA\rA\r"
+  },
+  {
+    "base": "😀  本文 ",
+    "mine": "😀  本文 ",
+    "theirs": "😀 本文 同じ ",
+    "result": "😀 本文 同じ "
+  },
+  {
+    "base": "同じA同じ本文",
+    "mine": "同じA同じ本文",
+    "theirs": "同じA同じ本文追記変更",
+    "result": "同じA同じ本文追記変更"
+  },
+  {
+    "base": "😀\u001c😀\u001c",
+    "mine": "😀\u001cA\u001c",
+    "theirs": "A\u001cA\u001c",
+    "result": null
+  },
+  {
+    "base": "A\n本文\n本文\n本文\n本文\n",
+    "mine": "A\n本文\n同じ\n本文\n",
+    "theirs": "A\n本文\n本文\n本文\n本文\n",
+    "result": "A\n本文\n同じ\n本文\n"
+  },
+  {
+    "base": "同じ\r\nA\r\nA\r\n",
+    "mine": "同じ\r\n同じ\r\n",
+    "theirs": "同じ\r\nA\r\nA\r\n",
+    "result": "同じ\r\n同じ\r\n"
+  },
+  {
+    "base": "本文\rA\r同じ\r本文\r😀\r本文\r😀\r",
+    "mine": "本文\rA\r同じ\r本文\r😀\r本文\r😀\r",
+    "theirs": "本文\rA\r同じ\r\r本文\r😀\r本文\r😀\r",
+    "result": "本文\rA\r同じ\r\r本文\r😀\r本文\r😀\r"
+  },
+  {
+    "base": "本文 同じ 同じ 同じ A ",
+    "mine": "本文 同じ 同じ 同じ A ",
+    "theirs": "A 変更 同じ 同じ A ",
+    "result": "A 変更 同じ 同じ A "
+  },
+  {
+    "base": "同じ😀A本文同じA",
+    "mine": "同じ😀A本文同じA",
+    "theirs": "同じ😀A本文同じA",
+    "result": "同じ😀A本文同じA"
+  },
+  {
+    "base": "同じ\u001c",
+    "mine": "追記\u001c同じ\u001c",
+    "theirs": "同じ\u001c",
+    "result": "追記\u001c同じ\u001c"
+  },
+  {
+    "base": "本文\nA\n😀\n同じ\nA\n",
+    "mine": "本文\nA\n😀\n同じ\nA\n",
+    "theirs": "本文\nA\nA\n😀\n同じ\nA\n",
+    "result": "本文\nA\nA\n😀\n同じ\nA\n"
+  },
+  {
+    "base": "本文\r\n",
+    "mine": "同じ\r\n",
+    "theirs": "A\r\n\r\n",
+    "result": null
+  },
+  {
+    "base": "本文\rA\r\r😀\r",
+    "mine": "本文\r追記\rA\r\r😀\r",
+    "theirs": "本文\r変更\r\r😀\r",
+    "result": "本文\r追記\r変更\r\r😀\r"
+  },
+  {
+    "base": "A 本文 本文 😀 同じ ",
+    "mine": "A 本文 本文 😀 同じ ",
+    "theirs": "A 本文 本文 😀 同じ ",
+    "result": "A 本文 本文 😀 同じ "
+  },
+  {
+    "base": "😀本文",
+    "mine": "😀本文追記",
+    "theirs": "😀本文",
+    "result": "😀本文追記"
+  },
+  {
+    "base": "😀\u001c本文\u001cA\u001c😀\u001c",
+    "mine": "😀\u001c本文\u001cA\u001c😀\u001c",
+    "theirs": "😀\u001c本文\u001cA\u001c😀\u001c",
+    "result": "😀\u001c本文\u001cA\u001c😀\u001c"
+  },
+  {
+    "base": "本文\n同じ\n\nA\n\nA\n\n😀\n",
+    "mine": "本文\n同じ\n\nA\n同じ\nA\n\n変更\n",
+    "theirs": "本文\n\nA\n\nA\n\n😀\n",
+    "result": "本文\n\nA\n同じ\nA\n\n変更\n"
+  },
+  {
+    "base": "\r\n本文\r\n😀\r\nA\r\n",
+    "mine": "\r\nA\r\n本文\r\n追記\r\n😀\r\nA\r\n",
+    "theirs": "\r\n本文\r\n😀\r\nA\r\n",
+    "result": "\r\nA\r\n本文\r\n追記\r\n😀\r\nA\r\n"
+  },
+  {
+    "base": "\rA\r",
+    "mine": "追記\r変更\r\rA\r",
+    "theirs": "同じ\r",
+    "result": "追記\r変更\r同じ\r"
+  },
+  {
+    "base": " 同じ 😀  本文 ",
+    "mine": " 同じ 😀  本文 ",
+    "theirs": " 同じ 😀  本文 ",
+    "result": " 同じ 😀  本文 "
+  },
+  {
+    "base": "同じA本文😀😀本文",
+    "mine": "同じA本文😀😀変更",
+    "theirs": "同じA本文😀😀本文",
+    "result": "同じA本文😀😀変更"
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "A\u001c追記\u001c",
+    "result": "A\u001c追記\u001c"
+  },
+  {
+    "base": "\n",
+    "mine": "変更\n",
+    "theirs": "\n追記\n",
+    "result": "変更\n追記\n"
+  },
+  {
+    "base": "A\r\n同じ\r\n😀\r\n",
+    "mine": "変更\r\n追記\r\n同じ\r\n😀\r\nA\r\n",
+    "theirs": "A\r\nA\r\n😀\r\n",
+    "result": "変更\r\n追記\r\nA\r\n😀\r\nA\r\n"
+  },
+  {
+    "base": "",
+    "mine": "同じ\r",
+    "theirs": "",
+    "result": "同じ\r"
+  },
+  {
+    "base": "本文 本文 同じ 同じ 本文 A 😀  ",
+    "mine": "本文 本文 同じ 同じ 本文 A 😀  ",
+    "theirs": "本文 本文 同じ 同じ 本文 A 😀 追記  追記 ",
+    "result": "本文 本文 同じ 同じ 本文 A 😀 追記  追記 "
+  },
+  {
+    "base": "本文本文😀本文",
+    "mine": "本文本文追記A😀変更",
+    "theirs": "本文本文😀本文",
+    "result": "本文本文追記A😀変更"
+  },
+  {
+    "base": "",
+    "mine": "追記\u001c",
+    "theirs": "",
+    "result": "追記\u001c"
+  },
+  {
+    "base": "\n本文\n本文\n\n\n\n\nA\n",
+    "mine": "\n本文\n本文\n\n\nA\n\n同じ\nA\n",
+    "theirs": "\n本文\n本文\n\n\n\n\nA\n",
+    "result": "\n本文\n本文\n\n\nA\n\n同じ\nA\n"
+  },
+  {
+    "base": "",
+    "mine": "変更\r\n",
+    "theirs": "",
+    "result": "変更\r\n"
+  },
+  {
+    "base": "A\r本文\r😀\rA\r\r😀\r同じ\r\r",
+    "mine": "A\r本文\r😀\rA\r\r😀\r同じ\r\r",
+    "theirs": "A\r本文\r😀\rA\r\r😀\r同じ\r同じ\r",
+    "result": "A\r本文\r😀\rA\r\r😀\r同じ\r同じ\r"
+  },
+  {
+    "base": "A 😀 A A 😀 ",
+    "mine": "追記 A 😀 A A 😀 ",
+    "theirs": "A 😀 A A A  😀 ",
+    "result": "追記 A 😀 A A A  😀 "
+  },
+  {
+    "base": "A😀",
+    "mine": "A😀追記",
+    "theirs": "AA変更変更",
+    "result": "AA追記変更変更"
+  },
+  {
+    "base": "😀\u001c😀\u001c同じ\u001c",
+    "mine": "😀\u001c😀\u001c同じ\u001c",
+    "theirs": "A\u001c😀\u001c😀\u001c同じ\u001c\u001c",
+    "result": "A\u001c😀\u001c😀\u001c同じ\u001c\u001c"
+  },
+  {
+    "base": "😀\nA\n本文\n同じ\n本文\n同じ\n",
+    "mine": "😀\nA\n本文\n同じ\n同じ\n",
+    "theirs": "😀\nA\n\nA\n追記\n本文\n同じ\n本文\n同じ\n",
+    "result": "😀\nA\n\nA\n追記\n本文\n同じ\n同じ\n"
+  },
+  {
+    "base": "\r\n😀\r\nA\r\n同じ\r\n同じ\r\n",
+    "mine": "同じ\r\nA\r\nA\r\n同じ\r\n同じ\r\n",
+    "theirs": "\r\n😀\r\n追記\r\nA\r\n追記\r\n同じ\r\n\r\n同じ\r\n",
+    "result": "同じ\r\nA\r\n追記\r\nA\r\n追記\r\n同じ\r\n\r\n同じ\r\n"
+  },
+  {
+    "base": "\r\r同じ\r",
+    "mine": "\r\r変更\r",
+    "theirs": "\r追記\rA\r",
+    "result": null
+  },
+  {
+    "base": "同じ A 本文 本文  A ",
+    "mine": " 同じ  A 本文 本文  A ",
+    "theirs": "同じ A 本文  A 同じ ",
+    "result": " 同じ  A 本文  A 同じ "
+  },
+  {
+    "base": "A",
+    "mine": "A",
+    "theirs": "A",
+    "result": "A"
+  },
+  {
+    "base": "\u001c",
+    "mine": "\u001c",
+    "theirs": "\u001c変更\u001c",
+    "result": "\u001c変更\u001c"
+  },
+  {
+    "base": "同じ\n😀\n😀\n本文\n",
+    "mine": "同じ\n😀\n😀\n本文\nA\n",
+    "theirs": "同じ\n変更\n本文\nA\n",
+    "result": "同じ\n変更\n本文\nA\n"
+  },
+  {
+    "base": "😀\r\n同じ\r\n同じ\r\n本文\r\n本文\r\n",
+    "mine": "😀\r\n同じ\r\n同じ\r\n本文\r\n本文\r\n",
+    "theirs": "😀\r\n同じ\r\n変更\r\n本文\r\n",
+    "result": "😀\r\n同じ\r\n変更\r\n本文\r\n"
+  },
+  {
+    "base": "本文\r同じ\r😀\rA\r",
+    "mine": "本文\r同じ\r同じ\rA\r",
+    "theirs": "同じ\r😀\rA\r",
+    "result": "同じ\r同じ\rA\r"
+  },
+  {
+    "base": "本文 同じ ",
+    "mine": "本文 追記 同じ ",
+    "theirs": "本文 同じ ",
+    "result": "本文 追記 同じ "
+  },
+  {
+    "base": "本文A同じ本文",
+    "mine": "AA本文",
+    "theirs": "A同じ変更同じ",
+    "result": "AA変更同じ"
+  },
+  {
+    "base": "\u001c",
+    "mine": "\u001c同じ\u001c",
+    "theirs": "\u001c",
+    "result": "\u001c同じ\u001c"
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "同じ\n",
+    "result": "同じ\n"
+  },
+  {
+    "base": "",
+    "mine": "追記\r\nA\r\n",
+    "theirs": "",
+    "result": "追記\r\nA\r\n"
+  },
+  {
+    "base": "😀\r\rA\r\r同じ\r同じ\r",
+    "mine": "😀\rA\r\r同じ\r同じ\r",
+    "theirs": "😀\r\r\r同じ\r同じ\r",
+    "result": "😀\r\r同じ\r同じ\r"
+  },
+  {
+    "base": " ",
+    "mine": " ",
+    "theirs": " ",
+    "result": " "
+  },
+  {
+    "base": "A😀同じ同じ本文本文同じ",
+    "mine": "AA同じ同じ本文同じ",
+    "theirs": "A😀同じA同じ本文本文同じ",
+    "result": "AA同じA同じ本文同じ"
+  },
+  {
+    "base": "😀\u001c",
+    "mine": "😀\u001c",
+    "theirs": "変更\u001c変更\u001c",
+    "result": "変更\u001c変更\u001c"
+  },
+  {
+    "base": "本文\n😀\n😀\n本文\n同じ\nA\n\n同じ\n",
+    "mine": "本文\n😀\n😀\n本文\n同じ\nA\n\n同じ\n",
+    "theirs": "A\n😀\n😀\n同じ\n同じ\nA\n\n同じ\n",
+    "result": "A\n😀\n😀\n同じ\n同じ\nA\n\n同じ\n"
+  },
+  {
+    "base": "本文\r\n本文\r\nA\r\n😀\r\n😀\r\n😀\r\n同じ\r\n",
+    "mine": "本文\r\n本文\r\nA\r\n😀\r\n😀\r\n😀\r\n同じ\r\n",
+    "theirs": "A\r\n本文\r\n変更\r\n😀\r\n😀\r\n同じ\r\n",
+    "result": "A\r\n本文\r\n変更\r\n😀\r\n😀\r\n同じ\r\n"
+  },
+  {
+    "base": "本文\r本文\rA\r本文\r😀\r😀\r本文\r",
+    "mine": "本文\r本文\rA\r本文\r😀\r😀\r本文\r",
+    "theirs": "本文\r追記\r本文\rA\r本文\r😀\r😀\r本文\r",
+    "result": "本文\r追記\r本文\rA\r本文\r😀\r😀\r本文\r"
+  },
+  {
+    "base": "同じ ",
+    "mine": "同じ 追記 同じ A ",
+    "theirs": "同じ ",
+    "result": "同じ 追記 同じ A "
+  },
+  {
+    "base": "A同じA😀😀😀",
+    "mine": "A同じA😀😀変更",
+    "theirs": "同じA変更😀😀変更",
+    "result": null
+  },
+  {
+    "base": "本文\u001cA\u001c",
+    "mine": "本文\u001cA\u001c追記\u001cA\u001c",
+    "theirs": "本文\u001cA\u001c変更\u001c同じ\u001c",
+    "result": null
+  },
+  {
+    "base": "本文\nA\nA\n",
+    "mine": "本文\nA\nA\n",
+    "theirs": "本文\nA\n\nA\n",
+    "result": "本文\nA\n\nA\n"
+  },
+  {
+    "base": "😀\r\n同じ\r\n😀\r\n😀\r\n\r\n",
+    "mine": "😀\r\n同じ\r\n😀\r\n😀\r\n\r\n",
+    "theirs": "😀\r\n😀\r\n😀\r\nA\r\n\r\n",
+    "result": "😀\r\n😀\r\n😀\r\nA\r\n\r\n"
+  },
+  {
+    "base": "😀\rA\r😀\rA\r同じ\rA\r同じ\r",
+    "mine": "\r😀\rA\r😀\r同じ\rA\r同じ\r",
+    "theirs": "😀\rA\rA\r同じ\rA\r同じ\r",
+    "result": "\r😀\rA\r同じ\rA\r同じ\r"
+  },
+  {
+    "base": " A ",
+    "mine": " 同じ  ",
+    "theirs": " 追記 追記  A ",
+    "result": " 追記 追記  同じ  "
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "",
+    "result": ""
+  },
+  {
+    "base": "同じ\u001c本文\u001c同じ\u001c\u001c",
+    "mine": "同じ\u001c本文\u001c\u001c追記\u001c",
+    "theirs": "A\u001c本文\u001c同じ\u001c",
+    "result": "A\u001c本文\u001c追記\u001c"
+  },
+  {
+    "base": "本文\n本文\n😀\n😀\n😀\nA\n😀\nA\n",
+    "mine": "本文\n本文\n😀\n😀\n\n😀\nA\n追記\n😀\nA\n",
+    "theirs": "本文\n本文\n😀\n変更\n😀\nA\n😀\nA\n",
+    "result": "本文\n本文\n😀\n変更\n\n😀\nA\n追記\n😀\nA\n"
+  },
+  {
+    "base": "同じ\r\n😀\r\n本文\r\n",
+    "mine": "😀\r\n本文\r\n変更\r\n",
+    "theirs": "同じ\r\n😀\r\n\r\n",
+    "result": "😀\r\n\r\n変更\r\n"
+  },
+  {
+    "base": "A\r本文\r",
+    "mine": "A\r本文\r",
+    "theirs": "A\r本文\r",
+    "result": "A\r本文\r"
+  },
+  {
+    "base": "A A 😀 ",
+    "mine": "A A A 😀  ",
+    "theirs": "A A 😀 ",
+    "result": "A A A 😀  "
+  },
+  {
+    "base": "😀😀",
+    "mine": "変更同じ😀",
+    "theirs": "😀😀",
+    "result": "変更同じ😀"
+  },
+  {
+    "base": "本文\u001c本文\u001c😀\u001c本文\u001c本文\u001c本文\u001c\u001c",
+    "mine": "本文\u001c本文\u001c😀\u001c本文\u001c本文\u001cA\u001c\u001c",
+    "theirs": "本文\u001c本文\u001c😀\u001c本文\u001c本文\u001c本文\u001c\u001c",
+    "result": "本文\u001c本文\u001c😀\u001c本文\u001c本文\u001cA\u001c\u001c"
+  },
+  {
+    "base": "\n😀\n同じ\n\nA\n本文\n",
+    "mine": "\n😀\n同じ\n\nA\n本文\n",
+    "theirs": "\n😀\n同じ\n追記\n\nA\n",
+    "result": "\n😀\n同じ\n追記\n\nA\n"
+  },
+  {
+    "base": "同じ\r\n\r\n😀\r\n同じ\r\n本文\r\n同じ\r\n\r\nA\r\n",
+    "mine": "同じ\r\n\r\n😀\r\n同じ\r\n本文\r\n同じ\r\n\r\nA\r\n",
+    "theirs": "同じ\r\n\r\n😀\r\n\r\n同じ\r\n同じ\r\n\r\nA\r\n",
+    "result": "同じ\r\n\r\n😀\r\n\r\n同じ\r\n同じ\r\n\r\nA\r\n"
+  },
+  {
+    "base": "同じ\r本文\r\r😀\r本文\rA\rA\r",
+    "mine": "追記\r同じ\r本文\r\r本文\rA\rA\rA\r",
+    "theirs": "同じ\r本文\r\r😀\rA\r追記\rA\r",
+    "result": "追記\r同じ\r本文\r\rA\r追記\rA\rA\r"
+  },
+  {
+    "base": "A A 同じ 本文 ",
+    "mine": "A A 同じ 本文 ",
+    "theirs": "A A 追記 同じ 本文 ",
+    "result": "A A 追記 同じ 本文 "
+  },
+  {
+    "base": "A😀同じ本文本文",
+    "mine": "A😀変更本文変更",
+    "theirs": "A😀同じ本文",
+    "result": null
+  },
+  {
+    "base": "同じ\u001c",
+    "mine": "追記\u001c同じ\u001c",
+    "theirs": "同じ\u001c",
+    "result": "追記\u001c同じ\u001c"
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "",
+    "result": ""
+  },
+  {
+    "base": "",
+    "mine": "\r\n",
+    "theirs": "\r\n変更\r\n",
+    "result": null
+  },
+  {
+    "base": "😀\r😀\r😀\r\r",
+    "mine": "😀\r😀\r追記\r\r",
+    "theirs": "😀\r😀\r😀\r\r同じ\r",
+    "result": "😀\r😀\r追記\r\r同じ\r"
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "",
+    "result": ""
+  },
+  {
+    "base": "A同じ",
+    "mine": "A変更",
+    "theirs": "A同じ",
+    "result": "A変更"
+  },
+  {
+    "base": "A\u001c",
+    "mine": "A\u001c追記\u001c",
+    "theirs": "A\u001c追記\u001c",
+    "result": "A\u001c追記\u001c"
+  },
+  {
+    "base": "",
+    "mine": "\n",
+    "theirs": "",
+    "result": "\n"
+  },
+  {
+    "base": "本文\r\n😀\r\n同じ\r\n",
+    "mine": "本文\r\n😀\r\n同じ\r\n",
+    "theirs": "本文\r\n😀\r\n追記\r\n同じ\r\n同じ\r\n",
+    "result": "本文\r\n😀\r\n追記\r\n同じ\r\n同じ\r\n"
+  },
+  {
+    "base": "\r同じ\r本文\r\r本文\r\r本文\r",
+    "mine": "\r同じ\r\r同じ\r本文\r\r本文\r\r本文\r",
+    "theirs": "\r同じ\r本文\r\r本文\r\r本文\r",
+    "result": "\r同じ\r\r同じ\r本文\r\r本文\r\r本文\r"
+  },
+  {
+    "base": "A 本文 A 本文 A 同じ   ",
+    "mine": "A 本文 A 本文 A 同じ   ",
+    "theirs": "同じ A A 本文 A 同じ   ",
+    "result": "同じ A A 本文 A 同じ   "
+  },
+  {
+    "base": "😀😀同じ",
+    "mine": "😀😀同じ",
+    "theirs": "😀同じ追記",
+    "result": "😀同じ追記"
+  },
+  {
+    "base": "\u001c本文\u001c本文\u001c同じ\u001cA\u001cA\u001c\u001c同じ\u001c",
+    "mine": "\u001c本文\u001c本文\u001c同じ\u001cA\u001cA\u001c\u001c",
+    "theirs": "\u001c本文\u001c同じ\u001c追記\u001cA\u001cA\u001c\u001c同じ\u001cA\u001c",
+    "result": "\u001c本文\u001c同じ\u001c追記\u001cA\u001cA\u001c\u001cA\u001c"
+  },
+  {
+    "base": "\n\n😀\n本文\n\nA\n",
+    "mine": "\n\n😀\n本文\n\nA\n",
+    "theirs": "\n\n😀\n本文\nA\n",
+    "result": "\n\n😀\n本文\nA\n"
+  },
+  {
+    "base": "",
+    "mine": "A\r\n",
+    "theirs": "",
+    "result": "A\r\n"
+  },
+  {
+    "base": "同じ\r本文\rA\r😀\r😀\r同じ\r",
+    "mine": "同じ\r本文\rA\r😀\r😀\r同じ\r",
+    "theirs": "同じ\r本文\rA\r😀\r😀\r同じ\r",
+    "result": "同じ\r本文\rA\r😀\r😀\r同じ\r"
+  },
+  {
+    "base": " 本文 ",
+    "mine": " 本文 追記 ",
+    "theirs": " 本文 ",
+    "result": " 本文 追記 "
+  },
+  {
+    "base": "同じA😀同じ",
+    "mine": "同じA😀AA同じ追記",
+    "theirs": "同じA😀同じ",
+    "result": null
+  },
+  {
+    "base": "A\u001c本文\u001c😀\u001cA\u001c",
+    "mine": "変更\u001c本文\u001c😀\u001cA\u001c",
+    "theirs": "A\u001c本文\u001c同じ\u001c同じ\u001c",
+    "result": "変更\u001c本文\u001c同じ\u001c同じ\u001c"
+  },
+  {
+    "base": "😀\n同じ\n😀\n😀\n😀\nA\nA\n",
+    "mine": "A\n同じ\n😀\n😀\nA\nA\n",
+    "theirs": "😀\n同じ\n😀\n😀\n😀\nA\nA\n",
+    "result": "A\n同じ\n😀\n😀\nA\nA\n"
+  },
+  {
+    "base": "A\r\n",
+    "mine": "A\r\nA\r\n",
+    "theirs": "A\r\nA\r\n",
+    "result": "A\r\nA\r\n"
+  },
+  {
+    "base": "😀\rA\r",
+    "mine": "😀\r変更\rA\r",
+    "theirs": "😀\rA\rA\r",
+    "result": "😀\r変更\rA\rA\r"
+  },
+  {
+    "base": "",
+    "mine": "A ",
+    "theirs": "変更 A ",
+    "result": null
+  },
+  {
+    "base": "同じ同じ",
+    "mine": "追記追記同じ",
+    "theirs": "追記同じ",
+    "result": null
+  },
+  {
+    "base": "😀\u001c😀\u001cA\u001c",
+    "mine": "A\u001c同じ\u001c😀\u001cA\u001c",
+    "theirs": "\u001c😀\u001c😀\u001cA\u001c",
+    "result": "\u001cA\u001c同じ\u001c😀\u001cA\u001c"
+  },
+  {
+    "base": "\n\n本文\n\n",
+    "mine": "\n\nA\n",
+    "theirs": "\n本文\n\n",
+    "result": "\nA\n"
+  },
+  {
+    "base": "\r\n😀\r\n😀\r\n同じ\r\n",
+    "mine": "\r\n😀\r\n😀\r\n同じ\r\n",
+    "theirs": "\r\n😀\r\n😀\r\n同じ\r\n",
+    "result": "\r\n😀\r\n😀\r\n同じ\r\n"
+  },
+  {
+    "base": "同じ\r本文\r同じ\rA\r同じ\r本文\r",
+    "mine": "同じ\r本文\r変更\rA\r同じ\r",
+    "theirs": "\r同じ\r本文\r同じ\rA\r同じ\r本文\r",
+    "result": "\r同じ\r本文\r変更\rA\r同じ\r"
+  },
+  {
+    "base": "同じ A A  😀 本文 ",
+    "mine": "同じ A  😀 追記 ",
+    "theirs": "A A A  😀 本文 ",
+    "result": "A A  😀 追記 "
+  },
+  {
+    "base": "",
+    "mine": "追記",
+    "theirs": "",
+    "result": "追記"
+  },
+  {
+    "base": "",
+    "mine": "A\u001c",
+    "theirs": "A\u001c",
+    "result": "A\u001c"
+  },
+  {
+    "base": "\n同じ\n同じ\n😀\n😀\n",
+    "mine": "\n同じ\n同じ\n😀\nA\n😀\n",
+    "theirs": "\n同じ\n同じ\n😀\n😀\n",
+    "result": "\n同じ\n同じ\n😀\nA\n😀\n"
+  },
+  {
+    "base": "",
+    "mine": "\r\n追記\r\n",
+    "theirs": "A\r\n",
+    "result": null
+  },
+  {
+    "base": "本文\r同じ\r同じ\r同じ\r",
+    "mine": "本文\r同じ\r同じ\r同じ\r",
+    "theirs": "本文\r同じ\r同じ\r同じ\r",
+    "result": "本文\r同じ\r同じ\r同じ\r"
+  },
+  {
+    "base": " A     ",
+    "mine": " A    変更 ",
+    "theirs": "A     ",
+    "result": "A    変更 "
+  },
+  {
+    "base": "😀",
+    "mine": "A追記😀",
+    "theirs": "AA",
+    "result": "A追記AA"
+  },
+  {
+    "base": "😀\u001c本文\u001c同じ\u001c",
+    "mine": "本文\u001c同じ\u001c",
+    "theirs": "😀\u001c同じ\u001cA\u001c",
+    "result": "同じ\u001cA\u001c"
+  },
+  {
+    "base": "本文\n本文\n\n本文\n\n\n本文\n",
+    "mine": "本文\n本文\n\n本文\n\n本文\n",
+    "theirs": "本文\nA\n\n本文\n\n\n本文\nA\n",
+    "result": "本文\nA\n\n本文\n\n本文\nA\n"
+  },
+  {
+    "base": "同じ\r\n😀\r\nA\r\n同じ\r\n本文\r\n",
+    "mine": "同じ\r\n😀\r\nA\r\n同じ\r\n同じ\r\n\r\n",
+    "theirs": "同じ\r\nA\r\n同じ\r\n本文\r\n",
+    "result": "同じ\r\nA\r\n同じ\r\n同じ\r\n\r\n"
+  },
+  {
+    "base": "同じ\r同じ\r😀\r同じ\r😀\r本文\r\r",
+    "mine": "同じ\r同じ\r😀\r同じ\rA\r本文\r\r",
+    "theirs": "同じ\r同じ\r😀\r同じ\r😀\r本文\r\r変更\r",
+    "result": "同じ\r同じ\r😀\r同じ\rA\r本文\r\r変更\r"
+  },
+  {
+    "base": "同じ 😀 同じ 同じ 本文 😀  同じ ",
+    "mine": "同じ 同じ 同じ 追記 本文 😀  同じ A ",
+    "theirs": "同じ 😀 同じ 同じ 本文 😀  同じ ",
+    "result": "同じ 同じ 同じ 追記 本文 😀  同じ A "
+  },
+  {
+    "base": "😀😀😀😀",
+    "mine": "😀😀😀😀",
+    "theirs": "😀😀😀😀同じ",
+    "result": "😀😀😀😀同じ"
+  },
+  {
+    "base": "😀\u001c",
+    "mine": "変更\u001cA\u001c同じ\u001c",
+    "theirs": "😀\u001c追記\u001c",
+    "result": "変更\u001cA\u001c同じ\u001c追記\u001c"
+  },
+  {
+    "base": "\n同じ\n同じ\n\n\n",
+    "mine": "\n同じ\n同じ\n\n\n",
+    "theirs": "\n同じ\n\nA\n",
+    "result": "\n同じ\n\nA\n"
+  },
+  {
+    "base": "",
+    "mine": "変更\r\n",
+    "theirs": "A\r\n",
+    "result": null
+  },
+  {
+    "base": "\r\r😀\r\rA\rA\r",
+    "mine": "\r\rA\r😀\r\r追記\rA\rA\r",
+    "theirs": "\r\r😀\rA\rA\r追記\r",
+    "result": "\r\rA\r😀\r追記\rA\rA\r追記\r"
+  },
+  {
+    "base": "",
+    "mine": "変更 ",
+    "theirs": "",
+    "result": "変更 "
+  },
+  {
+    "base": "同じA",
+    "mine": "同じ変更A",
+    "theirs": "変更同じ",
+    "result": null
+  },
+  {
+    "base": "本文\u001c😀\u001c",
+    "mine": "本文\u001c\u001c変更\u001cA\u001c",
+    "theirs": "本文\u001c😀\u001c",
+    "result": "本文\u001c\u001c変更\u001cA\u001c"
+  },
+  {
+    "base": "😀\nA\n",
+    "mine": "😀\nA\nA\nA\n",
+    "theirs": "\n😀\nA\n",
+    "result": "\n😀\nA\nA\nA\n"
+  },
+  {
+    "base": "同じ\r\n同じ\r\n同じ\r\n同じ\r\nA\r\n",
+    "mine": "同じ\r\n同じ\r\n同じ\r\n同じ\r\nA\r\n",
+    "theirs": "同じ\r\n同じ\r\n同じ\r\n同じ\r\nA\r\n",
+    "result": "同じ\r\n同じ\r\n同じ\r\n同じ\r\nA\r\n"
+  },
+  {
+    "base": "😀\rA\r\r",
+    "mine": "変更\r\rA\rA\r",
+    "theirs": "A\r\r",
+    "result": null
+  },
+  {
+    "base": " 😀 本文 本文 同じ 同じ A  ",
+    "mine": " 😀 本文  本文 A 同じ A  ",
+    "theirs": "  😀 本文 追記 本文 同じ 同じ 変更  ",
+    "result": null
+  },
+  {
+    "base": "同じ本文",
+    "mine": "本文",
+    "theirs": "同じ本文A",
+    "result": "本文A"
+  },
+  {
+    "base": "A\u001cA\u001c\u001c同じ\u001c",
+    "mine": "変更\u001cA\u001c\u001c同じ\u001c",
+    "theirs": "A\u001cA\u001c\u001cA\u001c",
+    "result": "変更\u001cA\u001c\u001cA\u001c"
+  },
+  {
+    "base": "A\n😀\nA\n本文\n本文\nA\n",
+    "mine": "😀\nA\n本文\nA\n",
+    "theirs": "A\n😀\nA\n本文\n同じ\nA\n",
+    "result": null
+  },
+  {
+    "base": "",
+    "mine": "A\r\n\r\n",
+    "theirs": "",
+    "result": "A\r\n\r\n"
+  },
+  {
+    "base": "",
+    "mine": "同じ\r\r",
+    "theirs": "",
+    "result": "同じ\r\r"
+  },
+  {
+    "base": "",
+    "mine": "追記  ",
+    "theirs": "",
+    "result": "追記  "
+  },
+  {
+    "base": "😀",
+    "mine": "😀",
+    "theirs": "😀変更",
+    "result": "😀変更"
+  },
+  {
+    "base": "\u001c",
+    "mine": "\u001c",
+    "theirs": "同じ\u001c",
+    "result": "同じ\u001c"
+  },
+  {
+    "base": "😀\n本文\n\n😀\nA\n",
+    "mine": "😀\n本文\n\nA\n",
+    "theirs": "😀\n本文\n\n😀\n追記\nA\n",
+    "result": "😀\n本文\n\n追記\nA\n"
+  },
+  {
+    "base": "\r\n\r\n\r\n",
+    "mine": "\r\n\r\nA\r\nA\r\n",
+    "theirs": "\r\n\r\n\r\n\r\n\r\n変更\r\n",
+    "result": "\r\n\r\nA\r\nA\r\n\r\n\r\n変更\r\n"
+  },
+  {
+    "base": "😀\r\r",
+    "mine": "追記\r😀\r\r",
+    "theirs": "😀\r\r",
+    "result": "追記\r😀\r\r"
+  },
+  {
+    "base": "同じ A 本文 A 😀 ",
+    "mine": "同じ A 本文 A 😀 ",
+    "theirs": "同じ A  本文 A 😀 ",
+    "result": "同じ A  本文 A 😀 "
+  },
+  {
+    "base": "",
+    "mine": "同じ",
+    "theirs": "変更",
+    "result": null
+  },
+  {
+    "base": "A\u001c😀\u001c\u001c😀\u001c同じ\u001c同じ\u001c同じ\u001cA\u001c",
+    "mine": "A\u001c変更\u001c\u001c😀\u001c同じ\u001c同じ\u001c同じ\u001cA\u001c",
+    "theirs": "A\u001c😀\u001c\u001c😀\u001c同じ\u001c同じ\u001c同じ\u001c変更\u001c",
+    "result": "A\u001c変更\u001c\u001c😀\u001c同じ\u001c同じ\u001c同じ\u001c変更\u001c"
+  },
+  {
+    "base": "\nA\n\n",
+    "mine": "\nA\n\n",
+    "theirs": "A\n\n同じ\n",
+    "result": "A\n\n同じ\n"
+  },
+  {
+    "base": "😀\r\n本文\r\n本文\r\nA\r\n\r\n\r\nA\r\n\r\n",
+    "mine": "追記\r\n😀\r\n本文\r\n本文\r\nA\r\n\r\n\r\nA\r\n\r\n",
+    "theirs": "本文\r\n本文\r\nA\r\n\r\n\r\nA\r\n\r\n",
+    "result": "追記\r\n本文\r\n本文\r\nA\r\n\r\n\r\nA\r\n\r\n"
+  },
+  {
+    "base": "\r同じ\r😀\rA\r\r本文\r同じ\r",
+    "mine": "\r同じ\r😀\rA\rA\r\r本文\r同じ\r",
+    "theirs": "\r同じ\rA\rA\r\r本文\r同じ\r",
+    "result": "\r同じ\rA\rA\rA\r\r本文\r同じ\r"
+  },
+  {
+    "base": " 同じ A A 同じ ",
+    "mine": "A A 同じ ",
+    "theirs": " A 同じ ",
+    "result": null
+  },
+  {
+    "base": "同じ",
+    "mine": "",
+    "theirs": "",
+    "result": ""
+  },
+  {
+    "base": "本文\u001c同じ\u001c本文\u001c",
+    "mine": "本文\u001c同じ\u001c本文\u001cA\u001c",
+    "theirs": "同じ\u001c本文\u001c",
+    "result": "同じ\u001c本文\u001cA\u001c"
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "A\n",
+    "result": "A\n"
+  },
+  {
+    "base": "\r\n😀\r\n",
+    "mine": "\r\n😀\r\n",
+    "theirs": "\r\n",
+    "result": "\r\n"
+  },
+  {
+    "base": "A\r本文\r本文\r本文\r",
+    "mine": "A\r本文\r本文\r",
+    "theirs": "A\r本文\r本文\r本文\r",
+    "result": "A\r本文\r本文\r"
+  },
+  {
+    "base": "本文 😀  同じ ",
+    "mine": "😀  同じ ",
+    "theirs": "本文 😀  同じ ",
+    "result": "😀  同じ "
+  },
+  {
+    "base": "😀",
+    "mine": "A",
+    "theirs": "😀",
+    "result": "A"
+  },
+  {
+    "base": "A\u001cA\u001c同じ\u001c😀\u001c😀\u001c",
+    "mine": "A\u001c同じ\u001c同じ\u001c同じ\u001c",
+    "theirs": "A\u001c同じ\u001c😀\u001c😀\u001c追記\u001c",
+    "result": "A\u001c同じ\u001c同じ\u001c同じ\u001c追記\u001c"
+  },
+  {
+    "base": "同じ\n同じ\n\n\n",
+    "mine": "同じ\n\n\n",
+    "theirs": "同じ\n同じ\n\n\n",
+    "result": "同じ\n\n\n"
+  },
+  {
+    "base": "",
+    "mine": "",
+    "theirs": "変更\r\n",
+    "result": "変更\r\n"
+  },
+  {
+    "base": "😀\r😀\r同じ\r😀\r本文\r",
+    "mine": "😀\r追記\r😀\r同じ\r追記\r😀\r",
+    "theirs": "😀\r😀\r同じ\r😀\r同じ\r",
+    "result": null
+  },
+  {
+    "base": " 😀 本文 ",
+    "mine": " 😀 本文 A 同じ ",
+    "theirs": "追記 変更 😀 本文 ",
+    "result": "追記 変更 😀 本文 A 同じ "
+  },
+  {
+    "base": "本文本文AAA同じ",
+    "mine": "本文AA同じ追記",
+    "theirs": "本文本文AAA同じ",
+    "result": "本文AA同じ追記"
+  },
+  {
+    "base": "本文\u001c😀\u001c",
+    "mine": "本文\u001c😀\u001c",
+    "theirs": "本文\u001c",
+    "result": "本文\u001c"
+  },
+  {
+    "base": "\n本文\n😀\n😀\nA\n",
+    "mine": "\n本文\n😀\n😀\nA\n",
+    "theirs": "\n本文\n😀\nA\n😀\nA\n",
+    "result": "\n本文\n😀\nA\n😀\nA\n"
+  },
+  {
+    "base": "😀\r\n\r\n同じ\r\n本文\r\n同じ\r\n😀\r\n😀\r\n同じ\r\n",
+    "mine": "😀\r\n\r\n同じ\r\n本文\r\n😀\r\n\r\n変更\r\n同じ\r\n",
+    "theirs": "😀\r\n\r\n同じ\r\n\r\n本文\r\n同じ\r\n😀\r\n😀\r\n",
+    "result": null
+  },
+  {
+    "base": "\rA\r本文\rA\r本文\r",
+    "mine": "追記\rA\r本文\rA\r変更\r",
+    "theirs": "\rA\r本文\rA\r本文\r\r",
+    "result": "追記\rA\r本文\rA\r変更\r\r"
+  },
+  {
+    "base": "同じ 😀 同じ 本文 同じ A ",
+    "mine": "A 😀 同じ 本文 同じ ",
+    "theirs": "同じ 😀 同じ 本文 同じ A ",
+    "result": "A 😀 同じ 本文 同じ "
+  },
+  {
+    "base": "本文A",
+    "mine": "本文A",
+    "theirs": "本文A",
+    "result": "本文A"
+  },
+  {
+    "base": "A\u001c本文\u001c😀\u001c",
+    "mine": "本文\u001c変更\u001c",
+    "theirs": "A\u001c本文\u001c😀\u001c",
+    "result": "本文\u001c変更\u001c"
+  }
+]

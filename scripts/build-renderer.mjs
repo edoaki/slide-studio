@@ -1,4 +1,4 @@
-import { cp, mkdir, rm, stat } from "node:fs/promises";
+import { cp, copyFile, mkdir, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -57,6 +57,13 @@ if (process.argv.includes("--clean")) {
 
 for (const entry of copies) {
   await copyAssets(entry);
+}
+
+// Core reads the same exported message constants as the UI. Generate this
+// packaged copy from the single source, including for unpacked ASAR assets.
+const stringsModule = resolve(root, "packages/web/strings.js");
+if (await exists(stringsModule)) {
+  await copyFile(stringsModule, resolve(dist, "packages/core/assets/strings.js"));
 }
 
 // The content agent must execute before authored slide scripts. Keep the
