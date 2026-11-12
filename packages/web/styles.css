@@ -77,12 +77,22 @@ button {
 }
 
 .app {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   height: 100vh;
   height: 100dvh;
   min-height: 0;
   background: var(--bg);
+}
+
+.app-header,
+.app-error,
+.app-footer {
+  flex: 0 0 auto;
+}
+
+.app-body {
+  flex: 1 1 auto;
 }
 
 .app-header {

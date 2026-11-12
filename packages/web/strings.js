@@ -5,7 +5,7 @@
  */
 export const strings = {
   appName: 'Slide Studio',
-  appSubtitle: 'QMD 原稿を直接編集',
+  appSubtitle: 'QMD ソースを編集',
   documentTitle: 'Slide Studio',
   brandMark: 'SS',
 
@@ -115,8 +115,8 @@ export const strings = {
   },
 
   notices: {
-    trial: '原稿（QMD）の直接編集を試す試験版です。',
-    unavailable: '直接編集・AI・履歴はまだ利用できません。',
+    trial: '原稿（QMD）のソース編集を試す試験版です。',
+    unavailable: 'スライド上の直接編集・AI・履歴は未対応です。',
     pdf: 'PDF 書き出しは試験的です。'
   },
 
