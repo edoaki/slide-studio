@@ -16,8 +16,10 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import test, { type TestContext } from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   OLD_DEFAULT_THEMES,
+  OLD_PORTABLE_READMES,
   OLD_THEMES,
   RUNTIME_FILES,
   StudioError,
@@ -30,14 +32,24 @@ import {
   figure_steps,
   figure_title,
   location_file,
-  parseLegacySource,
+  pyStr,
+  pyTruthy,
   recent_roots,
   remember_root,
   runtime_rel,
   saved_root,
   set_front,
+  set_strings_file,
   theme_variables,
 } from "../../packages/core/src/legacy-workspace.js";
+import { parse } from "../../packages/core/src/legacy-source.js";
+import {
+  drop_cover_layout,
+  preserve_title_header,
+  read_vars,
+  refresh_heading_options,
+} from "../../packages/core/src/legacy-theme-edit.js";
+import { with_current_palette } from "../../packages/core/src/legacy-block-design.js";
 
 function scratch(t: TestContext): string {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), "slide-studio-legacy-")));
@@ -47,6 +59,26 @@ function scratch(t: TestContext): string {
 
 function sha(data: string | Buffer): string {
   return createHash("sha256").update(data).digest("hex");
+}
+
+function repositoryRoot(): string {
+  let directory = dirname(fileURLToPath(import.meta.url));
+  while (true) {
+    const packagePath = join(directory, "package.json");
+    if (existsSync(packagePath)) {
+      try {
+        const value = JSON.parse(readFileSync(packagePath, "utf8")) as { name?: unknown };
+        if (value.name === "slide-studio") return directory;
+      } catch {
+        // Keep walking until the source package root is found.
+      }
+    }
+    const parent = dirname(directory);
+    if (parent === directory) {
+      throw new Error("could not locate the slide-studio repository root");
+    }
+    directory = parent;
+  }
 }
 
 function readJson(path: string): Record<string, unknown> {
@@ -93,9 +125,14 @@ test("creates the legacy layout, bundled themes, runtime and agent guidance", as
     assert.equal(existsSync(join(root, ".agents/skills/slide-studio-slides/SKILL.md")), true);
   }
   const readme = readFileSync(join(root, "README.md"), "utf8");
-  assert.match(readme, /slide-studio build/u);
+  assert.doesNotMatch(readme, /slide-studio build/u);
   assert.doesNotMatch(readme, /uv run|Python 3/u);
+  assert.match(readme, /準備中/u);
   assert.equal(existsSync(join(root, "build.py")), false);
+  assert.equal(
+    OLD_PORTABLE_READMES.has(sha(readFileSync(join(TEMPLATES, "portable", "README.md"), "utf8"))),
+    true,
+  );
   const record = readJson(join(ws.state, "bundled-themes.json"));
   assert.equal(typeof record["default.css"], "string");
 });
@@ -159,7 +196,7 @@ test("set_front changes only requested front-matter keys and renames figures", a
   assert.equal(set_front("## A\n", {}), "## A\n");
   assert.equal(set_front("## A\n", { topic: "x" }), "---\ntopic: x\n---\n\n## A\n");
 
-  const parsed = parseLegacySource(source);
+  const parsed = parse(source);
   assert.deepEqual(parsed.pages.map((page) => page.id), ["cover"]);
   assert.equal(parsed.meta.topic, "alpha");
   assert.equal(theme_variables("/* --ignored: x; */ :root{--one: 1; --one: 2; --two:#fff}").join(","), "--one,--two");
@@ -418,16 +455,22 @@ test("figure, shelf, topic and recent/preferences operations keep legacy semanti
 
 test("rejects invalid and escaping names and symlinked workspace entries", async (t) => {
   const root = await scratch(t);
-  for (const value of ["Bad", "with space", "con", "NUL", "a/b", ""]) {
+  for (const value of ["Bad", "with space", "NUL", "a/b", ""]) {
     assert.throws(() => check_name(value), StudioError, value);
   }
-  assert.throws(() => Workspace.open("relative-root"), /absolute/u);
+  // Legacy lookups keep Mac-created reserved Windows names; only creation rejects them.
+  assert.equal(check_name("con"), "con");
+  assert.equal(check_name("aux"), "aux");
+  const relativeRoot = relative(process.cwd(), join(root, "relative-root"));
+  const relativeWorkspace = Workspace.open(relativeRoot);
+  assert.equal(relativeWorkspace.root, realpathSync.native(join(root, "relative-root")));
 
   const ws = Workspace.open(root);
   assert.throws(() => ws.figure_dir("../escape/name"), StudioError);
   assert.throws(() => ws.figure_dir("demo/../name"), StudioError);
-  assert.throws(() => ws.figure_dir("demo/CON"), StudioError);
+  assert.equal(ws.figure_dir("demo/CON"), join(ws.shelf_dir("demo"), "CON"));
   assert.throws(() => ws.deck_meta(".."), StudioError);
+  assert.throws(() => ws.new_topic("con"), StudioError);
 
   const outside = join(root, "..", `outside-${Date.now()}`);
   mkdirSync(outside, { recursive: true });
@@ -446,4 +489,282 @@ test("rejects invalid and escaping names and symlinked workspace entries", async
   assert.equal(fresh.has_deck("talk"), false);
   assert.deepEqual(fresh.list_decks(), []);
   assert.throws(() => fresh.deck_meta("talk"));
+});
+
+test("set_front preserves CRLF and BOM without the Python double-front bug", async (t) => {
+  const root = await scratch(t);
+  const crlf = "---\r\ntitle: old\r\n---\r\n\r\n## 題\r\n";
+  const updated = set_front(crlf, { title: '"日本語"' });
+  assert.equal(updated.startsWith('---\r\ntitle: "日本語"\r\n---\r\n'), true);
+  assert.equal((updated.match(/^---/gmu) ?? []).length, 2);
+  assert.equal(updated.endsWith("## 題\r\n"), true);
+
+  const bom = `\uFEFF${crlf}`;
+  const withBom = set_front(bom, { theme: "night" });
+  assert.equal(withBom.startsWith("\uFEFF---\r\ntitle: old\r\n"), true);
+  assert.match(withBom, /^theme: night\r$/mu);
+  assert.equal((withBom.replace(/^\uFEFF/u, "").match(/^---/gmu) ?? []).length, 2);
+
+  assert.equal(set_front("## A\n", {}), "## A\n");
+  assert.equal(pyStr(true), "True");
+  assert.equal(pyStr(null), "None");
+  assert.equal(pyTruthy([]), false);
+  assert.equal(pyTruthy([1]), true);
+});
+
+test("bibliography migration preserves paren entries and refuses broken BibTeX", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("talk", "topic");
+  const local = join(ws.deck_dir("talk"), "reference.bib");
+  const target = ws.bib("talk");
+
+  writeFileSync(local, "@article(paren, title={Keep paren})\n");
+  ws.ensure();
+  assert.match(readFileSync(target, "utf8"), /Keep paren/u);
+  assert.equal(existsSync(local), false);
+  assert.equal(
+    readdirSync(join(ws.state, "trash")).some((name) => name.startsWith("bib-")),
+    true,
+  );
+
+  writeFileSync(local, "@article{broken, title={missing close}\n");
+  ws.ensure();
+  assert.equal(existsSync(local), true);
+  assert.equal(readFileSync(local, "utf8"), "@article{broken, title={missing close}\n");
+  assert.equal(ws.migration_preparation().some((item) => item.name === "文献の移行"), true);
+
+  writeFileSync(local, "@string{publisher = {ACM}}\n@comment{keep me}\n");
+  ws.ensure();
+  assert.match(readFileSync(target, "utf8"), /@string\{publisher/u);
+  assert.match(readFileSync(target, "utf8"), /@comment\{keep me\}/u);
+});
+
+test("agent files back up edits on version changes and forget edited obsolete files", async (t) => {
+  const root = await scratch(t);
+  Workspace.open(root);
+  const agents = join(root, "AGENTS.md");
+  writeFileSync(agents, "# my edit\n");
+  const next = Workspace.open(root, true, { version: "9.9.9" });
+  assert.match(readFileSync(agents, "utf8"), /Slide Studio の置き場/u);
+  const trash = join(next.state, "trash", "agent-files");
+  assert.equal(
+    readdirSync(trash).some((stamp) => existsSync(join(trash, stamp, "AGENTS.md"))),
+    true,
+  );
+
+  const stampPath = join(next.state, "agent-files.json");
+  const stamp = readJson(stampPath);
+  const obsolete = ".agents/skills/obsolete/SKILL.md";
+  stamp[obsolete] = sha("original obsolete");
+  writeJson(stampPath, stamp);
+  const obsoletePath = join(root, obsolete);
+  mkdirSync(dirname(obsoletePath), { recursive: true });
+  writeFileSync(obsoletePath, "user edited obsolete");
+  next.ensure();
+  assert.equal(existsSync(obsoletePath), true);
+  writeFileSync(obsoletePath, "original obsolete");
+  next.ensure();
+  assert.equal(existsSync(obsoletePath), true);
+});
+
+test("agent cleanup never deletes through a symlinked .agents directory", async (t) => {
+  const root = await scratch(t);
+  const workspace = Workspace.open(root);
+  const outside = join(root, "..", `agents-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  rmSync(join(root, ".agents"), { recursive: true, force: true });
+  try {
+    symlinkSync(outside, join(root, ".agents"), "dir");
+  } catch {
+    return;
+  }
+  writeFileSync(join(outside, "AGENTS.md"), "outside");
+  const stampPath = join(workspace.state, "agent-files.json");
+  const stamp = readJson(stampPath);
+  stamp["AGENTS.md"] = sha("outside");
+  writeJson(stampPath, stamp);
+  workspace.ensure();
+  assert.equal(readFileSync(join(outside, "AGENTS.md"), "utf8"), "outside");
+});
+
+test("topic migration does not touch decks when topics/ already exists", async (t) => {
+  const root = await scratch(t);
+  mkdirSync(join(root, "figures", "alpha", "demo"), { recursive: true });
+  writeFileSync(join(root, "figures", "alpha", "demo", "figure.mjs"), "export default {};\n");
+  mkdirSync(join(root, "topics", "existing"), { recursive: true });
+  mkdirSync(join(root, "decks", "old"), { recursive: true });
+  const qmd = join(root, "decks", "old", "slides.qmd");
+  const text = "---\ntopic: alpha\ntheme: default\n---\n\n![x](figures/alpha/demo/index.html)\n";
+  writeFileSync(qmd, text);
+
+  Workspace.open(root);
+  assert.equal(readFileSync(qmd, "utf8"), text);
+  assert.equal(existsSync(join(root, "figures", "alpha", "demo", "figure.mjs")), true);
+});
+
+test("topic migration refuses symlinks instead of deleting their content", async (t) => {
+  const root = await scratch(t);
+  const outside = join(root, "..", `figures-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  writeFileSync(join(outside, "keep.txt"), "keep");
+  mkdirSync(join(root, "figures", "alpha"), { recursive: true });
+  try {
+    symlinkSync(outside, join(root, "figures", "alpha", "link"), "dir");
+  } catch {
+    return;
+  }
+  assert.throws(() => Workspace.open(root), StudioError);
+  assert.equal(readFileSync(join(outside, "keep.txt"), "utf8"), "keep");
+});
+
+test("new_deck follows internal symlinks, rejects external ones and rolls back", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("source", "alpha");
+  writeFileSync(join(ws.deck_dir("source"), "extra.txt"), "content");
+  try {
+    symlinkSync(join(ws.deck_dir("source"), "extra.txt"), join(ws.deck_dir("source"), "alias.txt"));
+  } catch {
+    return;
+  }
+  ws.new_deck("copy", "beta", "default", "source");
+  assert.equal(readFileSync(join(ws.deck_dir("copy"), "alias.txt"), "utf8"), "content");
+  assert.equal(lstatSync(join(ws.deck_dir("copy"), "alias.txt")).isSymbolicLink(), false);
+
+  const outside = join(root, "..", `deck-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  writeFileSync(join(outside, "secret.txt"), "secret");
+  symlinkSync(join(outside, "secret.txt"), join(ws.deck_dir("source"), "external.txt"));
+  assert.throws(() => ws.new_deck("bad", "beta", "default", "source"), StudioError);
+  assert.equal(existsSync(ws.deck_dir("bad")), false);
+  assert.equal(
+    readdirSync(ws.decks).some((name) => name.startsWith(".new-")),
+    false,
+  );
+});
+
+test("reserved Windows names stay visible while creation rejects them", async (t) => {
+  const root = await scratch(t);
+  mkdirSync(join(root, "decks", "con"), { recursive: true });
+  writeFileSync(
+    join(root, "decks", "con", "slides.qmd"),
+    "---\ntopic: aux\ntheme: default\n---\n\n## A\n",
+  );
+  mkdirSync(join(root, "topics", "aux"), { recursive: true });
+  const ws = Workspace.open(root);
+  assert.deepEqual(ws.list_decks(), ["con"]);
+  assert.equal(ws.deck_shelf("con"), "aux");
+  assert.throws(() => ws.new_topic("con"), StudioError);
+  assert.throws(() => ws.new_deck("COM1", "aux"), StudioError);
+});
+
+test("unreadable memo and symlinked themes do not make the workspace unopenable", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("talk", "topic");
+  const memo = ws.memo("talk");
+  const target = join(ws.deck_dir("talk"), "memo-target.md");
+  writeFileSync(target, readFileSync(memo));
+  unlinkSync(memo);
+  try {
+    symlinkSync(target, memo);
+  } catch {
+    return;
+  }
+  assert.equal(ws.is_untouched("talk"), false);
+
+  const outside = join(root, "..", `theme-outside-${Date.now()}`);
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  writeFileSync(join(outside, "default.css"), "/* outside */\n");
+  unlinkSync(join(ws.themes, "default.css"));
+  symlinkSync(join(outside, "default.css"), join(ws.themes, "default.css"));
+  ws.ensure();
+  assert.equal(ws.theme_preparation().length, 1);
+  assert.throws(() => ws.theme_default("../../x"), StudioError);
+});
+
+test("theme preparation strings come from the configured strings module", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  writeFileSync(join(ws.themes, "default.css"), "/* old */\n");
+  const strings = join(root, "strings.js");
+  writeFileSync(
+    strings,
+    'export const THEME_PREPARATION = {"name": "Custom", "detail": "D", "fix": "F"};\n',
+  );
+  set_strings_file(strings);
+  try {
+    assert.equal(ws.theme_preparation()[0]?.name, "Custom");
+  } finally {
+    set_strings_file(null);
+  }
+});
+
+test("figure helpers and quote stripping match Python code-point semantics", async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_topic("demo");
+  const figure = join(ws.shelf_dir("demo"), "route");
+  mkdirSync(figure, { recursive: true });
+  writeFileSync(
+    join(figure, "figure.mjs"),
+    "export default { steps: ['one\ntwo'] };\n",
+  );
+  // Python's item pattern has no DOTALL, so a quoted step containing a newline
+  // is skipped rather than swallowing text across the newline.
+  assert.deepEqual(figure_steps(figure), []);
+
+  ws.new_deck("talk", "demo");
+  writeFileSync(
+    ws.qmd("talk"),
+    '---\ntitle: "Talk"\ntopic: demo\ntheme: default\n---\n\n## Cover\n\n{{< fig \'demo/route\' >}}\n',
+  );
+  assert.deepEqual(ws.decks_using("demo/route"), []);
+  assert.deepEqual(ws.decks_using("'demo/route'"), ["talk"]);
+});
+
+test("theme helpers match the original Python golden outputs", async () => {
+  const goldenPath = join(repositoryRoot(), "tests", "fixtures", "theme-parity", "golden.json");
+  assert.equal(existsSync(goldenPath), true, `missing theme golden fixture: ${goldenPath}`);
+  const golden = JSON.parse(readFileSync(goldenPath, "utf8")) as {
+    variables: string[];
+    cases: Array<{
+      name: string;
+      css: string;
+      values: Record<string, string>;
+      drop: string;
+      refresh: string;
+      title: string;
+      palette: string;
+    }>;
+  };
+  assert.ok(golden.cases.length > 0, "theme golden fixture has no cases");
+  for (const item of golden.cases) {
+    assert.deepEqual(
+      read_vars(item.css, golden.variables),
+      item.values,
+      `${item.name}: read_vars`,
+    );
+    assert.equal(
+      refresh_heading_options(item.css, golden.variables),
+      item.refresh,
+      `${item.name}: refresh`,
+    );
+    assert.equal(
+      preserve_title_header(item.css, undefined, golden.variables),
+      item.title,
+      `${item.name}: title`,
+    );
+    assert.equal(drop_cover_layout(item.css), item.drop, `${item.name}: drop`);
+    assert.equal(
+      with_current_palette(item.css, item.values),
+      item.palette,
+      `${item.name}: palette`,
+    );
+  }
 });

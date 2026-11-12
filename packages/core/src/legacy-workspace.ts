@@ -1,15 +1,11 @@
 /**
  * Compatibility layer for the legacy Python workspace model.
  *
- * The on-disk contract is intentionally identical to the original
- * `slide_studio/workspace.py`: `decks/`, `topics/`, `themes/` and the hidden
- * `.slide-studio/` state directory live directly under the selected root.
- * Every write in this module is atomic.
- *
- * Source parsing is delegated to a parser callback when the integration layer
- * provides `legacy-source.ts`. A small local parser is used until that module
- * is available; it implements the front-matter and page-boundary parts needed
- * by workspace operations without copying the legacy Python application.
+ * The on-disk contract is identical to `slide_studio/workspace.py`: `decks/`,
+ * `topics/`, `themes/` and `.slide-studio/` live directly under the selected
+ * root. All writes are atomic, all destructive operations are validated
+ * against the canonical root, and originals are moved to `.slide-studio/trash/`
+ * before they are replaced or removed.
  */
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -34,20 +30,41 @@ import {
 } from "node:fs";
 import type { Dirent, Stats } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { parseDocument } from "yaml";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
+import { fileURLToPath } from "node:url";
 import type { CoreErrorCode } from "../../contracts/src/desktop.js";
 import { assetPath } from "./assets.js";
 import { CoreError, isNodeError } from "./errors.js";
 import {
-  assertAbsoluteRoot,
   assertInsideRoot,
-  assertSafeDeckId,
   canonicalRoot,
   isInsideRoot,
 } from "./paths.js";
+import { parse } from "./legacy-source.js";
+import type { Doc } from "./legacy-source.js";
+import {
+  drop_cover_layout,
+  preserve_title_header,
+  refresh_heading_options,
+  read_vars,
+  OVERRIDE_RE,
+} from "./legacy-theme-edit.js";
+import { with_current_palette } from "./legacy-block-design.js";
+import {
+  copy_topic_assets,
+  migrateTopics,
+} from "./legacy-topic-migrate.js";
 
-export const VERSION = "0.1.0";
+export const VERSION = packageVersion();
+export { VERSION as __version__ };
 
 /** Bundled templates. The runtime can replace these roots in integration tests. */
 export let TEMPLATES = assetPath("templates");
@@ -55,6 +72,9 @@ export let RUNTIME = assetPath("runtime");
 
 export function set_templates_root(path: string): void {
   TEMPLATES = resolve(path);
+  THEME_VARIABLES = theme_variables(
+    readFileSync(join(TEMPLATES, "themes", "_base.css"), "utf8"),
+  );
 }
 
 export function set_runtime_root(path: string): void {
@@ -64,6 +84,7 @@ export function set_runtime_root(path: string): void {
 const NAME = /^[a-z0-9][a-z0-9-]*$/u;
 const WINDOWS_RESERVED = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/iu;
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/u;
+const BOM = "\uFEFF";
 
 export const RUNTIME_FILES = ["figure.mjs", "motion.mjs", "figure.css"] as const;
 
@@ -98,6 +119,25 @@ export class StudioError extends CoreError {
   }
 }
 
+function packageVersion(): string {
+  let directory = dirname(fileURLToPath(import.meta.url));
+  for (let depth = 0; depth < 10; depth += 1) {
+    try {
+      const value = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as {
+        name?: unknown;
+        version?: unknown;
+      };
+      if (value.name === "slide-studio" && typeof value.version === "string") return value.version;
+    } catch {
+      // Keep walking up until the repository/package root is found.
+    }
+    const parent = dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  return "0.1.0";
+}
+
 function expandUser(value: string): string {
   if (value === "~") return homedir();
   if (value.startsWith("~/") || value.startsWith("~\\")) return join(homedir(), value.slice(2));
@@ -105,7 +145,6 @@ function expandUser(value: string): string {
 }
 
 function sha256Bytes(data: Buffer | string): string {
-  // Kept local so this module has no dependency on the newer source service.
   return createHash("sha256").update(data).digest("hex");
 }
 
@@ -155,12 +194,43 @@ function readJsonArray(path: string): Record<string, unknown>[] {
   return [];
 }
 
-function primitiveFrontValue(value: unknown): string {
+export function pyTruthy(value: unknown): boolean {
+  if (value === null || value === undefined || value === false) return false;
+  if (typeof value === "number") return value !== 0 && !Number.isNaN(value);
+  if (typeof value === "string") return value.length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
+}
+
+function pyRepr(value: unknown): string {
+  if (typeof value === "string") return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
+  if (Array.isArray(value)) return `[${value.map(pyRepr).join(", ")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .map(([key, item]) => `${pyRepr(key)}: ${pyRepr(item)}`)
+      .join(", ")}}`;
+  }
+  return pyStr(value);
+}
+
+export function pyStr(value: unknown): string {
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "bigint") return String(value);
   if (typeof value === "boolean") return value ? "True" : "False";
   if (value === null || value === undefined) return "None";
-  return JSON.stringify(value);
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "number") {
+    if (Number.isNaN(value)) return "nan";
+    if (value === Number.POSITIVE_INFINITY) return "inf";
+    if (value === Number.NEGATIVE_INFINITY) return "-inf";
+    if (Object.is(value, -0)) return "-0.0";
+    return String(value);
+  }
+  return pyRepr(value);
+}
+
+function primitiveFrontValue(value: unknown): string {
+  return pyStr(value);
 }
 
 function sortedJson(value: Record<string, unknown>, indent = 0): string {
@@ -175,10 +245,27 @@ function timeNs(): string {
 
 function sameJson(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
   const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
-  for (const key of keys) {
-    if (left[key] !== right[key]) return false;
-  }
+  for (const key of keys) if (left[key] !== right[key]) return false;
   return true;
+}
+
+const RETRYABLE_RENAME = new Set(["EPERM", "EACCES", "EBUSY", "ENOTEMPTY"]);
+const sleepBuffer = new Int32Array(new SharedArrayBuffer(4));
+
+function renameWithRetry(from: string, to: string): void {
+  const delays = process.platform === "win32" ? [0, 10, 20, 40, 80, 120, 200] : [0];
+  for (let attempt = 0; attempt < delays.length; attempt += 1) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (error) {
+      const retryable = isNodeError(error)
+        && typeof error.code === "string"
+        && RETRYABLE_RENAME.has(error.code);
+      if (!retryable || attempt === delays.length - 1) throw error;
+      Atomics.wait(sleepBuffer, 0, 0, delays[attempt]);
+    }
+  }
 }
 
 function atomicWrite(path: string, data: string | Uint8Array, mode?: number): void {
@@ -191,10 +278,7 @@ function atomicWrite(path: string, data: string | Uint8Array, mode?: number): vo
       ? existing.mode & 0o777
       : 0o666 & ~process.umask();
   }
-  const temporary = join(
-    directory,
-    `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`,
-  );
+  const temporary = join(directory, `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`);
   let descriptor: number | undefined;
   try {
     descriptor = openSync(temporary, "wx", finalMode);
@@ -207,7 +291,24 @@ function atomicWrite(path: string, data: string | Uint8Array, mode?: number): vo
     }
     closeSync(descriptor);
     descriptor = undefined;
-    renameSync(temporary, path);
+    renameWithRetry(temporary, path);
+    if (process.platform !== "win32") {
+      let directoryDescriptor: number | undefined;
+      try {
+        directoryDescriptor = openSync(directory, "r");
+        fsyncSync(directoryDescriptor);
+      } catch {
+        // Directory fsync is a durability improvement; the rename already won.
+      } finally {
+        if (directoryDescriptor !== undefined) {
+          try {
+            closeSync(directoryDescriptor);
+          } catch {
+            // Ignore close failures after a successful rename.
+          }
+        }
+      }
+    }
   } catch (error) {
     if (descriptor !== undefined) {
       try {
@@ -225,421 +326,48 @@ function atomicWrite(path: string, data: string | Uint8Array, mode?: number): vo
   }
 }
 
-// ---------------------------------------------------------------- front matter
-
-export interface LegacyAttrs {
-  id: string;
-  classes: string[];
-  kv: Record<string, string>;
-  to_json(): { id: string; classes: string[]; kv: Record<string, string> };
+function isReadOnlyError(error: unknown): boolean {
+  return isNodeError(error)
+    && (error.code === "EACCES" || error.code === "EPERM" || error.code === "EROFS");
 }
 
-function makeAttrs(id = "", classes: string[] = [], kv: Record<string, string> = {}): LegacyAttrs {
-  return {
-    id,
-    classes,
-    kv,
-    to_json() {
-      return { id, classes: [...classes], kv: { ...kv } };
-    },
-  };
-}
-
-const ATTR_TOKEN = /#([^\s}]+)|\.([^\s}=]+)|([^\s=}]+)=(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|([^\s}]*))/gu;
-
-function parseAttrs(inner: string): LegacyAttrs {
-  const attrs = makeAttrs();
-  for (const match of inner.matchAll(ATTR_TOKEN)) {
-    if (match[1]) {
-      attrs.id = match[1];
-    } else if (match[2]) {
-      attrs.classes.push(match[2]);
-    } else {
-      const value = match[4] ?? match[5] ?? match[6] ?? "";
-      attrs.kv[match[3] ?? ""] = value.replace(/\\"/gu, '"').replace(/\\\\/gu, "\\");
-    }
-  }
-  return attrs;
-}
-
-const DIV_OPEN = /^ {0,3}(:{3,})[ \t]*(\{[^{}]*\}|[\w-]+)[ \t]*:*[ \t]*$/u;
-const DIV_CLOSE = /^ {0,3}:{3,}[ \t]*$/u;
-const HEADING = /^(#{1,2})[ \t]+(.*?)[ \t]*$/u;
-const ATTR_TAIL = /[ \t]*\{([^{}]*)\}[ \t]*$/u;
-const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/u;
-
-function divAttrs(line: string): LegacyAttrs {
-  const match = DIV_OPEN.exec(line);
-  if (!match) return makeAttrs();
-  const spec = match[2] ?? "";
-  return spec.startsWith("{") ? parseAttrs(spec.slice(1, -1)) : makeAttrs("", [spec]);
-}
-
-export interface LegacyPage {
-  index: number;
-  level: number;
-  title: string;
-  attrs: LegacyAttrs;
-  start: number;
-  head_end: number;
-  end: number;
-  generated: string;
-  raw_only: boolean;
-  unclosed: string[];
-  id: string;
-  to_json(): Record<string, unknown>;
-}
-
-export interface LegacyDocument {
-  text: string;
-  front: [number, number];
-  meta: Record<string, unknown>;
-  meta_error: string;
-  pages: LegacyPage[];
-  unclosed_at: number | null;
-  body_start: number;
-  preamble: string;
-  to_json(): Record<string, unknown>;
-}
-
-export type LegacySourceParser = (text: string) => LegacyDocument;
-
-let configuredParser: LegacySourceParser | null = null;
-
-/** The integration layer can register `legacy-source.parse` here. */
-export function set_source_parser(parser: LegacySourceParser | null): void {
-  configuredParser = parser;
-}
-
-class Lines {
-  readonly text: string;
-  readonly starts: number[] = [];
-  readonly ends: number[] = [];
-
-  constructor(text: string) {
-    this.text = text;
-    let position = 0;
-    for (const line of text.split("\n")) {
-      this.starts.push(position);
-      this.ends.push(position + line.length);
-      position += line.length + 1;
-    }
-    if (text.endsWith("\n")) {
-      this.starts.pop();
-      this.ends.pop();
-    }
-  }
-
-  get length(): number {
-    return this.starts.length;
-  }
-
-  line(index: number): string {
-    return this.text.slice(this.starts[index] ?? 0, this.ends[index] ?? 0).replace(/\r$/u, "");
-  }
-
-  blank(index: number): boolean {
-    return !this.line(index).trim();
-  }
-
-  indexAt(offset: number): number {
-    let low = 0;
-    let high = this.starts.length;
-    while (low < high) {
-      const middle = (low + high) >> 1;
-      if ((this.starts[middle] ?? 0) <= offset) low = middle + 1;
-      else high = middle;
-    }
-    return low - 1;
-  }
-}
-
-interface ScanState {
-  code_close: Map<number, number>;
-  div_close: Map<number, number | null>;
-  unclosed: Array<[number, string]>;
-  in_code: boolean[];
-  depth: number[];
-}
-
-function frontMatter(text: string): { end: number; meta: Record<string, unknown>; error: string } {
-  if (!text.startsWith("---")) return { end: 0, meta: {}, error: "" };
-  const match = /^---[ \t]*\r?\n([\s\S]*?\r?\n)?(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/u.exec(text);
-  if (!match) return { end: 0, meta: {}, error: "" };
-  const end = match[0].length;
-  try {
-    const document = parseDocument(match[1] ?? "", { prettyErrors: false });
-    if (document.errors.length > 0) throw new Error(document.errors.map((item) => item.message).join("; "));
-    let meta = document.toJS({ maxAliasCount: 10 }) as unknown;
-    if (meta === null || meta === undefined) meta = {};
-    if (typeof meta !== "object" || Array.isArray(meta)) {
-      return { end, meta: {}, error: "front matter が辞書ではありません" };
-    }
-    const result = meta as Record<string, unknown>;
-    if (!("topic" in result) && "figures" in result) result.topic = result.figures;
-    return { end, meta: result, error: "" };
-  } catch (error) {
-    return { end, meta: {}, error: `front matter を読めません: ${String(error)}` };
-  }
-}
-
-function scanDocument(lines: Lines, first: number): ScanState {
-  const codeClose = new Map<number, number>();
-  const divClose = new Map<number, number | null>();
-  const unclosed: Array<[number, string]> = [];
-  const inCode = new Array<boolean>(lines.length).fill(false);
-  const depth = new Array<number>(lines.length).fill(0);
-  const stack: number[] = [];
-  let index = first;
-  while (index < lines.length) {
-    const source = lines.line(index);
-    const fence = FENCE_OPEN.exec(source);
-    if (fence && !(fence[1]?.[0] === "`" && (fence[2] ?? "").includes("`"))) {
-      const character = fence[1]?.[0] ?? "`";
-      const minimum = fence[1]?.length ?? 3;
-      const close = new RegExp(`^ {0,3}${character}{${minimum},}[ \\t]*$`, "u");
-      let closing = -1;
-      for (let candidate = index + 1; candidate < lines.length; candidate += 1) {
-        if (close.test(lines.line(candidate))) {
-          closing = candidate;
-          break;
-        }
-      }
-      if (closing < 0) {
-        unclosed.push([index, "```"]);
-        index += 1;
-        continue;
-      }
-      codeClose.set(index, closing);
-      for (let line = index; line <= closing; line += 1) inCode[line] = true;
-      index = closing + 1;
-      continue;
-    }
-    if (DIV_OPEN.test(source)) {
-      stack.push(index);
-    } else if (DIV_CLOSE.test(source) && stack.length > 0) {
-      const opening = stack.pop();
-      if (opening !== undefined) divClose.set(opening, index);
-    }
-    index += 1;
-  }
-  for (const opening of stack) {
-    divClose.set(opening, null);
-    unclosed.push([opening, ":::"]);
-  }
-  for (const [opening, closing] of divClose) {
-    if (closing !== null) {
-      for (let line = opening + 1; line < closing; line += 1) depth[line] = (depth[line] ?? 0) + 1;
-    }
-  }
-  unclosed.sort((left, right) => left[0] - right[0]);
-  return { code_close: codeClose, div_close: divClose, unclosed, in_code: inCode, depth };
-}
-
-function makePage(
-  index: number,
-  level: number,
-  title: string,
-  attrs: LegacyAttrs,
-  start: number,
-  headEnd: number,
-  end: number,
-  generated = "",
-): LegacyPage {
-  const page = {
-    index,
-    level,
-    title,
-    attrs,
-    start,
-    head_end: headEnd,
-    end,
-    generated,
-    raw_only: false,
-    unclosed: [] as string[],
-    get id() {
-      return attrs.id;
-    },
-  } as unknown as LegacyPage;
-  page.to_json = () => ({
-    index,
-    level,
-    title,
-    id: attrs.id,
-    classes: [...attrs.classes],
-    kv: { ...attrs.kv },
-    start,
-    head_end: headEnd,
-    end,
-    generated,
-    raw_only: page.raw_only,
-    unclosed: [...page.unclosed],
-    chunks: [],
-  });
-  return page;
-}
-
-export function parseLegacySource(text: string): LegacyDocument {
-  const front = frontMatter(text);
-  const lines = new Lines(text);
-  let first = front.end < text.length ? lines.indexAt(front.end) : lines.length;
-  if (first < 0) first = 0;
-  if (front.end && first < lines.length && (lines.starts[first] ?? 0) < front.end) first += 1;
-  const scan = scanDocument(lines, first);
-
-  const heads: number[] = [];
-  const markers = new Map<number, { marker: string; close: number }>();
-  for (let index = first; index < lines.length; index += 1) {
-    if (scan.in_code[index] || (scan.depth[index] ?? 0) > 0) continue;
-    const marker = DIV_OPEN.test(lines.line(index)) ? divAttrs(lines.line(index)).id : "";
-    const closing = scan.div_close.get(index);
-    if (
-      (marker === "toc" || marker === "refs")
-      && closing !== undefined
-      && closing !== null
-      && rangeBlank(lines, index + 1, closing)
-    ) {
-      const previousIndex = heads[heads.length - 1];
-      const previous = previousIndex === undefined ? null : HEADING.exec(lines.line(previousIndex));
-      const previousAttrs = previous ? ATTR_TAIL.exec(previous[2] ?? "") : null;
-      const expected = marker === "refs" ? "references" : "toc";
-      if (
-        previousAttrs
-        && parseAttrs(previousAttrs[1] ?? "").id === expected
-        && previousIndex !== undefined
-        && rangeBlank(lines, previousIndex + 1, index)
-      ) {
-        markers.set(previousIndex, { marker, close: closing });
-      } else {
-        heads.push(index);
-        markers.set(index, { marker, close: closing });
-      }
-      continue;
-    }
-    const heading = HEADING.exec(lines.line(index));
-    if (!heading) continue;
-    const previousBlank = index === first
-      || lines.blank(index - 1)
-      || (heads.length > 0 && heads[heads.length - 1] === index - 1);
-    if (previousBlank) heads.push(index);
-  }
-
-  const pages: LegacyPage[] = [];
-  for (let number = 0; number < heads.length; number += 1) {
-    const index = heads[number] ?? 0;
-    const next = heads[number + 1];
-    const end = next === undefined ? text.length : (lines.starts[next] ?? text.length);
-    const marker = markers.get(index);
-    if (marker) {
-      const title = marker.marker === "toc" ? "目次" : "参考文献";
-      const id = marker.marker === "toc" ? "toc" : "references";
-      let classes: string[] = [];
-      for (let line = index; line <= marker.close; line += 1) {
-        if (DIV_OPEN.test(lines.line(line))) {
-          classes = divAttrs(lines.line(line)).classes;
-          break;
-        }
-      }
-      const page = makePage(
-        number,
-        2,
-        title,
-        makeAttrs(id, [`${marker.marker}-slide`, ...classes]),
-        lines.starts[index] ?? 0,
-        lines.ends[marker.close] ?? 0,
-        end,
-        marker.marker,
-      );
-      pages.push(page);
-      continue;
-    }
-    const heading = HEADING.exec(lines.line(index));
-    if (!heading) continue;
-    let rawTitle = heading[2] ?? "";
-    let attrs = makeAttrs();
-    const attributeMatch = ATTR_TAIL.exec(rawTitle);
-    if (attributeMatch) {
-      attrs = parseAttrs(attributeMatch[1] ?? "");
-      rawTitle = rawTitle.slice(0, attributeMatch.index);
-    }
-    rawTitle = rawTitle.replace(/[ \t]+#+[ \t]*$/u, "").trim();
-    const page = makePage(
-      number,
-      (heading[1] ?? "").length,
-      rawTitle,
-      attrs,
-      lines.starts[index] ?? 0,
-      lines.ends[index] ?? 0,
-      end,
-      attrs.id === "references" ? "refs" : "",
-    );
-    pages.push(page);
-  }
-
-  let unclosedAt: number | null = null;
-  if (scan.unclosed.length > 0) {
-    const firstUnclosed = scan.unclosed[0];
-    if (firstUnclosed) unclosedAt = lines.starts[firstUnclosed[0]] ?? null;
-    if (unclosedAt !== null) {
-      for (const page of pages) if (page.end > unclosedAt) page.raw_only = true;
-      for (const [line, kind] of scan.unclosed) {
-        const page = pages.find((item) => item.start <= (lines.starts[line] ?? 0) && (lines.starts[line] ?? 0) < item.end);
-        if (page) page.unclosed.push(kind);
-      }
-    }
-  }
-
-  const bodyStart = front.end;
-  const preambleEnd = pages[0]?.start ?? text.length;
-  const document: LegacyDocument = {
-    text,
-    front: [0, front.end],
-    meta: front.meta,
-    meta_error: front.error,
-    pages,
-    unclosed_at: unclosedAt,
-    body_start: bodyStart,
-    preamble: text.slice(bodyStart, preambleEnd),
-    to_json() {
-      return {
-        front: [0, front.end],
-        meta: front.meta,
-        meta_error: front.error,
-        pages: pages.map((page) => page.to_json()),
-      };
-    },
-  };
-  return document;
-}
-
-function rangeBlank(lines: Lines, start: number, end: number): boolean {
-  for (let index = start; index < end; index += 1) if (!lines.blank(index)) return false;
-  return true;
-}
-
-export function parse_source(text: string): LegacyDocument {
-  if (configuredParser) return configuredParser(text);
-  return parseLegacySource(text);
-}
-
-// ---------------------------------------------------------------- public helpers
+// ---------------------------------------------------------------- names
 
 export function check_name(value: unknown, what = "名前"): string {
-  if (
-    typeof value !== "string"
-    || !NAME.test(value)
-    || WINDOWS_RESERVED.test(value.split(".", 1)[0] ?? "")
-  ) {
-    throw new StudioError(`${what}には英小文字・数字・ハイフンを使ってください: ${JSON.stringify(value)}`);
+  if (typeof value !== "string" || !NAME.test(value)) {
+    throw new StudioError(`${what}には英小文字・数字・ハイフンを使ってください: ${pyRepr(value)}`);
   }
   return value;
 }
 
-function validateWindowsDeckName(value: string): void {
+function validateWindowsName(value: string): void {
   if (WINDOWS_RESERVED.test(value.split(".", 1)[0] ?? "")) {
     throw new StudioError(`予約された名前は使えません: ${JSON.stringify(value)}`);
   }
 }
+
+function check_creation_name(value: unknown, what = "名前"): string {
+  const name = check_name(value, what);
+  validateWindowsName(name);
+  return name;
+}
+
+function checkLookupName(value: unknown, what: string): string {
+  if (
+    typeof value !== "string"
+    || !value
+    || value === "."
+    || value === ".."
+    || isAbsolute(value)
+    || /[\\/]/u.test(value)
+    || CONTROL_CHARACTER.test(value)
+  ) {
+    throw new StudioError(`${what}が正しくありません: ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+// ---------------------------------------------------------------- location
 
 export function default_root(): string {
   const configured = process.env.SLIDE_STUDIO_HOME;
@@ -684,22 +412,18 @@ export function remember_root(
   root: string,
   options: { previous?: string | null } = {},
 ): void {
-  const values = [
-    root,
-    ...(options.previous ? [options.previous] : []),
-    ...recent_roots(),
-  ];
+  const values = [root, ...(options.previous ? [options.previous] : []), ...recent_roots()];
   const recent: string[] = [];
-  for (const value of values) {
-    if (!recent.includes(value)) recent.push(value);
-  }
+  for (const value of values) if (!recent.includes(value)) recent.push(value);
   atomicWrite(location_file(), JSON.stringify({ root, recent: recent.slice(0, 12) }));
 }
+
+// ---------------------------------------------------------------- themes
 
 export function theme_variables(css: string): string[] {
   const withoutComments = css.replace(/\/\*[\s\S]*?\*\//gu, "");
   const found: string[] = [];
-  const pattern = /(?<![\w-])(--[\w-]+)\s*:\s*[^;{}\s][^;{}]*(?=[;}])/gu;
+  const pattern = /(?<![\p{L}\p{N}_-])(--[\p{L}\p{N}_-]+)\s*:\s*[^;{}\s][^;{}]*(?=[;}])/gu;
   for (const match of withoutComments.matchAll(pattern)) {
     const name = match[1];
     if (name && !found.includes(name)) found.push(name);
@@ -707,13 +431,13 @@ export function theme_variables(css: string): string[] {
   return found;
 }
 
-export const THEME_VARIABLES = theme_variables(
+export let THEME_VARIABLES = theme_variables(
   readFileSync(join(TEMPLATES, "themes", "_base.css"), "utf8"),
 );
 
+// ---------------------------------------------------------------- source helpers
+
 export function runtime_rel(fig_dir: string, ws: Workspace): string {
-  // Python: os.path.relpath(ws.runtime, fig_dir). Node's relative(from, to)
-  // takes the arguments in the opposite order.
   return (relative(fig_dir, ws.runtime) || ".").replaceAll(sep, "/");
 }
 
@@ -737,7 +461,7 @@ export function figure_steps(directory: string): string[] {
     const match = /\bsteps\s*:\s*\[([\s\S]*?)\]/u.exec(text);
     if (!match) return [];
     const steps: string[] = [];
-    for (const item of (match[1] ?? "").matchAll(/(['"`])([\s\S]*?)\1/gu)) {
+    for (const item of (match[1] ?? "").matchAll(/(['"`])([^\n]*?)\1/gu)) {
       if (item[2] !== undefined) steps.push(item[2]);
     }
     return steps;
@@ -746,20 +470,36 @@ export function figure_steps(directory: string): string[] {
   }
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
 export function set_front(text: string, values: Record<string, unknown>): string {
-  let document = parse_source(text);
+  const bom = text.startsWith(BOM);
+  const body = bom ? text.slice(1) : text;
+  const eol = body.includes("\r\n") ? "\r\n" : body.includes("\r") && !body.includes("\n") ? "\r" : "\n";
+  const normalized = body.replace(/\r\n?/gu, "\n");
+  let updated = setFrontNormalized(normalized, values);
+  if (eol !== "\n") updated = updated.replaceAll("\n", eol);
+  return `${bom ? BOM : ""}${updated}`;
+}
+
+function setFrontNormalized(text: string, values: Record<string, unknown>): string {
+  let document: Doc = parse(text);
   const normalized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(values)) normalized[key === "figures" ? "topic" : key] = value;
+  for (const [key, value] of Object.entries(values)) {
+    normalized[key === "figures" ? "topic" : key] = value;
+  }
 
   if (document.front[1] && "figures" in document.meta) {
     let head = text.slice(0, document.front[1]);
     if (/^topic\s*:/mu.test(head)) {
-      head = head.replace(/^figures\s*:.*\r?\n/gmu, "");
+      head = head.replace(/^figures\s*:.*\n/gmu, "");
     } else {
       head = head.replace(/^figures(?=\s*:)/gmu, "topic");
     }
     text = head + text.slice(document.front[1]);
-    document = parse_source(text);
+    document = parse(text);
   }
 
   const entries = Object.entries(normalized);
@@ -772,15 +512,15 @@ export function set_front(text: string, values: Record<string, unknown>): string
   const head = text.slice(0, document.front[1]);
   const rest = text.slice(document.front[1]);
   const lines = head.split("\n");
-  let close = 0;
+  let close = -1;
   for (let index = lines.length - 1; index > 0; index -= 1) {
-    const line = lines[index] ?? "";
-    if (line.trim() === "---" || line.trim() === "...") {
+    const line = (lines[index] ?? "").trim();
+    if (line === "---" || line === "...") {
       close = index;
       break;
     }
   }
-  const eol = head.includes("\r\n") ? "\r" : "";
+  if (close < 0) return text;
   for (const [key, value] of entries) {
     const pattern = new RegExp(`^${escapeRegExp(key)}\\s*:`, "u");
     let hit: number | null = null;
@@ -790,7 +530,7 @@ export function set_front(text: string, values: Record<string, unknown>): string
         break;
       }
     }
-    const rendered = `${key}: ${primitiveFrontValue(value)}${eol}`;
+    const rendered = `${key}: ${primitiveFrontValue(value)}`;
     if (hit !== null) {
       lines[hit] = rendered;
     } else {
@@ -801,26 +541,118 @@ export function set_front(text: string, values: Record<string, unknown>): string
   return lines.join("\n") + rest;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-}
-
-export function blank_qmd(shelf: string, theme: string, title?: string | null): string {
-  let text = readFileSync(join(TEMPLATES, "deck", "slides.qmd"), "utf8")
-    .split("{{SHELF}}").join(shelf)
-    .split("{{THEME}}").join(theme);
+export function blank_qmd(
+  shelf: string,
+  theme: string,
+  title?: string | null,
+  templatesRoot = TEMPLATES,
+): string {
+  let text = readFileSync(join(templatesRoot, "deck", "slides.qmd"), "utf8")
+    .replaceAll("{{SHELF}}", shelf)
+    .replaceAll("{{THEME}}", theme);
   if (title) {
     const shown = title.replace(/[\r\n]/gu, " ");
-    text = text.split("発表タイトル").join(shown);
+    text = text.replaceAll("発表タイトル", shown);
     text = set_front(text, { title: JSON.stringify(title) });
   }
   return text;
 }
 
+function words(text: string): string[] {
+  return text.split(/\s+/u).filter(Boolean);
+}
+
+// ---------------------------------------------------------------- strings
+
+interface ThemePreparationMessages {
+  name: string;
+  detail: string;
+  fix: string;
+}
+interface MigrationPreparationMessages {
+  topics: string;
+  folders: string;
+  folderFix: string;
+  bib: string;
+  bibFix: string;
+}
+
+const FALLBACK_THEME_PREPARATION: ThemePreparationMessages = {
+  name: "テーマの準備",
+  detail: "同梱テーマの default.css が古い形式のままです。",
+  fix: "テーマを現在の版に戻すか、発表ごとの styles/slides.css に調整を移してください。",
+};
+const FALLBACK_MIGRATION_PREPARATION: MigrationPreparationMessages = {
+  topics: "トピックの移行",
+  folders: "旧 figures/ と新しい topics/ が同じ置き場にあります。",
+  folderFix: "figures/ の中身を topics/<トピック>/html/ へ移してください。",
+  bib: "文献の移行",
+  bibFix: "発表ごとの reference.bib とトピックの reference.bib を確認してください。",
+};
+
+let STRINGS_FILE: string | null = null;
+
+/** Integration/tests can point at the renderer's canonical strings module. */
+export function set_strings_file(path: string | null): void {
+  STRINGS_FILE = path ? resolve(path) : null;
+}
+
+function stringsCandidates(): string[] {
+  const values = STRINGS_FILE ? [STRINGS_FILE] : [];
+  values.push(join(process.cwd(), "packages", "web", "strings.js"));
+  values.push(join(dirname(fileURLToPath(import.meta.url)), "../../../web/strings.js"));
+  try {
+    values.push(assetPath("strings.js"));
+  } catch {
+    // Assets may be unavailable in a pure unit test.
+  }
+  return values;
+}
+
+function readStringsConstant(name: string): Record<string, string> | null {
+  for (const path of stringsCandidates()) {
+    try {
+      const text = readFileSync(path, "utf8");
+      const marker = `export const ${name} = `;
+      const start = text.indexOf(marker);
+      if (start < 0) continue;
+      const source = text.slice(start + marker.length);
+      const match = /^(\{[\s\S]*?\});/u.exec(source);
+      if (!match) continue;
+      const parsed = JSON.parse(match[1]!) as unknown;
+      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, string>;
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
+function themePreparationMessages(): ThemePreparationMessages {
+  const found = readStringsConstant("THEME_PREPARATION");
+  return {
+    name: typeof found?.name === "string" ? found.name : FALLBACK_THEME_PREPARATION.name,
+    detail: typeof found?.detail === "string" ? found.detail : FALLBACK_THEME_PREPARATION.detail,
+    fix: typeof found?.fix === "string" ? found.fix : FALLBACK_THEME_PREPARATION.fix,
+  };
+}
+
+function migrationPreparationMessages(): MigrationPreparationMessages {
+  const found = readStringsConstant("MIGRATION_PREPARATION");
+  return {
+    topics: typeof found?.topics === "string" ? found.topics : FALLBACK_MIGRATION_PREPARATION.topics,
+    folders: typeof found?.folders === "string" ? found.folders : FALLBACK_MIGRATION_PREPARATION.folders,
+    folderFix: typeof found?.folderFix === "string" ? found.folderFix : FALLBACK_MIGRATION_PREPARATION.folderFix,
+    bib: typeof found?.bib === "string" ? found.bib : FALLBACK_MIGRATION_PREPARATION.bib,
+    bibFix: typeof found?.bibFix === "string" ? found.bibFix : FALLBACK_MIGRATION_PREPARATION.bibFix,
+  };
+}
+
 // ---------------------------------------------------------------- workspace
 
 export interface WorkspaceOptions {
-  parser?: LegacySourceParser | null;
   templatesRoot?: string;
   runtimeRoot?: string;
   version?: string;
@@ -835,18 +667,18 @@ export class Workspace {
   readonly #templates: string;
   readonly #runtimeAssets: string;
   readonly #version: string;
-  #parser: LegacySourceParser | null;
+  readonly #themeVariables: string[];
 
   constructor(root: string, options: WorkspaceOptions = {}) {
     const expanded = expandUser(root);
-    if (!isAbsolute(expanded)) {
-      throw new StudioError("workspace root must be an absolute path");
-    }
-    this.root = existsSync(expanded) ? canonicalRoot(expanded) : resolve(expanded);
+    const resolved = resolve(expanded);
+    this.root = existsSync(resolved) ? canonicalRoot(resolved) : resolved;
     this.#templates = options.templatesRoot ? resolve(options.templatesRoot) : TEMPLATES;
     this.#runtimeAssets = options.runtimeRoot ? resolve(options.runtimeRoot) : RUNTIME;
     this.#version = options.version ?? VERSION;
-    this.#parser = options.parser ?? null;
+    this.#themeVariables = theme_variables(
+      readFileSync(join(this.#templates, "themes", "_base.css"), "utf8"),
+    );
   }
 
   static open(
@@ -854,9 +686,8 @@ export class Workspace {
     ensure = true,
     options: WorkspaceOptions = {},
   ): Workspace {
-    const selected = root ?? default_root();
-    const expanded = expandUser(selected);
-    assertAbsoluteRoot(expanded);
+    const selected = root ? expandUser(root) : default_root();
+    const expanded = resolve(selected);
     if (ensure) mkdirSync(expanded, { recursive: true });
     const workspace = new Workspace(expanded, options);
     if (ensure) workspace.ensure();
@@ -926,9 +757,9 @@ export class Workspace {
     const before: Record<string, unknown> = { ...placed };
 
     const themeDirectory = join(this.#templates, "themes");
-    const bundled = this.#listFiles(themeDirectory).filter(
-      (name) => name.endsWith(".css") && !name.startsWith("_"),
-    ).sort();
+    const bundled = this.#listFiles(themeDirectory)
+      .filter((name) => name.endsWith(".css") && !name.startsWith("_"))
+      .sort();
     for (const name of bundled) {
       const source = join(themeDirectory, name);
       const destination = join(this.themes, name);
@@ -940,7 +771,10 @@ export class Workspace {
       }
       if (existing) {
         if (existing.isSymbolicLink() || !existing.isFile()) {
-          throw new StudioError(`theme may not be a symbolic link: ${name}`, "INVALID_INPUT");
+          // A linked theme may point outside the workspace. Leave it alone and
+          // let theme_preparation() surface it instead of making the workspace
+          // impossible to open.
+          continue;
         }
         const currentDigest = sha256Bytes(readFileSync(destination));
         if (currentDigest === digest) {
@@ -984,7 +818,7 @@ export class Workspace {
           recent_themes: recent,
           ...(prefs.theme === "serif" ? { theme: "terracotta" } : {}),
         });
-        unlinkSync(oldSerif);
+        this.#unlinkOptional(oldSerif);
         placed["serif.css"] = null;
       }
     }
@@ -1052,7 +886,7 @@ export class Workspace {
         recent_themes: recent,
         ...(prefs.theme === name ? { theme: "default" } : {}),
       });
-      if (exists) unlinkSync(retired);
+      if (exists) this.#unlinkOptional(retired);
     }
     this.#unlinkOptional(join(this.state, "theme-defaults", `${name}.css`));
     this.#removeTree(join(this.state, "themes", name));
@@ -1070,17 +904,33 @@ export class Workspace {
 
   #refreshThemes(): void {
     const directory = this.themes;
-    for (const name of this.#listFiles(directory).filter((item) => item.endsWith(".css")).sort()) {
+    for (const name of this.#listEntries(directory)
+      .filter((item) => item.name.endsWith(".css"))
+      .map((item) => item.name)
+      .sort()) {
       const path = join(directory, name);
       if (!this.#isRegularFile(path)) continue;
       const css = this.#readText(path, name);
-      let updated = css;
-      if (THEME_VARIABLES.every((variable) => theme_variables(css).includes(variable))) {
-        const repainted = withCurrentPalette(css, readVars(css));
+      let updated = drop_cover_layout(refresh_heading_options(css, this.#themeVariables));
+      if (this.#themeVariables.every((variable) => theme_variables(css).includes(variable))) {
+        const repainted = with_current_palette(updated, read_vars(css, this.#themeVariables));
         if (repainted !== updated) {
           this.#write(join(this.state, "trash", "themes", timeNs(), name), css);
           updated = repainted;
         }
+      }
+      const original = join(this.#templates, "themes", name);
+      const colors = read_vars(css, this.#themeVariables);
+      if (
+        OVERRIDE_RE.test(css)
+        && colors["--header"] === colors["--paper"]
+        && this.#isRegularFile(original)
+      ) {
+        updated = preserve_title_header(
+          updated,
+          readFileSync(original, "utf8"),
+          this.#themeVariables,
+        );
       }
       if (updated !== css) this.#write(path, updated);
     }
@@ -1088,33 +938,45 @@ export class Workspace {
 
   theme_preparation(): Array<Record<string, unknown>> {
     const path = join(this.themes, "default.css");
+    const link = lstatOrNull(path);
+    if (link?.isSymbolicLink()) {
+      const messages = themePreparationMessages();
+      return [{
+        name: messages.name,
+        ok: false,
+        detail: "themes/default.css はシンボリックリンクです。リンク先を確認してください。",
+        fix: messages.fix,
+      }];
+    }
     if (!this.#isRegularFile(path)) return [];
     const css = this.#readText(path, "default.css");
-    if (THEME_VARIABLES.every((variable) => theme_variables(css).includes(variable))) return [];
+    if (this.#themeVariables.every((variable) => theme_variables(css).includes(variable))) return [];
+    const messages = themePreparationMessages();
     return [{
-      name: "テーマの準備",
+      name: messages.name,
       ok: false,
-      detail: "同梱テーマの default.css が古い形式のままです。",
-      fix: "テーマを現在の版に戻すか、発表ごとの styles/slides.css に調整を移してください。",
+      detail: messages.detail,
+      fix: messages.fix,
     }];
   }
 
   migration_preparation(): Array<Record<string, unknown>> {
+    const messages = migrationPreparationMessages();
     const output: Array<Record<string, unknown>> = [];
     if (existsNoFollow(join(this.root, "figures")) && existsNoFollow(this.topics)) {
       output.push({
-        name: "トピックの移行",
+        name: messages.topics,
         ok: false,
-        detail: "旧 figures/ と新しい topics/ が同じ置き場にあります。",
-        fix: "figures/ の中身を topics/<トピック>/html/ へ移してください。",
+        detail: messages.folders,
+        fix: messages.folderFix,
       });
     }
     for (const detail of this.#bibliographyConflicts()) {
       output.push({
-        name: "文献の移行",
+        name: messages.bib,
         ok: false,
         detail,
-        fix: "発表ごとの reference.bib とトピックの reference.bib を確認してください。",
+        fix: messages.bibFix,
       });
     }
     return output;
@@ -1124,30 +986,49 @@ export class Workspace {
   list_decks(): string[] {
     const directory = this.decks;
     if (!this.#isDirectory(directory)) return [];
-    return this.#listEntries(directory)
-      .filter((entry) => entry.isDirectory() && !entry.name.startsWith(("_")) && !entry.name.startsWith("."))
-      .map((entry) => entry.name)
-      .filter((name) => {
-        try {
-          assertSafeDeckId(name);
-          validateWindowsDeckName(name);
-          const qmd = join(directory, name, "slides.qmd");
-          const link = lstatOrNull(qmd);
-          return Boolean(link && !link.isSymbolicLink() && link.isFile());
-        } catch {
-          return false;
-        }
-      })
-      .sort();
+    const output: string[] = [];
+    for (const entry of this.#listEntries(directory)) {
+      if (entry.name.startsWith("_") || entry.name.startsWith(".")) continue;
+      const deckPath = join(directory, entry.name);
+      const deckLink = lstatOrNull(deckPath);
+      if (!deckLink) continue;
+      let realDeck: string;
+      try {
+        realDeck = realpathSync.native(deckPath);
+      } catch {
+        continue;
+      }
+      if (!isInsideRoot(this.root, realDeck)) continue;
+      try {
+        if (!statSync(realDeck).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      const qmd = join(deckPath, "slides.qmd");
+      let realQmd: string;
+      try {
+        realQmd = realpathSync.native(qmd);
+      } catch {
+        continue;
+      }
+      if (!isInsideRoot(this.root, realQmd)) continue;
+      try {
+        if (statSync(realQmd).isFile()) output.push(entry.name);
+      } catch {
+        // Not a readable deck.
+      }
+    }
+    return output.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
   }
 
   has_deck(deck: string): boolean {
     try {
       const path = this.qmd(deck);
       const link = lstatOrNull(path);
-      if (!link || link.isSymbolicLink() || !link.isFile()) return false;
+      if (!link) return false;
       const real = realpathSync.native(path);
-      return isInsideRoot(this.root, real);
+      if (!isInsideRoot(this.root, real)) return false;
+      return statSync(real).isFile();
     } catch {
       return false;
     }
@@ -1161,45 +1042,51 @@ export class Workspace {
   }
 
   deck_meta(deck: string): Record<string, unknown> {
-    return this.#parse(this.#readText(this.qmd(deck), "slides.qmd")).meta;
+    return parse(this.#readText(this.qmd(deck), "slides.qmd")).meta;
   }
 
   deck_shelf(deck: string): string {
     const shelf = this.deck_meta(deck).topic;
-    if (!shelf) throw new StudioError(`${deck} の front matter に topic:（トピック）がありません`);
-    return String(shelf);
+    if (!pyTruthy(shelf)) {
+      throw new StudioError(`${deck} の front matter に topic:（トピック）がありません`);
+    }
+    return pyStr(shelf);
   }
 
   bib(deck: string, meta?: Record<string, unknown> | null): string {
     const topic = (meta ?? this.deck_meta(deck)).topic;
-    if (!topic) return join(this.state, "missing-topic.bib");
-    return join(this.topic_dir(String(topic)), "reference.bib");
+    if (!pyTruthy(topic)) return join(this.state, "missing-topic.bib");
+    return join(this.topic_dir(pyStr(topic)), "reference.bib");
   }
 
   deck_theme(deck: string): string {
-    return String(this.deck_meta(deck).theme || "default");
+    const theme = this.deck_meta(deck).theme;
+    return pyTruthy(theme) ? pyStr(theme) : "default";
   }
 
   is_blank(deck: string): boolean {
-    const text = this.#readText(this.qmd(deck), "slides.qmd");
-    const document = this.#parse(text);
+    const text = normalizeForCompare(this.#readText(this.qmd(deck), "slides.qmd"));
+    const document = parse(text);
     if (document.pages.length === 0) return true;
     const meta = document.meta;
-    const title = String(meta.title ?? "");
-    const blank = blank_qmd(
-      String(meta.topic ?? ""),
-      String(meta.theme ?? ""),
+    const title = pyTruthy(meta.title) ? pyStr(meta.title) : "";
+    const blank = normalizeForCompare(this.#blank(
+      pyTruthy(meta.topic) ? pyStr(meta.topic) : "",
+      pyTruthy(meta.theme) ? pyStr(meta.theme) : "",
       title === "" || title === "発表タイトル" ? null : title,
-    );
+    ));
     return set_front(text, {}).trim() === blank.trim();
   }
 
   is_untouched(deck: string): boolean {
     if (!this.is_blank(deck)) return false;
     const memo = this.memo(deck);
+    if (existsNoFollow(memo) && !this.#isRegularFile(memo)) return false;
     if (!this.#isRegularFile(memo)) return true;
-    const current = this.#readText(memo, "memo.md");
-    const template = readFileSync(join(this.#templates, "deck", "memo.md"), "utf8");
+    const current = normalizeForCompare(this.#readText(memo, "memo.md"));
+    const template = normalizeForCompare(
+      readFileSync(join(this.#templates, "deck", "memo.md"), "utf8"),
+    );
     return words(current).join("\u0000") === words(template).join("\u0000");
   }
 
@@ -1210,8 +1097,9 @@ export class Workspace {
     source_deck: string | null = null,
     title: string | null = null,
   ): string {
-    check_name(deck, "フォルダ名");
+    check_creation_name(deck, "フォルダ名");
     check_name(shelf, "トピックの名前");
+    if (!existsNoFollow(this.topic_dir(shelf))) validateWindowsName(shelf);
     check_name(theme, "テーマ");
     if (source_deck) check_name(source_deck, "複製する発表");
     const destination = this.deck_dir(deck);
@@ -1222,29 +1110,41 @@ export class Workspace {
       throw new StudioError(`テーマがありません: themes/${theme}.css`);
     }
 
-    if (source_deck) {
-      const source = this.require_deck(source_deck);
-      const ignore = (directory: string, names: string[]): string[] => [
-        ...names.filter((name) =>
-          name === ".DS_Store" || name.endsWith(".html") || name.endsWith(".pdf")
-        ),
-        ...(resolve(directory) === resolve(source) ? ["materials"] : []),
-      ];
-      this.#copyTree(source, destination, { ignore });
-      const qmd = join(destination, "slides.qmd");
-      const sourceBib = this.bib(source_deck);
-      if (shelf !== this.deck_shelf(source_deck) && this.#isRegularFile(sourceBib)) {
-        this.#write(join(destination, "reference.bib"), this.#read(sourceBib, "reference.bib"));
+    this.#ensureDirectory(this.decks, "decks");
+    const temporary = join(this.decks, `.new-${randomUUID()}`);
+    try {
+      if (source_deck) {
+        const source = this.require_deck(source_deck);
+        const ignore = (directory: string, names: string[]): string[] => [
+          ...names.filter((name) => isIgnoredDeckFile(name)),
+          ...(resolve(directory) === resolve(source) ? ["materials"] : []),
+        ];
+        this.#copyTree(source, temporary, { ignore });
+        const qmd = join(temporary, "slides.qmd");
+        const sourceBib = this.bib(source_deck);
+        if (shelf !== this.deck_shelf(source_deck) && this.#isRegularFile(sourceBib)) {
+          this.#write(join(temporary, "reference.bib"), this.#read(sourceBib, "reference.bib"));
+        }
+        let text = copy_topic_assets(
+          this,
+          source_deck,
+          deck,
+          shelf,
+          this.#readText(qmd, "slides.qmd"),
+        );
+        text = set_front(text, { topic: shelf, theme });
+        if (title) text = set_front(text, { title: JSON.stringify(title) });
+        this.#write(qmd, text);
+      } else {
+        this.#copyTree(join(this.#templates, "deck"), temporary, {
+          ignore: (_directory, names) => names.filter((name) => name === ".DS_Store"),
+        });
+        this.#write(join(temporary, "slides.qmd"), blank_qmd(shelf, theme, title, this.#templates));
       }
-      let text = this.#copyTopicAssets(source_deck, shelf, this.#readText(qmd, "slides.qmd"));
-      text = set_front(text, { topic: shelf, theme });
-      if (title) text = set_front(text, { title: JSON.stringify(title) });
-      this.#write(qmd, text);
-    } else {
-      this.#copyTree(join(this.#templates, "deck"), destination, {
-        ignore: (_directory, names) => names.filter((name) => name === ".DS_Store"),
-      });
-      this.#write(join(destination, "slides.qmd"), blank_qmd(shelf, theme, title));
+      renameWithRetry(temporary, destination);
+    } catch (error) {
+      this.#removeTree(temporary);
+      throw error;
     }
 
     this.#ensureDirectory(this.shelf_dir(shelf), "topic html");
@@ -1274,9 +1174,13 @@ export class Workspace {
       const meta = this.deck_meta(deck);
       output.push({
         ...item,
-        title: String(meta.title || meta.pagetitle || deck),
-        shelf: String(meta.topic || ""),
-        theme: String(meta.theme || ""),
+        title: pyTruthy(meta.title)
+          ? pyStr(meta.title)
+          : pyTruthy(meta.pagetitle)
+            ? pyStr(meta.pagetitle)
+            : deck,
+        shelf: pyTruthy(meta.topic) ? pyStr(meta.topic) : "",
+        theme: pyTruthy(meta.theme) ? pyStr(meta.theme) : "",
         modified: statValue.mtimeMs / 1000,
       });
     }
@@ -1310,15 +1214,18 @@ export class Workspace {
   // ------------------------------------------------------------ 棚と図
   shelves(): string[] {
     if (!this.#isDirectory(this.topics)) return [];
-    return this.#listEntries(this.topics)
-      .filter((entry) =>
-        entry.isDirectory() && !entry.name.startsWith(".") && !entry.name.startsWith("_")
-      )
-      .map((entry) => entry.name)
-      .sort();
+    const output: string[] = [];
+    for (const entry of this.#listEntries(this.topics)) {
+      if (entry.name.startsWith(".") || entry.name.startsWith("_")) continue;
+      const path = join(this.topics, entry.name);
+      if (!this.#entryIsDirectory(path)) continue;
+      output.push(entry.name);
+    }
+    return output.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
   }
 
   new_topic(shelf: string): string {
+    check_creation_name(shelf, "トピック");
     const destination = this.topic_dir(shelf);
     if (existsNoFollow(destination)) {
       throw new StudioError(`同じ名前のトピックがあります: ${shelf}`);
@@ -1339,20 +1246,16 @@ export class Workspace {
 
     for (const deck of this.list_decks()) {
       const text = this.#readText(this.qmd(deck), "slides.qmd");
-      const metaTopic = String(this.#parse(text).meta.topic ?? "");
+      const topic = parse(text).meta.topic;
+      const metaTopic = pyTruthy(topic) ? pyStr(topic) : "";
       const figurePattern = new RegExp(`\\{\\{<\\s*fig\\s+["']?${escapeRegExp(shelf)}/`, "u");
-      if (
-        metaTopic === shelf
-        || text.includes(`topics/${shelf}/`)
-        || figurePattern.test(text)
-      ) {
+      if (metaTopic === shelf || text.includes(`topics/${shelf}/`) || figurePattern.test(text)) {
         throw new StudioError("topicInUse", "CONFLICT");
       }
     }
 
     const trash = join(this.state, "trash", "topics", `${shelf}-${timeNs()}`);
-    this.#ensureDirectory(dirname(trash), "topic trash");
-    renameSync(base, trash);
+    this.#renameWithinRoot(base, trash);
     return trash;
   }
 
@@ -1361,19 +1264,34 @@ export class Workspace {
     const link = lstatOrNull(base);
     if (!link) return true;
     if (link.isSymbolicLink() || !link.isDirectory()) return false;
-    return !this.#walkEntries(base).some(([path, entry]) =>
-      entry.isFile() && basename(path) !== ".DS_Store"
-    );
+    const hasFile = (directory: string): boolean => {
+      for (const entry of this.#listEntries(directory)) {
+        const path = join(directory, entry.name);
+        if (entry.isSymbolicLink()) {
+          if (entry.name !== ".DS_Store") return true;
+        } else if (entry.isDirectory()) {
+          if (hasFile(path)) return true;
+        } else if (entry.isFile() && entry.name !== ".DS_Store") {
+          return true;
+        }
+      }
+      return false;
+    };
+    return !hasFile(base);
   }
 
   themes_list(): string[] {
-    return this.#listFiles(this.themes)
-      .filter((name) => name.endsWith(".css") && !name.startsWith("_"))
-      .map((name) => name.slice(0, -4))
-      .sort();
+    const output: string[] = [];
+    for (const entry of this.#listEntries(this.themes)) {
+      if (entry.name.startsWith("_") || !entry.name.endsWith(".css")) continue;
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+      output.push(entry.name.slice(0, -4));
+    }
+    return output.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
   }
 
   theme_default(name: string): string | null {
+    check_name(name, "テーマ");
     if (name.startsWith("_")) return null;
     for (const path of [
       join(this.state, "theme-defaults", `${name}.css`),
@@ -1386,7 +1304,7 @@ export class Workspace {
   }
 
   register_theme(name: string, css: string): void {
-    check_name(name, "テーマ");
+    check_creation_name(name, "テーマ");
     if (existsNoFollow(join(this.themes, `${name}.css`))) {
       throw new StudioError("同じ名前のテーマがあります");
     }
@@ -1406,8 +1324,7 @@ export class Workspace {
     }
 
     const trash = join(this.state, "trash", "themes", timeNs());
-    this.#ensureDirectory(trash, "theme trash");
-    renameSync(path, join(trash, `${name}.css`));
+    this.#renameWithinRoot(path, join(trash, `${name}.css`));
     this.#unlinkOptional(join(this.state, "theme-defaults", `${name}.css`));
     this.#removeTree(join(this.state, "themes", name));
 
@@ -1437,16 +1354,17 @@ export class Workspace {
       || !name
       || isAbsolute(name)
       || name.includes("\\")
-      || parts.some((part) =>
-        part === ""
-        || part === "."
-        || part === ".."
-        || WINDOWS_RESERVED.test(part.split(".", 1)[0] ?? "")
-      )
+      || parts.some((part) => part === "" || part === "." || part === "..")
     ) {
       throw new StudioError(`トピック/名前で図を指定してください: ${ref}`);
     }
-    return join(this.shelf_dir(shelf), name);
+    check_name(shelf, "トピック");
+    const base = join(this.topics, shelf, "html");
+    const result = join(base, ...parts);
+    if (!isInsideRoot(base, result)) {
+      throw new StudioError(`トピック/名前で図を指定してください: ${ref}`, "OUTSIDE_ROOT");
+    }
+    return result;
   }
 
   list_figures(shelf: string | null = null, deck: string | null = null): Array<Record<string, unknown>> {
@@ -1455,7 +1373,10 @@ export class Workspace {
     const base = this.shelf_dir(selected);
     if (!this.#isDirectory(base)) return [];
     const output: Array<Record<string, unknown>> = [];
-    for (const entry of this.#listEntries(base).sort((left, right) => left.name.localeCompare(right.name))) {
+    const entries = this.#listEntries(base).sort((left, right) =>
+      left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+    );
+    for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name.startsWith("_")) continue;
       const directory = join(base, entry.name);
       if (!this.#isRegularFile(join(directory, "figure.mjs"))) continue;
@@ -1475,7 +1396,7 @@ export class Workspace {
     for (const deck of this.list_decks()) {
       const text = this.#readText(this.qmd(deck), "slides.qmd");
       for (const match of text.matchAll(/\{\{<\s*fig\s+(\S+)/gu)) {
-        if ((match[1] ?? "").replace(/^["']|["']$/gu, "") === ref) {
+        if ((match[1] ?? "").replace(/^"+|"+$/gu, "") === ref) {
           output.push(deck);
           break;
         }
@@ -1485,20 +1406,16 @@ export class Workspace {
   }
 
   // ------------------------------------------------------------ internals
-  #parse(text: string): LegacyDocument {
-    const parser = this.#parser ?? configuredParser;
-    return parser ? parser(text) : parseLegacySource(text);
+  #parse(text: string): Doc {
+    return parse(text);
+  }
+
+  #blank(shelf: string, theme: string, title: string | null): string {
+    return blank_qmd(shelf, theme, title, this.#templates);
   }
 
   #deckName(deck: string): string {
-    try {
-      assertSafeDeckId(deck);
-    } catch (error) {
-      if (error instanceof CoreError) throw new StudioError(error.message, error.code);
-      throw error;
-    }
-    validateWindowsDeckName(deck);
-    return deck;
+    return checkLookupName(deck, "発表名");
   }
 
   #assertLexicalInside(path: string, label: string): void {
@@ -1506,6 +1423,22 @@ export class Workspace {
     if (!isInsideRoot(this.root, target)) {
       throw new StudioError(`refusing to access outside the workspace root: ${label}`, "OUTSIDE_ROOT");
     }
+  }
+
+  #nearestExisting(path: string): string {
+    let current = path;
+    while (!existsNoFollow(current)) {
+      const parent = dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+    return current;
+  }
+
+  #assertParentRealInside(path: string, label: string): void {
+    const parent = this.#nearestExisting(dirname(path));
+    const real = realpathSync.native(parent);
+    assertInsideRoot(this.root, real, label);
   }
 
   #ensureDirectory(path: string, label: string): string {
@@ -1540,6 +1473,20 @@ export class Workspace {
     return this.#ensureDirectory(path, label);
   }
 
+  #entryIsDirectory(path: string): boolean {
+    const link = lstatOrNull(path);
+    if (!link) return false;
+    if (link.isSymbolicLink()) {
+      try {
+        const real = realpathSync.native(path);
+        return isInsideRoot(this.root, real) && statSync(real).isDirectory();
+      } catch {
+        return false;
+      }
+    }
+    return link.isDirectory();
+  }
+
   #isDirectory(path: string): boolean {
     const link = lstatOrNull(path);
     return Boolean(link && !link.isSymbolicLink() && link.isDirectory());
@@ -1556,16 +1503,15 @@ export class Workspace {
     const link = lstatOrNull(path);
     if (!link) throw new StudioError(`${label} がありません`, "NOT_FOUND");
     if (link.isSymbolicLink()) {
-      let target: string | null = null;
+      let target: string;
       try {
         target = realpathSync.native(path);
       } catch {
-        // A broken symlink is still not a valid workspace file.
+        throw new StudioError(`${label} がありません`, "NOT_FOUND");
       }
-      if (target && !isInsideRoot(this.root, target)) {
-        throw new StudioError(`refusing to access outside the workspace root: ${label}`, "OUTSIDE_ROOT");
-      }
-      throw new StudioError(`${label} may not be a symbolic link`);
+      assertInsideRoot(this.root, target, label);
+      if (!statSync(target).isFile()) throw new StudioError(`${label} is not a file`, "NOT_FOUND");
+      return readFileSync(target);
     }
     if (!link.isFile()) throw new StudioError(`${label} is not a file`, "NOT_FOUND");
     const real = realpathSync.native(path);
@@ -1584,17 +1530,73 @@ export class Workspace {
       throw new StudioError(`${basename(path)} may not be a symbolic link`);
     }
     if (link && !link.isFile()) throw new StudioError(`${basename(path)} is not a file`);
-    atomicWrite(path, data, mode ?? (link?.isFile() ? link.mode & 0o777 : undefined));
+    try {
+      atomicWrite(path, data, mode ?? (link?.isFile() ? link.mode & 0o777 : undefined));
+    } catch (error) {
+      if (isReadOnlyError(error)) {
+        throw new StudioError(
+          `${basename(path)} は読み取り専用のため書き換えられません（元のファイルは残しています）`,
+          "READ_ONLY",
+        );
+      }
+      throw error;
+    }
   }
 
   #unlinkOptional(path: string): void {
     const link = lstatOrNull(path);
-    if (link && !link.isDirectory()) unlinkSync(path);
+    if (!link || link.isDirectory()) return;
+    const realParent = realpathSync.native(dirname(path));
+    assertInsideRoot(this.root, realParent, basename(path));
+    try {
+      unlinkSync(join(realParent, basename(path)));
+    } catch (error) {
+      if (isReadOnlyError(error)) {
+        throw new StudioError(
+          `${basename(path)} は読み取り専用のため削除できません（元のファイルは残しています）`,
+          "READ_ONLY",
+        );
+      }
+      throw error;
+    }
   }
 
   #removeTree(path: string): void {
     this.#assertLexicalInside(path, basename(path));
-    rmSync(path, { recursive: true, force: true });
+    if (!existsNoFollow(dirname(path))) return;
+    const realParent = realpathSync.native(dirname(path));
+    assertInsideRoot(this.root, realParent, basename(path));
+    const target = join(realParent, basename(path));
+    const link = lstatOrNull(target);
+    if (!link) return;
+    if (link.isSymbolicLink()) {
+      unlinkSync(target);
+      return;
+    }
+    if (!link.isDirectory()) {
+      unlinkSync(target);
+      return;
+    }
+    rmSync(target, { recursive: true, force: true });
+  }
+
+  #renameWithinRoot(from: string, to: string): void {
+    const fromParent = realpathSync.native(dirname(from));
+    assertInsideRoot(this.root, fromParent, basename(from));
+    this.#ensureDirectory(dirname(to), "trash");
+    const toParent = realpathSync.native(dirname(to));
+    assertInsideRoot(this.root, toParent, basename(to));
+    try {
+      renameWithRetry(join(fromParent, basename(from)), join(toParent, basename(to)));
+    } catch (error) {
+      if (isReadOnlyError(error)) {
+        throw new StudioError(
+          `${basename(from)} は読み取り専用のため移動できません（元のファイルは残しています）`,
+          "READ_ONLY",
+        );
+      }
+      throw error;
+    }
   }
 
   #listEntries(directory: string): Dirent[] {
@@ -1627,188 +1629,164 @@ export class Workspace {
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
   }
 
-  #copyTree(source: string, destination: string, options: CopyOptions = {}): void {
+  #copyTree(
+    source: string,
+    destination: string,
+    options: CopyOptions = {},
+    visited: Set<string> = new Set(),
+  ): void {
+    const sourceLink = lstatOrNull(source);
+    if (!sourceLink) throw new StudioError(`コピー元がありません: ${source}`);
+    if (sourceLink.isSymbolicLink()) {
+      const real = realpathSync.native(source);
+      assertInsideRoot(this.root, real, relative(this.root, source));
+      if (visited.has(real)) {
+        throw new StudioError(`シンボリックリンクが循環しています: ${source}`, "CONFLICT");
+      }
+      const statValue = statSync(real);
+      if (statValue.isDirectory()) {
+        this.#copyTree(real, destination, options, new Set([...visited, real]));
+        return;
+      }
+      if (statValue.isFile()) {
+        this.#write(destination, readFileSync(real), statValue.mode & 0o777);
+        return;
+      }
+      throw new StudioError(`コピーできない種類のファイルです: ${source}`, "CONFLICT");
+    }
+
     this.#ensureDirectory(destination, basename(destination));
-    const names = this.#listEntries(source)
-      .filter((entry) => !entry.isSymbolicLink())
-      .map((entry) => entry.name)
-      .sort();
+    const entries = this.#listEntries(source);
+    const names = entries.filter((entry) => !entry.isSymbolicLink()).map((entry) => entry.name).sort();
     const ignored = new Set(options.ignore?.(source, names) ?? []);
-    for (const entry of this.#listEntries(source)) {
-      if (entry.isSymbolicLink() || ignored.has(entry.name)) continue;
+    for (const entry of entries) {
+      if (ignored.has(entry.name)) continue;
       const from = join(source, entry.name);
       const to = join(destination, entry.name);
-      if (entry.isDirectory()) {
-        this.#copyTree(from, to, options);
-      } else if (entry.isFile()) {
-        const sourceStat = lstatSync(from);
-        this.#write(to, readFileSync(from), sourceStat.mode & 0o777);
+      const link = lstatSync(from);
+      if (link.isSymbolicLink()) {
+        const real = realpathSync.native(from);
+        if (!isInsideRoot(this.root, real)) {
+          throw new StudioError(
+            `ワークスペースの外を指すリンクはコピーできません: ${relative(this.root, from)}`,
+            "OUTSIDE_ROOT",
+          );
+        }
+        if (visited.has(real)) {
+          throw new StudioError(`シンボリックリンクが循環しています: ${relative(this.root, from)}`, "CONFLICT");
+        }
+        const statValue = statSync(real);
+        if (statValue.isDirectory()) {
+          this.#copyTree(real, to, options, new Set([...visited, real]));
+        } else if (statValue.isFile()) {
+          this.#write(to, readFileSync(real), statValue.mode & 0o777);
+        } else {
+          throw new StudioError(`コピーできない種類のファイルです: ${relative(this.root, from)}`, "CONFLICT");
+        }
+      } else if (link.isDirectory()) {
+        this.#copyTree(from, to, options, visited);
+      } else if (link.isFile()) {
+        this.#write(to, readFileSync(from), link.mode & 0o777);
+      } else {
+        throw new StudioError(`コピーできない種類のファイルです: ${relative(this.root, from)}`, "CONFLICT");
       }
     }
   }
 
   #migrateTopics(): void {
-    const figures = join(this.root, "figures");
-    const topics = this.topics;
-    const hadFigures = this.#isDirectory(figures);
-    if (hadFigures && !existsNoFollow(topics)) {
-      this.#ensureDirectory(topics, "topics");
-      for (const entry of this.#listEntries(figures)) {
-        if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-        const source = join(figures, entry.name);
-        const html = join(topics, entry.name, "html");
-        this.#ensureDirectory(html, "topic html");
-        const nested = join(source, "html");
-        const sourceRoot = this.#isDirectory(nested) ? nested : source;
-        for (const child of this.#listEntries(sourceRoot)) {
-          if (child.name === ".DS_Store") continue;
-          const from = join(sourceRoot, child.name);
-          const to = join(html, child.name);
-          if (existsNoFollow(to)) continue;
-          if (child.isDirectory()) this.#copyTree(from, to);
-          else if (child.isFile()) this.#write(to, readFileSync(from));
-          rmSync(from, { recursive: true, force: true });
-        }
-        if (this.#listEntries(sourceRoot).every((child) => child.name === ".DS_Store")) {
-          rmSync(sourceRoot, { recursive: true, force: true });
-        }
-      }
-    }
-
-    if (this.#isDirectory(figures)) {
-      for (const entry of this.#listEntries(figures)) {
-        if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-        const source = join(figures, entry.name);
-        if (this.#listEntries(source).every((child) => child.name === ".DS_Store")) {
-          rmSync(source, { recursive: true, force: true });
-        }
-      }
-      if (this.#listEntries(figures).every((entry) => entry.name === ".DS_Store")) {
-        rmSync(figures, { recursive: true, force: true });
-      }
-    }
-
-    // Old decks referenced figures/<topic>/... directly. The new layout keeps
-    // the same figures under topics/<topic>/html/.
-    if (hadFigures) {
-      for (const deck of this.list_decks()) {
-        const path = this.qmd(deck);
-        const text = this.#readText(path, "slides.qmd");
-        if (!text.includes("figures/")) continue;
-        this.#write(
-          path,
-          text.replace(
-            /(^|["'(])figures\/([a-z0-9][a-z0-9-]*)\//gmu,
-            "$1topics/$2/html/",
-          ),
-        );
-      }
-    }
-
-    if (this.#isDirectory(topics)) {
-      for (const entry of this.#listEntries(topics)) {
-        if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name.startsWith("_")) continue;
-        const topic = join(topics, entry.name);
-        const html = join(topic, "html");
-        if (existsNoFollow(html)) continue;
-        const candidates = this.#listEntries(topic).filter((item) =>
-          item.isDirectory()
-          && item.name !== "images"
-          && !item.name.startsWith(".")
-          && (
-            existsNoFollow(join(topic, item.name, "figure.mjs"))
-            || existsNoFollow(join(topic, item.name, "index.html"))
-            || item.name === "_lib"
-          )
-        );
-        if (candidates.length === 0) continue;
-        this.#ensureDirectory(html, "topic html");
-        for (const candidate of candidates) {
-          const from = join(topic, candidate.name);
-          const to = join(html, candidate.name);
-          if (!existsNoFollow(to)) renameSync(from, to);
-        }
-      }
-    }
+    migrateTopics(this, set_front);
   }
 
-  #copyTopicAssets(sourceDeck: string, shelf: string, text: string): string {
-    const sourceShelf = this.deck_shelf(sourceDeck);
-    if (sourceShelf === shelf) return text;
-    const sourceHtml = this.shelf_dir(sourceShelf);
-    let updated = text.replace(
-      new RegExp(`\\{\\{<\\s*fig\\s+["']?${escapeRegExp(sourceShelf)}/`, "gu"),
-      (match) => match.replace(new RegExp(`${escapeRegExp(sourceShelf)}/$`, "u"), `${shelf}/`),
-    );
-    updated = updated.split(`topics/${sourceShelf}/`).join(`topics/${shelf}/`);
-    if (!this.#isDirectory(sourceHtml)) return updated;
-    const references = new Set<string>();
-    for (const match of updated.matchAll(new RegExp(`\\{\\{<\\s*fig\\s+["']?${escapeRegExp(shelf)}/([^\\s>]+)`, "gu"))) {
-      if (match[1]) references.add(match[1].replace(/["']$/u, ""));
-    }
-    for (const name of references) {
-      const from = join(sourceHtml, name);
-      const to = join(this.shelf_dir(shelf), name);
-      if (this.#isDirectory(from) && !existsNoFollow(to)) this.#copyTree(from, to);
-    }
-    const shared = join(sourceHtml, "_lib");
-    if (this.#isDirectory(shared) && !existsNoFollow(join(this.shelf_dir(shelf), "_lib"))) {
-      this.#copyTree(shared, join(this.shelf_dir(shelf), "_lib"));
-    }
-    return updated;
+  #copyTopicAssets(sourceDeck: string, deck: string, shelf: string, text: string): string {
+    return copy_topic_assets(this, sourceDeck, deck, shelf, text);
   }
 
+  // ------------------------------------------------------------ bibliography
   #migrateBibliography(): void {
-    for (const deck of this.list_decks()) {
-      const local = join(this.deck_dir(deck), "reference.bib");
-      if (!this.#isRegularFile(local)) continue;
-      const meta = this.deck_meta(deck);
-      const topic = meta.topic;
-      if (!topic) continue;
-      const target = join(this.topic_dir(String(topic)), "reference.bib");
-      const localBytes = this.#read(local, "reference.bib");
-      if (!this.#isRegularFile(target)) {
-        this.#write(target, localBytes);
-        unlinkSync(local);
+    if (existsNoFollow(join(this.root, "figures"))) return;
+    for (const [target, old] of this.#bibliographyPlans()) {
+      let merged: string;
+      try {
+        merged = mergeBibtexTexts([
+          this.#isRegularFile(target) ? this.#readText(target, "reference.bib") : "",
+          ...old.map((path) => this.#readText(path, "reference.bib")),
+        ]);
+      } catch {
+        // A conflict or unreadable BibTeX must never delete the local file.
         continue;
       }
-      const targetBytes = this.#read(target, "reference.bib");
-      if (localBytes.equals(targetBytes)) {
-        unlinkSync(local);
-        continue;
-      }
-      const merged = mergeBibtex(targetBytes.toString("utf8"), localBytes.toString("utf8"));
-      if (merged !== null) {
+      if (old.length > 0 || !this.#isRegularFile(target)) {
+        if (this.#isRegularFile(target)) {
+          this.#backupToTrash(
+            `bib-${timeNs()}/topics/${basename(dirname(target))}/${basename(target)}`,
+            this.#read(target, "reference.bib"),
+          );
+        }
         this.#write(target, merged);
-        unlinkSync(local);
+      }
+      for (const path of old) {
+        const destination = join(
+          this.state,
+          "trash",
+          `bib-${timeNs()}`,
+          basename(dirname(path)),
+          basename(path),
+        );
+        this.#renameWithinRoot(path, destination);
       }
     }
+  }
+
+  #bibliographyPlans(): Array<[string, string[]]> {
+    const groups = new Map<string, string[]>();
+    for (const deck of this.list_decks()) {
+      let target: string;
+      try {
+        target = this.bib(deck);
+      } catch {
+        continue;
+      }
+      if (dirname(target) === this.state) continue;
+      if (existsNoFollow(target) && !this.#isRegularFile(target)) continue;
+      if (!groups.has(target)) groups.set(target, []);
+      const old = join(this.deck_dir(deck), "reference.bib");
+      if (this.#isRegularFile(old)) groups.get(target)!.push(old);
+    }
+    return [...groups.entries()];
   }
 
   #bibliographyConflicts(): string[] {
-    const conflicts: string[] = [];
-    for (const deck of this.list_decks()) {
-      const local = join(this.deck_dir(deck), "reference.bib");
-      if (!this.#isRegularFile(local)) continue;
-      const topic = this.deck_meta(deck).topic;
-      if (!topic) continue;
-      const target = join(this.topic_dir(String(topic)), "reference.bib");
-      if (!this.#isRegularFile(target)) continue;
-      if (!this.#read(local, "reference.bib").equals(this.#read(target, "reference.bib"))) {
-        conflicts.push(`decks/${deck}/reference.bib と topics/${String(topic)}/reference.bib が違います`);
+    const errors: string[] = [];
+    for (const [target, old] of this.#bibliographyPlans()) {
+      try {
+        mergeBibtexTexts([
+          this.#isRegularFile(target) ? this.#readText(target, "reference.bib") : "",
+          ...old.map((path) => this.#readText(path, "reference.bib")),
+        ]);
+      } catch (error) {
+        errors.push(
+          `${basename(dirname(target))}: ${error instanceof Error ? error.message : String(error)} `
+            + `(${old.map((path) => basename(dirname(path))).join(", ")})`,
+        );
       }
     }
-    return conflicts;
+    return errors;
   }
 
+  // ------------------------------------------------------------ agent files
   #ensureAgentFiles(): void {
+    // PENDING integration: the generated agent-file writer must own
+    // `agent-files.json` and `_version`; this copy path stays the legacy port
+    // until that generator is wired.
     const templateDirectory = join(this.#templates, "workspace");
     if (!this.#isDirectory(templateDirectory)) return;
     const stamp = join(this.state, "agent-files.json");
     const known = readJsonObject(stamp);
     const files = new Map<string, Buffer>();
     const walk = (directory: string, prefix: string): void => {
-      for (const entry of this.#listEntries(directory).sort((left, right) => left.name.localeCompare(right.name))) {
+      for (const entry of this.#listEntries(directory).sort((left, right) =>
+        left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+      )) {
         if (entry.isSymbolicLink()) continue;
         const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
         const path = join(directory, entry.name);
@@ -1821,10 +1799,18 @@ export class Workspace {
     for (const [relativePath, data] of files) {
       const destination = this.#relativeToRoot(relativePath);
       if (!destination) continue;
+      try {
+        this.#assertParentRealInside(destination, relativePath);
+      } catch {
+        delete known[relativePath];
+        continue;
+      }
       const digest = sha256Bytes(data);
       const link = lstatOrNull(destination);
       if (link?.isSymbolicLink()) continue;
-      if (link?.isFile() && known[relativePath] === digest) continue;
+      if (link && !link.isFile()) continue;
+      // Compare the on-disk bytes, not the stamp's digest of the old template:
+      // a version change must replace (and back up) a user-edited file.
       if (link?.isFile() && readFileSync(destination).equals(data)) {
         known[relativePath] = digest;
         continue;
@@ -1837,6 +1823,12 @@ export class Workspace {
       ) {
         continue;
       }
+      if (link?.isFile()) {
+        this.#backupToTrash(
+          `agent-files/${timeNs()}/${relativePath}`,
+          readFileSync(destination),
+        );
+      }
       this.#write(destination, data);
       known[relativePath] = digest;
     }
@@ -1845,25 +1837,23 @@ export class Workspace {
     for (const relativePath of Object.keys(known)) {
       if (relativePath === "_version" || present.has(relativePath)) continue;
       const digest = known[relativePath];
-      if (typeof digest !== "string") {
-        delete known[relativePath];
-        continue;
-      }
+      delete known[relativePath];
+      if (typeof digest !== "string") continue;
       const destination = this.#relativeToRoot(relativePath);
-      if (!destination) {
-        delete known[relativePath];
+      if (!destination) continue;
+      try {
+        this.#assertParentRealInside(destination, relativePath);
+      } catch {
         continue;
       }
       const link = lstatOrNull(destination);
-      if (!link || link.isSymbolicLink() || !link.isFile()) {
-        delete known[relativePath];
-        continue;
-      }
+      if (!link || link.isSymbolicLink() || !link.isFile()) continue;
       if (sha256Bytes(readFileSync(destination)) !== digest) continue;
-      unlinkSync(destination);
-      delete known[relativePath];
+      this.#unlinkOptional(destination);
       let parent = dirname(destination);
       while (parent !== this.root) {
+        const parentLink = lstatOrNull(parent);
+        if (!parentLink || parentLink.isSymbolicLink()) break;
         try {
           rmdirSync(parent);
         } catch {
@@ -1880,14 +1870,38 @@ export class Workspace {
       if (parts[2]) skills.add(parts[2]);
     }
     const links = join(this.root, ".claude", "skills");
+    const linksLink = lstatOrNull(links);
+    let agentsSafe = true;
+    try {
+      this.#assertParentRealInside(join(this.root, ".agents", "skills", ".probe"), ".agents");
+    } catch {
+      agentsSafe = false;
+    }
+    if (linksLink?.isSymbolicLink() || !agentsSafe) {
+      // Never create or clean links through a symlinked `.claude/skills` or
+      // `.agents` directory.
+      known["_version"] = this.#version;
+      this.#write(stamp, JSON.stringify(known, null, 1));
+      return;
+    }
     for (const name of [...skills].sort()) {
       const link = join(links, name);
       if (existsNoFollow(link)) continue;
       this.#ensureDirectory(links, "skill links");
+      const relativeTarget = `../../.agents/skills/${name}`;
       try {
-        symlinkSync(`../../.agents/skills/${name}`, link, "dir");
+        symlinkSync(relativeTarget, link, "dir");
       } catch {
-        // Windows may require Developer Mode for directory links.
+        // Windows without Developer Mode: junction with an absolute target.
+        if (process.platform === "win32") {
+          try {
+            symlinkSync(join(this.root, ".agents", "skills", name), link, "junction");
+          } catch {
+            this.#copyTree(join(this.root, ".agents", "skills", name), link);
+          }
+        } else {
+          this.#copyTree(join(this.root, ".agents", "skills", name), link);
+        }
       }
     }
     if (this.#isDirectory(links)) {
@@ -1896,7 +1910,11 @@ export class Workspace {
         const statValue = lstatOrNull(link);
         if (!statValue?.isSymbolicLink() || existsSync(link)) continue;
         try {
-          if (readlinkSync(link) === `../../.agents/skills/${entry.name}`) unlinkSync(link);
+          this.#assertParentRealInside(link, entry.name);
+          const target = readlinkSync(link).replaceAll("\\", "/");
+          const relativeTarget = `../../.agents/skills/${entry.name}`;
+          const absoluteTarget = join(this.root, ".agents", "skills", entry.name).replaceAll("\\", "/");
+          if (target === relativeTarget || target === absoluteTarget) this.#unlinkOptional(link);
         } catch {
           // Leave links we cannot inspect alone.
         }
@@ -1906,14 +1924,22 @@ export class Workspace {
     this.#write(stamp, JSON.stringify(known, null, 1));
   }
 
+  #backupToTrash(relativePath: string, data: Buffer): void {
+    const destination = join(this.state, "trash", relativePath);
+    this.#write(destination, data);
+  }
+
   #ensurePortable(): void {
+    // PENDING: compiler provisioning and the generated CLI are not bundled.
+    // The README below deliberately does not advertise a command that is not
+    // available yet.
     const compiler = join(this.state, "compiler");
     this.#ensureDirectory(compiler, "compiler");
-    const oldTemplate = readIfFile(join(this.#templates, "portable", "README.md"));
     for (const readme of [join(this.root, "README.md"), join(compiler, "README.md")]) {
       const current = readIfFile(readme);
-      const untouchedOld = Boolean(oldTemplate && current && oldTemplate.equals(current));
+      const untouchedOld = Boolean(current && OLD_PORTABLE_READMES.has(sha256Bytes(current)));
       if (current && !untouchedOld) continue;
+      if (current) this.#backupToTrash(`portable/${timeNs()}/${basename(readme)}`, current);
       this.#write(readme, PORTABLE_README);
     }
   }
@@ -1928,81 +1954,218 @@ export class Workspace {
   }
 }
 
-function words(text: string): string[] {
-  return text.split(/\s+/u).filter(Boolean);
+function normalizeForCompare(text: string): string {
+  return (text.startsWith(BOM) ? text.slice(1) : text).replace(/\r\n?/gu, "\n");
 }
 
-function readVars(css: string): Record<string, string> {
-  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//gu, "");
-  const values: Record<string, string> = {};
-  for (const match of withoutComments.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+)/gu)) {
-    if (match[1] && match[2] !== undefined) values[match[1]] = match[2].trim();
-  }
-  return values;
+function isIgnoredDeckFile(name: string): boolean {
+  if (name === ".DS_Store") return true;
+  if (process.platform !== "win32") return name.endsWith(".html") || name.endsWith(".pdf");
+  const lower = name.toLowerCase();
+  return lower.endsWith(".html") || lower.endsWith(".pdf");
 }
 
-function paletteSection(css: string): string | null {
-  const match = /\/\* block palette v\d+:[^*]*\*\/\s*:root\s*\{[^}]*\}/u.exec(css);
-  return match ? match[0] : null;
-}
+// ---------------------------------------------------------------- BibTeX
+//
+// This is a conservative port of `.reference/parity/bibliography.py`. The core
+// worker owns the full `legacy-bibliography.ts`; until that module is wired we
+// keep the exact entry splitter/merge here so no local file can be deleted
+// after an ambiguous parse. When `legacy-bibliography.ts` lands these helpers
+// can be replaced by its `entries`/`merge` imports without changing callers.
 
-function currentPaletteFor(variables: Record<string, string>): string | null {
-  const themeDirectory = join(TEMPLATES, "themes");
-  let bundled: string[];
-  try {
-    bundled = readdirSync(themeDirectory).filter((name) => name.endsWith(".css") && !name.startsWith("_"));
-  } catch {
-    return null;
-  }
-  const colorKeys = [
-    "--ink", "--link", "--accent", "--header", "--muted", "--warn", "--good",
-    "--mark", "--mark-ink", "--mark-line", "--paper", "--rule", "--header-ink",
-  ];
-  for (const name of bundled) {
-    const candidate = readFileSync(join(themeDirectory, name), "utf8");
-    const candidateVars = readVars(candidate);
-    if (!colorKeys.every((key) => candidateVars[key] === variables[key])) continue;
-    const palette = paletteSection(candidate);
-    if (palette) return palette;
-  }
-  return null;
-}
-
-function withCurrentPalette(css: string, variables: Record<string, string>): string {
-  const existing = /\/\* block palette v(\d+):[^*]*\*\/\s*:root\s*\{[^}]*\}/u.exec(css);
-  const palette = currentPaletteFor(variables);
-  if (!palette) return css;
-  if (existing?.[1] === "4") return css;
-  if (!existing) return `${css.replace(/\s*$/u, "")}\n\n${palette}\n`;
-
-  const before = css.slice(0, existing.index);
-  const after = css.slice(existing.index + existing[0].length)
-    .replace(/\/\* block palette v\d+:[^*]*\*\/\s*:root\s*\{[^}]*\}/gu, "");
-  const overrides = new Map<string, string>();
-  const overrideSource = `${before.replace(/\/\* block palette v\d+:[^*]*\*\/\s*:root\s*\{[^}]*\}/gu, "")}\n${after}`;
-  for (const match of overrideSource.matchAll(/(--block-[\w-]+)\s*:\s*([^;}]+)/gu)) {
-    if (match[1] && match[2] !== undefined) overrides.set(match[1], match[2].trim());
-  }
-  const overrideCss = overrides.size > 0
-    ? `\n:root {\n${[...overrides].map(([key, value]) => `  ${key}:${value};`).join("\n")}\n}\n`
-    : "";
-  return `${before.replace(/\s*$/u, "")}\n\n${palette}\n${after}${overrideCss}`;
-}
-
-function mergeBibtex(target: string, local: string): string | null {
-  const keysOf = (text: string): Set<string> => {
-    const keys = new Set<string>();
-    for (const match of text.matchAll(/@\w+\s*\{\s*([^,\s]+)/gu)) {
-      if (match[1]) keys.add(match[1]);
+function bibEntries(text: string): Array<[string | null, string]> {
+  const result: Array<[string | null, string]> = [];
+  let position = 0;
+  const pattern = /@([\p{L}\p{N}_-]+)\s*([({])/gu;
+  const nextEntry = (start: number): RegExpExecArray | null => {
+    pattern.lastIndex = start;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text))) {
+      const lineStart = text.lastIndexOf("\n", match.index - 1) + 1;
+      if (text.slice(lineStart, match.index).includes("%")) {
+        const newline = text.indexOf("\n", pattern.lastIndex);
+        if (newline < 0) return null;
+        pattern.lastIndex = newline + 1;
+        continue;
+      }
+      return match;
     }
-    return keys;
+    return null;
   };
-  const targetKeys = keysOf(target);
-  const localKeys = keysOf(local);
-  const missing = [...localKeys].filter((key) => !targetKeys.has(key));
-  if (missing.length !== localKeys.size) return null;
-  if (missing.length === 0) return target;
-  return `${target.replace(/\s*$/u, "")}\n\n${local}`;
+
+  let first = nextEntry(position);
+  while (first) {
+    const match = first;
+    if (text.slice(position, match.index).trim()) {
+      result.push([null, text.slice(position, match.index).trim()]);
+    }
+    const opening = match[2]!;
+    let depth = 1;
+    let quoted = false;
+    let escaped = false;
+    let brace = 0;
+    let index = pattern.lastIndex;
+    while (index < text.length) {
+      const character = text[index]!;
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"' && (opening === "{" ? depth === 1 : brace === 0)) quoted = !quoted;
+      else if (!quoted) {
+        if (opening === "{") {
+          if (character === "{") depth += 1;
+          else if (character === "}") depth -= 1;
+        } else {
+          if (character === "{") brace += 1;
+          else if (character === "}") brace -= 1;
+          else if (character === ")" && brace === 0) depth -= 1;
+        }
+      }
+      index += 1;
+      if (depth === 0) break;
+    }
+    if (depth !== 0) throw new Error("BibTeX");
+    const raw = text.slice(match.index, index).trim();
+    const kind = match[1]!.toLowerCase();
+    const body = text.slice(match.index + match[0].length, index - 1);
+    let key: string | null;
+    if (kind === "comment" || kind === "preamble") {
+      key = null;
+    } else if (kind === "string") {
+      const macro = /^\s*([^=\s]+)\s*=/u.exec(body);
+      if (!macro) throw new Error("BibTeX");
+      key = `@string:${macro[1]!.toLowerCase()}`;
+    } else {
+      const keyMatch = /^\s*([^,\s]+)\s*,/u.exec(body);
+      if (!keyMatch) throw new Error("BibTeX");
+      key = keyMatch[1]!;
+    }
+    result.push([key, raw]);
+    position = index;
+    first = nextEntry(position);
+  }
+  if (text.slice(position).trim()) result.push([null, text.slice(position).trim()]);
+  return result;
+}
+
+function bibFields(raw: string): Array<[string, string]> {
+  const output: Array<[string, string]> = [];
+  let index = raw.indexOf(",") + 1;
+  const end = raw.length - 1;
+  while (index < end) {
+    while (index < end && (/\s/u.test(raw[index]!) || raw[index] === ",")) index += 1;
+    if (index >= end) break;
+    if (raw[index] === "%") {
+      index = raw.indexOf("\n", index);
+      if (index < 0) break;
+      continue;
+    }
+    const match = /^([\p{L}\p{N}_-]+)\s*=\s*/u.exec(raw.slice(index));
+    if (!match) throw new Error("BibTeX");
+    index += match[0].length;
+    const valueStart = index;
+    let depth = 0;
+    let quote = false;
+    let escape = false;
+    while (index < end) {
+      const character = raw[index]!;
+      if (escape) escape = false;
+      else if (character === "\\") escape = true;
+      else if (character === '"' && depth === 0) quote = !quote;
+      else if (!quote) {
+        if (character === "{") depth += 1;
+        else if (character === "}") depth -= 1;
+        else if (character === "," && depth === 0) break;
+      }
+      index += 1;
+    }
+    output.push([match[1]!.toLowerCase(), raw.slice(valueStart, index).trim()]);
+    index += 1;
+  }
+  return output;
+}
+
+function bibIdentity(key: string | null, raw: string): unknown {
+  if (key === null || key.startsWith("@string:")) return raw;
+  const kind = /^@([\p{L}\p{N}_-]+)/u.exec(raw)?.[1]?.toLowerCase() ?? "";
+  const valueIdentity = (value: string): [string, string] => {
+    if (
+      (value.startsWith("{") && value.endsWith("}"))
+      || (value.startsWith('"') && value.endsWith('"'))
+    ) {
+      return ["literal", value.slice(1, -1)];
+    }
+    if (/^\p{Nd}+$/u.test(value)) return ["literal", value];
+    return ["expression", value];
+  };
+  return [
+    kind,
+    bibFields(raw)
+      .map(([name, value]) => [name, valueIdentity(value)] as const)
+      .sort((left, right) => (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0)),
+  ];
+}
+
+function mergeBibtexTexts(texts: string[]): string {
+  const seen = new Map<string, string>();
+  const output: string[] = [];
+  const collisions = new Set<string>();
+  for (const text of texts) {
+    for (const [key, raw] of bibEntries(text)) {
+      const content = JSON.stringify(bibIdentity(key, raw));
+      if (key !== null && seen.has(key) && seen.get(key) !== content) collisions.add(key);
+      if (key === null || !seen.has(key)) output.push(raw);
+      if (key !== null) seen.set(key, content);
+    }
+  }
+  if (collisions.size > 0) {
+    throw new Error([...collisions].sort((left, right) => (left < right ? -1 : 1)).join(", "));
+  }
+  return `${output.join("\n\n")}${output.length > 0 ? "\n" : ""}`;
+}
+
+// ---------------------------------------------------------------- portable
+
+const LEGACY_PORTABLE_README = `# スライドの保管フォルダ
+
+このフォルダは、Slide Studio アプリなしでも編集・再ビルドできます。フォルダ名と置き場所は自由です。共有する際は、隠しフォルダ \`.slide-studio/\` も含めてフォルダ全体をコピーしてください。
+
+- \`decks/<発表名>/slides.qmd\`：原稿。テキストエディタで編集できます。
+- \`decks/<発表名>/styles/\`：発表のスタイル。
+- \`topics/<トピック>/\`：共有する \`html/\`・\`images/\`・\`reference.bib\`。\`themes/\`：テーマ。
+- \`.slide-studio/compiler/\`：このフォルダ用に同梱した変換コード・Lua・スタイル・ランタイム。
+- \`.slide-studio/runtime/\`：図が相対パスで読み込む共通コード。
+
+## コンパイル
+
+Python 3.13 以上と \`uv\` を用意し、ターミナルでこのフォルダに移動して実行します。初回は依存パッケージの取得にネットワークが必要です。Slide Studio のリポジトリ・インストールは不要です。
+
+\`\`\`sh
+uv run build.py --list
+uv run build.py 発表名 --html-only
+\`\`\`
+
+検査して HTML と PDF を生成するには、初回に Chromium を準備します。
+
+\`\`\`sh
+uv run build.py --setup
+uv run build.py 発表名
+\`\`\`
+
+出力は \`decks/<発表名>/<発表名>.html\` と \`.pdf\`。HTML はアニメーションを含む単一ファイルで、アプリなし・オフラインでブラウザで開けます。\`--html-only\` は検査を省略します。PDF は各ページの各 step の動きが終わった状態を1枚ずつ出力します。アニメーションの途中のフレームは含めません。
+
+依存パッケージと Chromium の準備後は、外部素材を含まない原稿をオフラインでビルドできます。QMD の図参照などは同梱の変換コードが処理するため、Pandoc 単体での実行では同じ結果になりません。
+`;
+
+/** Hash-pinned Python-era READMEs. Pinned by content so a template change cannot orphan them. */
+export const OLD_PORTABLE_READMES = new Set<string>([sha256Bytes(LEGACY_PORTABLE_README)]);
+try {
+  // The bundled asset is also recognised while the pinned copy above remains
+  // authoritative after the asset is changed or removed.
+  OLD_PORTABLE_READMES.add(
+    sha256Bytes(readFileSync(assetPath("templates", "portable", "README.md"))),
+  );
+} catch {
+  // Asset-less test runs keep only the pinned hash.
 }
 
 const PORTABLE_README = `# スライドの保管フォルダ
@@ -2014,13 +2177,7 @@ const PORTABLE_README = `# スライドの保管フォルダ
 - \`topics/<トピック>/\`：共有する \`html/\`・\`images/\`・\`reference.bib\`。\`themes/\`：テーマ。
 - \`.slide-studio/runtime/\`：図が相対パスで読み込む共通コード。
 
-## コンパイル
+## 書き出し
 
-Slide Studio の CLI から書き出します。
-
-\`\`\`sh
-slide-studio build <発表名>
-\`\`\`
-
-HTML と PDF は \`decks/<発表名>/\` に保存されます。アプリの画面から書き出す場合も同じ成果物になります。Python・uv の準備は不要です。
+Slide Studio のアプリ画面から HTML と PDF を書き出します。コマンドラインからの書き出しは準備中です。このフォルダに含まれる原稿・図・テーマは、アプリを入れていない環境でもテキストエディタで編集できます。
 `;
