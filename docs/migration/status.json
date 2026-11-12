@@ -79,6 +79,15 @@
       "source_commit": "b53890b",
       "result": "Integrated launcher succeeded:20pages,20PNG1280x720,0layout findings;21682ms",
       "artifact_directory": "/Users/aki/code/slide-studio-migration-artifacts/m1-integrated-render"
+    },
+    {
+      "name": "integrated_release_candidate_2026_11_13",
+      "source_commit": "1c1fcf4",
+      "tests": "425 passed, 7 skipped, 1 TODO; 0 unexpected failures",
+      "source_ui": "7 passed",
+      "installed_dmg": "3 passed after reinstalling latest DMG",
+      "distribution": "mac-arm64 DMG, mac-x64 DMG and win-x64 NSIS regenerated; mac-arm64 runtime verified only",
+      "record": "full-parity-progress.json"
     }
   ],
   "signing": {
@@ -159,11 +168,11 @@
     }
   ],
   "next_work": [
-    "Complete the 377-case legacy UI test correspondence; integration coverage is not a claim that every old test passes.",
-    "Live authenticated inference for each provider and full OS capability classification.",
-    "Finish edge rendering goldens and PDF visual/text comparison.",
-    "Windows runtime and Intel Mac runtime verification are not performed; Windows is deferred by user.",
-    "Developer ID/notarization, Windows signing and public GitHub release are not configured."
+    "Resolve malformed raw HTML differential and finish all 377 original UI test correspondences.",
+    "Finish PDF visual/text comparison against the frozen Python baseline.",
+    "Verify authenticated live inference and recovery for every provider when accounts are available.",
+    "Windows runtime validation is deferred by explicit user instruction; Intel runtime remains untested.",
+    "Configure signing/notarization and publish GitHub source/releases when the migration acceptance gates are satisfied."
   ],
   "source_commits": {
     "renderer": "b53890b",

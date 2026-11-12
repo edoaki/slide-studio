@@ -81,10 +81,27 @@
     "note": "Index counts test functions, not executed or parametrized cases"
   },
   "delivery": {
-    "status": "local_integration_verified_distribution_refresh_pending",
-    "installed_dmg": "Original UI installed from DMG in ~/Applications/Slide Studio.app; create, memo save, reopen, direct editing and HTML/PDF verified. Latest integration refinements are being repackaged.",
-    "windows_exe": "Original UI NSIS cross-build generated; runtime verification explicitly deferred.",
-    "github_clean_clone": "Local clean-clone verification in progress; no remote publication claimed."
+    "status": "local_installers_and_clean_clone_verified_full_parity_pending",
+    "source_commit": "1c1fcf4",
+    "installed_dmg": "Latest Apple Silicon DMG installed to /Users/aki/Applications/Slide Studio.app. Installed application passed 3 integration tests including empty PATH/bundled Pandoc, original editor workflow, AI fixture workflow and actual Codex sandbox CLI check/audit.",
+    "windows_exe": "NSIS x64 generated from the same implementation. Runtime verification deferred by user.",
+    "intel_dmg": "x64 DMG generated; Intel runtime not tested.",
+    "github_clean_clone": "Local Git clone, npm install and npm start verified. Remote GitHub branch/main/release not published.",
+    "sha256sums": [
+      "8b553b12bf95c9bbf9023447c711abd7bbc0fddbacb10e7bbd4090bab70d54f1  Slide-Studio-0.1.0-mac-arm64.dmg",
+      "cc7204f33e17ec54f3aa029f01ae7f395d5f33422fb326b5c7988f6d7db51102  Slide-Studio-0.1.0-mac-arm64.dmg.blockmap",
+      "4a73504839986b2aaa3d7a6d0494653ec62569b0eec10594e4ce0e251931a637  Slide-Studio-0.1.0-mac-x64.dmg",
+      "c8951f43d599090eb6ceb7df58a8b02a8509bebbb95d09d0852beb67c523f663  Slide-Studio-0.1.0-mac-x64.dmg.blockmap",
+      "ecdd3f030d7e7df2be9e86d9aaaa1c62c2b89a08d5b0183a4c338ad1ff25dd27  Slide-Studio-0.1.0-win-x64-Setup.exe",
+      "989a48e89d706c5a39a7fbce5b6b70389bd883f0702738d108d8af903e5a3fb2  Slide-Studio-0.1.0-win-x64-Setup.exe.blockmap"
+    ],
+    "clean_clone_evidence": {
+      "install_log": "/tmp/slide-studio-desktop/clean-clone-install.txt",
+      "latest_start_log": "/tmp/slide-studio-desktop/final-clone-start.txt",
+      "commit": "1c1fcf4",
+      "result": "npm start opened the original editor; created the first topic/deck in an empty workspace and saved its memo."
+    },
+    "integrity": "codesign --verify --deep --strict passed for the installed ad-hoc-signed Mac app; all six entries in release/SHA256SUMS verified. This is not Developer ID signing or notarization."
   },
   "integrated_foundation_tests": {
     "passed": 45,
@@ -239,17 +256,34 @@
     ],
     "automated": {
       "unit_http_contract": {
-        "tests": 424,
-        "passed": 417,
+        "tests": 433,
+        "passed": 425,
         "skipped": 7,
+        "todo": 1,
         "failed": 0,
-        "log": "/tmp/slide-studio-desktop/full-regression-release-candidate.txt"
+        "log": "/tmp/slide-studio-desktop/final-regression.txt"
       },
       "original_ui": {
         "tests": 7,
         "passed": 7,
         "failed": 0,
-        "log": "/tmp/slide-studio-desktop/full-ui-release-candidate.txt"
+        "log": "/tmp/slide-studio-desktop/final-source-ui.txt"
+      },
+      "installed_dmg": {
+        "tests": 3,
+        "passed": 3,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/final-installed-verified.txt"
+      },
+      "electron_bridge": {
+        "tests": 29,
+        "passed": 29,
+        "log": "/tmp/slide-studio-desktop/bridge-release-candidate.txt"
+      },
+      "electron_renderer": {
+        "tests": 28,
+        "passed": 28,
+        "log": "/tmp/slide-studio-desktop/renderer-release-candidate.txt"
       }
     },
     "real_runtime": {
@@ -263,6 +297,14 @@
       "Finish edge rendering goldens and PDF visual/text comparison.",
       "Windows runtime and Intel Mac runtime verification are not performed; Windows is deferred by user.",
       "Developer ID/notarization, Windows signing and public GitHub release are not configured."
-    ]
+    ],
+    "checks_status_fix": "Cached checks are republished after re-render and reused inspection, clearing a stale toolbar status. Regression and installed UI verified.",
+    "edge_rendering": {
+      "reference_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
+      "reference_regenerated_exactly": 7,
+      "passed": 6,
+      "todo": 1,
+      "pending": "Malformed raw HTML parser repair differs; retained as an explicit TODO test, not counted as passing. PDF visual/text acceptance remains pending."
+    }
   }
 }
