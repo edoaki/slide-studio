@@ -1,6 +1,8 @@
 # Electron・JS／TS移行と配布の実装計画
 
-作成日：2026-11-12。状態：実装前。対象：`edoaki/slide-studio` と紹介サイト `slide-studio-web`。
+作成日：2026-11-12。状態：M0作業中、Mac向けM1描画試作を先行。対象：`edoaki/slide-studio` と紹介サイト `slide-studio-web`。
+
+作業記録・検証結果・未完了事項は [移行の進捗記録](migration/status.json) を参照。2026-11-12の利用者の方針に従い、Windowsの試験環境が未定、署名が未準備の間もMac側を進める。M0・M1の完了条件はまだ満たしておらず、全面移植は未着手。
 
 ## 1. 目標と確定方針
 

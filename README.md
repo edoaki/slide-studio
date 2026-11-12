@@ -4,6 +4,8 @@
 
 ## 起動する
 
+Electron移行は開発中です。描画試作の手順は [開発ガイド](CONTRIBUTING.md#electron移行の描画試作)、進捗は [移行記録](docs/migration/status.json) を参照してください。以下は現在のPython版の利用方法です。
+
 Python 3.13 以上と `uv` がある環境で、このリポジトリ（`slide-studio`）のディレクトリから実行します。利用者が入力するコマンドはこれだけです。
 
 ```sh

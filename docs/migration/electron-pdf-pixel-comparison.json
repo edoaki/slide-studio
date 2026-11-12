@@ -1,0 +1,105 @@
+{
+  "dpi": 48,
+  "pages": [
+    {
+      "page": 1,
+      "mean_channel_error_0_255": 0.0,
+      "fraction_channels_changed": 0.0
+    },
+    {
+      "page": 2,
+      "mean_channel_error_0_255": 0.0,
+      "fraction_channels_changed": 0.0
+    },
+    {
+      "page": 3,
+      "mean_channel_error_0_255": 1.296974826388889,
+      "fraction_channels_changed": 0.030661168981481482
+    },
+    {
+      "page": 4,
+      "mean_channel_error_0_255": 0.28844907407407405,
+      "fraction_channels_changed": 0.0034071180555555556
+    },
+    {
+      "page": 5,
+      "mean_channel_error_0_255": 0.2559548611111111,
+      "fraction_channels_changed": 0.005811631944444445
+    },
+    {
+      "page": 6,
+      "mean_channel_error_0_255": 0.9087138310185185,
+      "fraction_channels_changed": 0.020046296296296295
+    },
+    {
+      "page": 7,
+      "mean_channel_error_0_255": 0.23433738425925926,
+      "fraction_channels_changed": 0.0028385416666666667
+    },
+    {
+      "page": 8,
+      "mean_channel_error_0_255": 0.134140625,
+      "fraction_channels_changed": 0.0019227430555555556
+    },
+    {
+      "page": 9,
+      "mean_channel_error_0_255": 0.0,
+      "fraction_channels_changed": 0.0
+    },
+    {
+      "page": 10,
+      "mean_channel_error_0_255": 0.2829050925925926,
+      "fraction_channels_changed": 0.0036024305555555558
+    },
+    {
+      "page": 11,
+      "mean_channel_error_0_255": 0.0,
+      "fraction_channels_changed": 0.0
+    },
+    {
+      "page": 12,
+      "mean_channel_error_0_255": 0.8064351851851852,
+      "fraction_channels_changed": 0.01851707175925926
+    },
+    {
+      "page": 13,
+      "mean_channel_error_0_255": 0.0,
+      "fraction_channels_changed": 0.0
+    },
+    {
+      "page": 14,
+      "mean_channel_error_0_255": 0.0,
+      "fraction_channels_changed": 0.0
+    },
+    {
+      "page": 15,
+      "mean_channel_error_0_255": 0.4069892939814815,
+      "fraction_channels_changed": 0.004830729166666666
+    },
+    {
+      "page": 16,
+      "mean_channel_error_0_255": 0.0,
+      "fraction_channels_changed": 0.0
+    },
+    {
+      "page": 17,
+      "mean_channel_error_0_255": 0.14202256944444444,
+      "fraction_channels_changed": 0.002400173611111111
+    },
+    {
+      "page": 18,
+      "mean_channel_error_0_255": 0.6851938657407407,
+      "fraction_channels_changed": 0.00986111111111111
+    },
+    {
+      "page": 19,
+      "mean_channel_error_0_255": 0.0,
+      "fraction_channels_changed": 0.0
+    },
+    {
+      "page": 20,
+      "mean_channel_error_0_255": 0.0,
+      "fraction_channels_changed": 0.0
+    }
+  ]
+}

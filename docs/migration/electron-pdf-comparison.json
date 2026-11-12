@@ -1,0 +1,271 @@
+{
+  "python": {
+    "pages": 20,
+    "page_sizes": [
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      }
+    ],
+    "size_bytes": 2942349,
+    "text_present": true,
+    "text_chars": 6539,
+    "text_sha256": "057a918decae674b1d0f66a94aa6db0895e7384cf3333b37d03217e7460a2883"
+  },
+  "electron": {
+    "pages": 20,
+    "page_sizes": [
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      }
+    ],
+    "size_bytes": 2023083,
+    "text_present": true,
+    "text_chars": 6431,
+    "text_sha256": "2e7d294d2d7f9229b1d479d39939f3ffa2cf06c1b3f303b7ac0f2184597e76a0"
+  },
+  "text_equal": false,
+  "integrated_electron": {
+    "pages": 20,
+    "page_sizes": [
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      },
+      {
+        "width_pt": 960.0,
+        "height_pt": 540.0
+      }
+    ],
+    "size_bytes": 2023083,
+    "text_present": true,
+    "text_chars": 6431,
+    "text_sha256": "2e7d294d2d7f9229b1d479d39939f3ffa2cf06c1b3f303b7ac0f2184597e76a0"
+  },
+  "integrated_artifact_directory": "/Users/aki/code/slide-studio-migration-artifacts/m1-integrated-render"
+}

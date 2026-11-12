@@ -1,0 +1,173 @@
+{
+  "date": "2026-11-12",
+  "milestone": "M0 groundwork and M1 macOS rendering spike",
+  "status": "in_progress",
+  "baseline_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
+  "python_code_commit": "186a68df8a8c6e20bf4ce495e70dd065f3c56eb8",
+  "layout": {
+    "reference": "../slide-studio-old (legacy/python; holds shared .git; do not delete)",
+    "migration": ". (migration/electron)"
+  },
+  "environment": {
+    "platform": "macOS-15.4-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "python": "3.13.7",
+    "pandoc": "3.9",
+    "playwright": "1.64.1",
+    "chromium": "156.0.8078.4",
+    "node": "24.18.0",
+    "pnpm": "10.34.6",
+    "opencode": "2.2.7",
+    "pandoc_for_comparison": "3.9 (reuse exact version in M1; distribution packaging not yet verified)",
+    "electron_chromium": "156.0.8078.96",
+    "electron_embedded_node": "24.22.2"
+  },
+  "candidates_from_registry": {
+    "electron": "45.3.1",
+    "electron-builder": "26.18.0",
+    "electron-updater": "6.8.11",
+    "typescript": "7.0.2",
+    "pdf-lib": "1.17.1"
+  },
+  "dependencies_status": "Electron/TypeScript/pdf-lib/Node/pnpm pinned with lockfile for M1 spike. electron-builder/updater remain unverified candidates.",
+  "validation": [
+    {
+      "command": "uv run pytest tests/test_source.py tests/test_edit.py -q",
+      "result": "119 passed in 10.87s"
+    },
+    {
+      "command": "python -m pytest tests/test_migration_baseline.py -q",
+      "result": "16 passed in 0.51s; macOS sandbox: no network, writes restricted to worker/temp"
+    },
+    {
+      "command": "python scripts/migration/baseline.py --output <new path> --runs 5",
+      "result": "5 successful runs, 20 PDF pages each, 960x540pt; HTML and canonical extracted-text hashes consistent; fixture unchanged",
+      "artifact_directory": "/Users/aki/code/slide-studio-migration-artifacts/m0-python-batch",
+      "source_commit": "7c59623aa8b54e2c594978281b58ae6922614a40",
+      "scope": "Warm-browser batch export only"
+    },
+    {
+      "command": "SLIDE_STUDIO_MIGRATION_CHROMIUM=1 python -m pytest tests/test_migration_baseline.py tests/test_migration_harness.py -q",
+      "result": "38 passed in 22.00s after integration; macOS sandbox permits loopback only and worktree/temp writes"
+    },
+    {
+      "command": "pnpm test:renderer",
+      "result": "TypeScript build and 21 Node tests passed on macOS arm64"
+    },
+    {
+      "command": "node scripts/migration/render-spike.mjs --job <fixed baseline job>",
+      "result": "20 slides, 20 PDF pages at 960x540 pt, 20 PNG screenshots at 1280x720, 0 layout findings; 22.713 s including screenshots",
+      "artifact_directory": "/Users/aki/code/slide-studio-migration-artifacts/m1-mac-render"
+    },
+    {
+      "command": "Real Electron negative cases",
+      "result": "Existing output sentinel preserved; timeout, SIGTERM and CSP blocked external resources fail and remove owned output/profile",
+      "evidence": "electron-runtime-negative.json"
+    },
+    {
+      "command": "5 cold Electron PDF-only jobs",
+      "result": "Median wall 4358.487 ms, max 4401.473 ms; 20 pages each. Different timing scope from Python baseline; no performance parity claim",
+      "evidence": "electron-pdf-timings.json"
+    },
+    {
+      "command": "SLIDE_STUDIO_RENDERER_E2E=1 pnpm test:renderer",
+      "result": "25 tests passed including4real Electron runtime cases after integration",
+      "source_commit": "b53890b"
+    },
+    {
+      "command": "pnpm render:spike --job <baseline job>",
+      "source_commit": "b53890b",
+      "result": "Integrated launcher succeeded:20pages,20PNG1280x720,0layout findings;21682ms",
+      "artifact_directory": "/Users/aki/code/slide-studio-migration-artifacts/m1-integrated-render"
+    }
+  ],
+  "signing": {
+    "macos": "security find-identity -v -p codesigning: 0 valid identities",
+    "windows": "not verified",
+    "accounts_and_costs": "User confirmed accounts/signing not prepared; costs not incurred"
+  },
+  "agent_boundary": {
+    "provider": "opencode/deepseek-v4.1-flash-free",
+    "probe_session": "ses_e31054c3affeNLC1axD0S1S79B",
+    "external_read": "denied: external_directory",
+    "unowned_write": "denied: edit",
+    "shell_and_network_tools": "not exposed",
+    "restrictions": "Tools limited to source reads and owned file edits; tests run by integrator",
+    "privacy_source": "https://opencode.ai/docs/console/models/#privacy",
+    "privacy_observation": "Published default zero retention/no training, listed exceptions do not name DeepSeek Flash Free; no private decks or secrets supplied",
+    "fallback": "provider.free-limit confirmed; renderer switched to authorized deepseek/deepseek-flash. See agent-tasks.json"
+  },
+  "open_gates": [
+    "Complete request/response, SSE ordering and cross-origin iframe contracts; current inventory is a reviewed draft",
+    "AI CLI x OS x role restrictions, tested rather than assumed",
+    "Windows and Intel runtime checks unavailable in this macOS arm64 session",
+    "M1 macOS spike proceeds only against fixed batch fixture and RenderJob; full API/SSE/iframe contracts remain incomplete",
+    "Supported OS minimums and packaging compatibility remain unverified",
+    "M1 cross-origin editor/CLI host integration and signed updates remain unimplemented",
+    "PDF quality: canonical text differs, including spaces and SVG text; 48 dpi raster comparison: 9 of 20 pages exact, remaining differences need diagnosis/acceptance",
+    "Matched performance baseline, GUI startup and aggregate process memory remain unmeasured",
+    "Retina screenshot path validated; pre-load deviceScaleFactor and canvas startup behavior need additional fixture coverage",
+    "WebRTC/STUN and DNS policy not verified by packet observation",
+    "Agent orchestration helper design/implementation remains pending"
+  ],
+  "artifacts": {
+    "batch_manifest": "python-batch-baseline.json",
+    "local_outputs": "/Users/aki/code/slide-studio-migration-artifacts/m0-python-batch",
+    "electron_result": "electron-render-result.json",
+    "electron_local_outputs": "/Users/aki/code/slide-studio-migration-artifacts/m1-integrated-render",
+    "quality_comparison": "electron-pdf-comparison.json",
+    "pixel_comparison": "electron-pdf-pixel-comparison.json"
+  },
+  "user_decisions": {
+    "date": "2026-11-12",
+    "windows": "Environment undecided; proceed with Mac work first",
+    "signing": "Apple Developer and Windows signing not yet prepared",
+    "acceptance": "Windows/signing gates remain open; no claim of milestone completion"
+  },
+  "toolchain_pinned": {
+    "node": "24.18.0",
+    "pnpm": "10.34.6",
+    "electron": "45.3.1",
+    "typescript": "7.0.2",
+    "pdf-lib": "1.17.1",
+    "@types/node": "24.19.2"
+  },
+  "prototype_contract": "../../packages/renderer/src/contracts.ts",
+  "runtime_notes": [
+    "macOS outer sandbox-exec conflicts with Electron own sandbox; realElectron runs used internal sandbox with contextIsolation and nodeIntegration disabled",
+    "NativeImage capture used Retina backing pixels; CDP captureScreenshot with PNG dimension verification fixes 1280x720 output",
+    "ESM top-level await app.whenReady deadlocked bootstrap; asynchronous main now lets module evaluation complete",
+    "Python code remains available and unchanged; desktop UI, host/CLI and packaging not implemented"
+  ],
+  "pdf_quality": "Not accepted. Opus review identifies text-layer regressions; investigate raw pages, cross-merge, font ToUnicode and hidden SVG text before any M1 quality approval.",
+  "documentation_checks": [
+    {
+      "file": "docs/electron-migration-plan.md",
+      "verification": "yomiyasu-check: executed via=verify run=20261112T095238Z-dc060b4c attempt=1 final=sha256:f701b47ee2a5 mode=rewrite checks=lint,diff meaning_risk=1 replay=skipped",
+      "disposition": "Reviewed additions against implementation and user decisions. Existing technical terms 版 and 入口 retained in their established meanings."
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "verification": "yomiyasu-check: executed via=verify run=20261112T101159Z-1e70179d attempt=1 final=sha256:0dfceb961bed mode=rewrite checks=lint,diff meaning_risk=4 replay=skipped",
+      "disposition": "Reviewed additions against implementation and user decisions. Existing technical terms 版 and 入口 retained in their established meanings."
+    },
+    {
+      "file": "README.md",
+      "verification": "yomiyasu-check: executed via=verify run=20261112T100220Z-6efb3e66 attempt=1 final=sha256:159b6295bb47 mode=rewrite checks=lint,diff meaning_risk=0 replay=skipped",
+      "disposition": "Reviewed additions against implementation and user decisions. Existing technical terms 版 and 入口 retained in their established meanings."
+    }
+  ],
+  "next_work": [
+    "Retain raw Python and Electron PDF pages; cross-merge to isolate print-compositor versus merger differences",
+    "Inspect ToUnicode space mappings and classify invisible/outlined SVG labels using high-resolution crops",
+    "Add focused text-layer fixture and an explicit policy for invisible text before declaring PDF parity",
+    "Finish API/SSE/iframe and AI CLI OS contracts; then continue M1 host/direct-edit/packaging work on Mac",
+    "Complete Windows and signing acceptance once environments/accounts are available"
+  ],
+  "source_commits": {
+    "renderer": "b53890b",
+    "baseline": "7c59623",
+    "harness": "698d6e1",
+    "inventory": "2cea5ca"
+  }
+}

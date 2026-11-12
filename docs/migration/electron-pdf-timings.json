@@ -1,0 +1,32 @@
+{
+  "scope": "Cold Electron process, existing HTML input, layout checks and PDF, screenshots disabled; not comparable to warm Python import+HTML+PDF batch",
+  "runs": [
+    {
+      "wall_ms": 4401.47275000345,
+      "job_ms": 4246,
+      "pages": 20
+    },
+    {
+      "wall_ms": 4299.604250001721,
+      "job_ms": 4156,
+      "pages": 20
+    },
+    {
+      "wall_ms": 4358.486957993591,
+      "job_ms": 4206,
+      "pages": 20
+    },
+    {
+      "wall_ms": 4341.1208750039805,
+      "job_ms": 4180,
+      "pages": 20
+    },
+    {
+      "wall_ms": 4390.706832986325,
+      "job_ms": 4238,
+      "pages": 20
+    }
+  ],
+  "median_wall_ms": 4358.486957993591,
+  "max_wall_ms": 4401.47275000345
+}

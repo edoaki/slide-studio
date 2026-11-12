@@ -1,0 +1,870 @@
+{
+  "schema_version": 1,
+  "kind": "batch_export_baseline",
+  "generated_at": "2026-11-12T09:14:46Z",
+  "git_commit": "7c59623aa8b54e2c594978281b58ae6922614a40",
+  "git_dirty": false,
+  "script": {
+    "path": "scripts/migration/baseline.py",
+    "sha256": "fd6f2cb5572de364489c9514a6355c2a78b984463a3a778ea5b8041bdd88b541"
+  },
+  "scope": {
+    "kind": "batch_export_baseline",
+    "is_batch_export_baseline": true,
+    "is_gui_startup_baseline": false,
+    "is_total_process_memory_baseline": false,
+    "measures": [
+      "Workspace.open on a fresh temporary directory",
+      "importer.import_deck of tests/fixtures/nco-intro",
+      "export.bundle_deck single-file HTML",
+      "export.pdf_from_html PDF via one reused check.Browser (warm browser)"
+    ],
+    "browser_mode": "one Chromium browser started before the measurements and reused (warm browser)",
+    "does_not_measure": [
+      "GUI startup or time to an editable view",
+      "total process memory across Python, Chromium, and Pandoc",
+      "browser process memory or cold browser launch",
+      "Electron renderer performance",
+      "AI features or network access"
+    ]
+  },
+  "environment": {
+    "git": {
+      "commit": "7c59623aa8b54e2c594978281b58ae6922614a40",
+      "dirty": false,
+      "tracked_dirty": false,
+      "untracked_scoped": [],
+      "untracked_scopes": [
+        "slide_studio/",
+        "scripts/migration/",
+        "tests/fixtures/"
+      ]
+    },
+    "platform": {
+      "platform": "macOS-15.4-arm64-arm-64bit-Mach-O",
+      "system": "Darwin",
+      "release": "24.4.0",
+      "machine": "arm64",
+      "processor": "arm"
+    },
+    "python": {
+      "version": "3.13.7",
+      "implementation": "CPython"
+    },
+    "pandoc": {
+      "version": "3.9",
+      "path": "/Users/aki/code/slide-studio/.venv/lib/python3.13/site-packages/pypandoc/files/pandoc"
+    },
+    "playwright": {
+      "version": "1.64.1"
+    },
+    "chromium": {
+      "browser": "chromium",
+      "version": "156.0.8078.4"
+    },
+    "slide_studio": {
+      "version": "0.1.0"
+    }
+  },
+  "fixture": {
+    "path": "tests/fixtures/nco-intro",
+    "deck": "nco-intro",
+    "topic": "nco",
+    "file_count": 58,
+    "aggregate_sha256": "402ecaaaae5c9cb1bb11665257707806fbe1a9da92ba3eaa607811836b6ffcbf",
+    "files": {
+      "html/_lib/am-data.mjs": "16f8cf567b6cd9b3c428f3ed07f4cb3174ce3a5b25d941695524b17c61c782af",
+      "html/_lib/draw.mjs": "b725fcd378a9d01645345cf961d2f5edd0a4f2877cd7e830fb6c601f7196a875",
+      "html/_lib/tsp-cities.mjs": "5b8a223f1a461d5c676beb4ab34e4a230c700b57737935ff0279d65ad5df19d3",
+      "html/_lib/tsp-method-map.mjs": "94764d368849942b743935f026393011c9010faf3b7a316bb6895318d9d3959e",
+      "html/_lib/tsp-methods.mjs": "9243fc6a3403ce576e6e49b7b693272a27f77d4791831cad423b60fa5db04c87",
+      "html/heuristic-nn/figure.mjs": "854bf90f6240041ea869e077c981bcace9b76c18ced2e23d23fd34fb33ce0035",
+      "html/heuristic-nn/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/heuristic-nn/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/heuristic-nn/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "html/metaheuristic-2opt/figure.mjs": "d60c52d9b783f29544ce5998561d25356945c077c90d4d0fabc0abe39b5eeeac",
+      "html/metaheuristic-2opt/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/metaheuristic-2opt/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/metaheuristic-2opt/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "html/nco-decoder/figure.mjs": "61824e744d43a87de055853ae866c6fcaaa0022315c42ebadb360c82a80ccb0c",
+      "html/nco-decoder/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/nco-decoder/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/nco-decoder/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "html/nco-encoder/figure.mjs": "8929850c2c4c89944af7a9a03b2aefea898b2e04aadd32dfdac871336fc5fb87",
+      "html/nco-encoder/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/nco-encoder/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/nco-encoder/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "html/nco-learning/figure.mjs": "669e97b887e18c6ab156d3f58e5169fb29188fff4a81723646a622df8de1b9ef",
+      "html/nco-learning/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/nco-learning/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/nco-learning/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "html/nco-overview/figure.mjs": "3508e5a1990da3c87d17fabbc3d7c1e7df792549f10765e02ec0d5f782bb0848",
+      "html/nco-overview/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/nco-overview/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/nco-overview/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "html/pomo/figure.mjs": "875f8bcfc67d813f1bba85565da5f5553d876886e8fb7d22beb4177522d2d5e4",
+      "html/pomo/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/pomo/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/pomo/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "html/search-space/figure.mjs": "5e238fe76e3583f6dd511dc3c153c4a86fd2b0d037bf1d9da2263370ce2f70b8",
+      "html/search-space/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/search-space/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/search-space/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "html/shared/am-data.mjs": "16f8cf567b6cd9b3c428f3ed07f4cb3174ce3a5b25d941695524b17c61c782af",
+      "html/shared/draw.mjs": "a7e21f04fc800fb3f9afbe42d1eda445f05fcd3d97f79df8f3dc10d86ad60e4f",
+      "html/shared/figure.css": "25663ee249de0653411afbdf884fd3b9d8e918d17864ed99d65610995f33685d",
+      "html/shared/motion.mjs": "2ff94087daa9c784d30d8b65c7ec1ba538808d5fe618818973fb46cd17e84ec5",
+      "html/shared/runtime.mjs": "b0840b13be5ea06eb1f9d228dd91b2d74ffdbc679a1f7cdc9c25f06b6c70defa",
+      "html/shared/tsp-cities.mjs": "5b8a223f1a461d5c676beb4ab34e4a230c700b57737935ff0279d65ad5df19d3",
+      "html/shared/tsp-method-map.mjs": "94764d368849942b743935f026393011c9010faf3b7a316bb6895318d9d3959e",
+      "html/shared/tsp-methods.mjs": "9243fc6a3403ce576e6e49b7b693272a27f77d4791831cad423b60fa5db04c87",
+      "html/social-problems/figure.mjs": "182d2addc48e5ac1b0b104503a336fe04a16667721bff8a1d63b365fd348034d",
+      "html/social-problems/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/social-problems/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/social-problems/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "html/solver-bnb/figure.mjs": "61242e9c7df041068be91b77d586d82b179b558d2cd82deeb9cf89d9f8cd2cb9",
+      "html/solver-bnb/index.html": "f832897679c5b261582c830224ee920cc906be0123e607db175e7de1920aea59",
+      "html/solver-bnb/main.mjs": "a4c1d37506158397ff6aa89bdcf25808ff257bdd3e29adea2bfeacee7467d334",
+      "html/solver-bnb/style.css": "04043910e20792f40905e76898782d1e700269c21f8f6b490a9d79a7ea9a3ee9",
+      "images/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "memo.md": "763305cf2e2ceedba0cc59157ed48f8224ceb7f631ed5aad931c4f2aabdc4868",
+      "reference.bib": "941ad6ae2caa9322daa1a948eee89b400615e4ca9cfcb58c93f56b9611e4faac",
+      "slides.qmd": "832e109bb58df847d418861a5ed9242944dcad0e594831b90167b73398cae6ff",
+      "styles/slides.css": "57e4bd039e4e4e77e40b564015ee4c106d95ec0134dcb5c5e937cbd979ab7bee"
+    }
+  },
+  "inputs": {
+    "fixture": "tests/fixtures/nco-intro",
+    "deck": "nco-intro",
+    "topic": "nco",
+    "runs": 5
+  },
+  "measurements": [
+    {
+      "run": 1,
+      "stages": {
+        "workspace_open_ms": 42.243,
+        "import_ms": 25.286,
+        "html_ms": 545.949,
+        "pdf_ms": 1951.774,
+        "total_ms": 2565.252
+      },
+      "html": {
+        "filename": "機械学習を使った組み合わせ最適化.html",
+        "size_bytes": 698685,
+        "sha256": "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9"
+      },
+      "pdf": {
+        "filename": "機械学習を使った組み合わせ最適化.pdf",
+        "pages": 20,
+        "page_sizes": [
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          }
+        ],
+        "size_bytes": 2942349,
+        "text_present": true,
+        "text_chars": 6539,
+        "text_sha256": "057a918decae674b1d0f66a94aa6db0895e7384cf3333b37d03217e7460a2883",
+        "sha256": "9a33feb606ba60bb5af8e07028b6faeec260f83610d0911d7a87964291da673c"
+      },
+      "export": {
+        "slides": 20,
+        "pdf_pages": 20
+      }
+    },
+    {
+      "run": 2,
+      "stages": {
+        "workspace_open_ms": 24.079,
+        "import_ms": 24.093,
+        "html_ms": 83.323,
+        "pdf_ms": 1639.236,
+        "total_ms": 1770.73
+      },
+      "html": {
+        "filename": "機械学習を使った組み合わせ最適化.html",
+        "size_bytes": 698685,
+        "sha256": "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9"
+      },
+      "pdf": {
+        "filename": "機械学習を使った組み合わせ最適化.pdf",
+        "pages": 20,
+        "page_sizes": [
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          }
+        ],
+        "size_bytes": 2942364,
+        "text_present": true,
+        "text_chars": 6539,
+        "text_sha256": "057a918decae674b1d0f66a94aa6db0895e7384cf3333b37d03217e7460a2883",
+        "sha256": "f11441e969ec5fd836d915a5aabb1852c3d394f4392334b2fe1144891d5ffbb0"
+      },
+      "export": {
+        "slides": 20,
+        "pdf_pages": 20
+      }
+    },
+    {
+      "run": 3,
+      "stages": {
+        "workspace_open_ms": 23.718,
+        "import_ms": 24.502,
+        "html_ms": 70.464,
+        "pdf_ms": 1739.29,
+        "total_ms": 1857.975
+      },
+      "html": {
+        "filename": "機械学習を使った組み合わせ最適化.html",
+        "size_bytes": 698685,
+        "sha256": "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9"
+      },
+      "pdf": {
+        "filename": "機械学習を使った組み合わせ最適化.pdf",
+        "pages": 20,
+        "page_sizes": [
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          }
+        ],
+        "size_bytes": 2942359,
+        "text_present": true,
+        "text_chars": 6539,
+        "text_sha256": "057a918decae674b1d0f66a94aa6db0895e7384cf3333b37d03217e7460a2883",
+        "sha256": "2e005c218c8417192fd77c233315e06799b4b1775156b604cb0476b9e840e8ec"
+      },
+      "export": {
+        "slides": 20,
+        "pdf_pages": 20
+      }
+    },
+    {
+      "run": 4,
+      "stages": {
+        "workspace_open_ms": 24.047,
+        "import_ms": 24.643,
+        "html_ms": 67.73,
+        "pdf_ms": 1677.399,
+        "total_ms": 1793.818
+      },
+      "html": {
+        "filename": "機械学習を使った組み合わせ最適化.html",
+        "size_bytes": 698685,
+        "sha256": "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9"
+      },
+      "pdf": {
+        "filename": "機械学習を使った組み合わせ最適化.pdf",
+        "pages": 20,
+        "page_sizes": [
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          }
+        ],
+        "size_bytes": 2942349,
+        "text_present": true,
+        "text_chars": 6539,
+        "text_sha256": "057a918decae674b1d0f66a94aa6db0895e7384cf3333b37d03217e7460a2883",
+        "sha256": "9a33feb606ba60bb5af8e07028b6faeec260f83610d0911d7a87964291da673c"
+      },
+      "export": {
+        "slides": 20,
+        "pdf_pages": 20
+      }
+    },
+    {
+      "run": 5,
+      "stages": {
+        "workspace_open_ms": 23.108,
+        "import_ms": 24.039,
+        "html_ms": 67.649,
+        "pdf_ms": 1659.948,
+        "total_ms": 1774.744
+      },
+      "html": {
+        "filename": "機械学習を使った組み合わせ最適化.html",
+        "size_bytes": 698685,
+        "sha256": "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9"
+      },
+      "pdf": {
+        "filename": "機械学習を使った組み合わせ最適化.pdf",
+        "pages": 20,
+        "page_sizes": [
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          },
+          {
+            "width_pt": 960.0,
+            "height_pt": 540.0
+          }
+        ],
+        "size_bytes": 2942397,
+        "text_present": true,
+        "text_chars": 6539,
+        "text_sha256": "057a918decae674b1d0f66a94aa6db0895e7384cf3333b37d03217e7460a2883",
+        "sha256": "c9a394e54a23e457f5bc8fdec558a732bfe09bf0ce078e2f609252217804f279"
+      },
+      "export": {
+        "slides": 20,
+        "pdf_pages": 20
+      }
+    }
+  ],
+  "summary": {
+    "workspace_open_ms": {
+      "median": 24.047,
+      "max": 42.243,
+      "min": 23.108
+    },
+    "import_ms": {
+      "median": 24.502,
+      "max": 25.286,
+      "min": 24.039
+    },
+    "html_ms": {
+      "median": 70.464,
+      "max": 545.949,
+      "min": 67.649
+    },
+    "pdf_ms": {
+      "median": 1677.399,
+      "max": 1951.774,
+      "min": 1639.236
+    },
+    "total_ms": {
+      "median": 1793.818,
+      "max": 2565.252,
+      "min": 1770.73
+    },
+    "html_size_bytes": {
+      "median": 698685.0,
+      "max": 698685.0,
+      "min": 698685.0
+    },
+    "pdf_size_bytes": {
+      "median": 2942359.0,
+      "max": 2942397.0,
+      "min": 2942349.0
+    },
+    "pdf_pages": {
+      "median": 20.0,
+      "max": 20.0,
+      "min": 20.0
+    },
+    "pdf_text_chars": {
+      "median": 6539.0,
+      "max": 6539.0,
+      "min": 6539.0
+    }
+  },
+  "html_hash_consistency": {
+    "unique_sha256": [
+      "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9"
+    ],
+    "consistent": true,
+    "runs": 5
+  },
+  "pdf_text_present": {
+    "all_runs": true,
+    "runs_with_text": 5,
+    "runs": 5,
+    "canonical_sha256": [
+      "057a918decae674b1d0f66a94aa6db0895e7384cf3333b37d03217e7460a2883"
+    ],
+    "canonical_sha256_consistent": true
+  },
+  "representative": {
+    "run": 4,
+    "selection": "closest total_ms to median",
+    "html": {
+      "file": "機械学習を使った組み合わせ最適化.html",
+      "sha256": "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9",
+      "size_bytes": 698685
+    },
+    "pdf": {
+      "file": "機械学習を使った組み合わせ最適化.pdf",
+      "sha256": "9a33feb606ba60bb5af8e07028b6faeec260f83610d0911d7a87964291da673c",
+      "size_bytes": 2942349,
+      "pages": 20,
+      "page_sizes": [
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        },
+        {
+          "width_pt": 960.0,
+          "height_pt": 540.0
+        }
+      ],
+      "text_present": true,
+      "text_chars": 6539,
+      "text_sha256": "057a918decae674b1d0f66a94aa6db0895e7384cf3333b37d03217e7460a2883"
+    }
+  },
+  "limitations": [
+    "This is a batch export baseline, not a GUI startup or total process memory baseline.",
+    "Timings come from one machine and one OS; they are not a performance guarantee.",
+    "One Chromium browser is started before the runs and reused, so cold browser launch is excluded.",
+    "Pandoc workers are reused as the product does; their first startup is included in the first run.",
+    "import_ms covers only importer.import_deck; Workspace.open is measured separately as workspace_open_ms.",
+    "pdf_text_present is a pypdf non-whitespace extraction heuristic, not a full PDF conformance check.",
+    "pdf_text_sha256 hashes canonical extracted text (line endings and trailing spaces normalised), so it is comparable even when raw PDF hashes differ because of timestamps.",
+    "The representative HTML/PDF is the run whose total_ms is closest to the median total.",
+    "Temporary directories use the local filesystem; disk and OS cache conditions affect timings.",
+    "git.dirty covers tracked changes plus untracked files under slide_studio/, scripts/migration/, and tests/fixtures/; unrelated untracked files are excluded.",
+    "If git.dirty is true, the recorded commit does not exactly reproduce the working tree."
+  ]
+}

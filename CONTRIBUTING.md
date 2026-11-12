@@ -18,6 +18,35 @@ Python 3.13 以上を使います。GUI は素の JavaScript（ES module）で�
 
 ## 開発・自動化用CLI
 
+### Electron移行の描画試作
+
+移行計画は [docs/electron-migration-plan.md](docs/electron-migration-plan.md)、検証結果と残作業は [docs/migration/status.json](docs/migration/status.json) に記録します。現時点ではMac向けのバッチ描画試作です。編集画面や正式配布への切り替えはまだ行っていません。
+
+Nodeは `.nvmrc`、pnpmは `package.json` の版を使います。npmコマンドは使いません。
+
+```sh
+pnpm install --frozen-lockfile
+pnpm test:renderer
+SLIDE_STUDIO_RENDERER_E2E=1 pnpm test:renderer
+pnpm render:spike --job /absolute/path/render-job.json
+```
+
+ジョブは次のJSON形式です。入力はPython版が生成した単一HTML、出力先はまだ存在しないディレクトリを絶対パスで指定します。
+
+```json
+{
+  "schemaVersion": 1,
+  "inputHtml": "/absolute/path/deck.html",
+  "outputDir": "/absolute/path/new-render-output",
+  "timeoutMs": 60000,
+  "screenshots": true
+}
+```
+
+成功するとPDF、各出力stepのPNG、検査結果を含む `manifest.json` を保存します。ランチャーは一時プロファイルを作り、Electron終了後に削除します。外部参照のないHTMLを使ってください。`SLIDE_STUDIO_RENDERER_E2E=1` は、POSIX環境で実際にElectronを起動して失敗時の保護・後片付けを検証します。Windows・Intel Mac・署名付き配布の検証は未実施です。
+
+### Python版のCLI
+
 利用者向けの起動は `uv run slide-studio` のみ。以下は検証やAIから呼ぶために残しています。
 
 ```sh

@@ -1,6 +1,7 @@
 {
   "name": "slide-studio",
   "version": "0.1.0",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.34.6",
@@ -9,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "build:renderer": "tsc",
     "test:renderer": "pnpm build:renderer && node --test dist/tests/renderer/*.test.js",
-    "render:spike": "pnpm build:renderer && electron dist/packages/renderer/src/cli.js"
+    "render:spike": "pnpm build:renderer && node scripts/migration/render-spike.mjs"
   },
   "dependencies": { "pdf-lib": "1.17.1" },
   "devDependencies": {

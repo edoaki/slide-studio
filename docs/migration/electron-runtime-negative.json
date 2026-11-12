@@ -1,0 +1,46 @@
+[
+  {
+    "case": "existing",
+    "returncode": 1,
+    "errors": [
+      "outputDir already exists; refusing to overwrite: /var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/slide-studio-neg-f43do81e/existing-out"
+    ],
+    "blocked": [],
+    "output_preserved": true,
+    "profile_cleaned": true
+  },
+  {
+    "case": "never-ready",
+    "returncode": 1,
+    "errors": [
+      "job timed out after 2000ms"
+    ],
+    "blocked": [],
+    "output_preserved": false,
+    "profile_cleaned": true
+  },
+  {
+    "case": "cancel",
+    "returncode": 1,
+    "errors": [
+      "Render frame was disposed before the request completed"
+    ],
+    "blocked": [],
+    "output_preserved": false,
+    "profile_cleaned": true
+  },
+  {
+    "case": "external",
+    "returncode": 1,
+    "errors": [
+      "job timed out after 2000ms",
+      "JavaScript error: Loading the image 'https://example.invalid/x.png' violates the following Content Security Policy directive: \"img-src data: blob:\". The action has been blocked.",
+      "JavaScript error: Connecting to 'https://example.invalid/x' violates the following Content Security Policy directive: \"connect-src 'none'\". The action has been blocked.",
+      "JavaScript error: Fetch API cannot load https://example.invalid/x. Refused to connect because it violates the document's Content Security Policy.",
+      "JavaScript error: Uncaught (in promise) TypeError: Failed to fetch"
+    ],
+    "blocked": [],
+    "output_preserved": false,
+    "profile_cleaned": true
+  }
+]
