@@ -1,0 +1,88 @@
+# Manual desktop packaging only. Never publishes or creates a release.
+#
+# Integrator: pin actions/checkout, actions/setup-node and
+# actions/upload-artifact to verified commit SHAs before committing. Tag
+# versions are used here because no verified SHAs were available in this
+# session; do not invent one.
+name: desktop-build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macOS arm64 DMG
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript and assets
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build macOS DMG (ad-hoc, no publish)
+        run: npm run dist:mac
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: slide-studio-mac-arm64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            release/*.dmg
+            release/*.blockmap
+            release/SHA256SUMS
+
+  windows:
+    name: Windows x64 NSIS installer
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript and assets
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Windows NSIS installer (unsigned, no publish)
+        run: npm run dist:win
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: slide-studio-win-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            release/*.exe
+            release/*.blockmap
+            release/SHA256SUMS
