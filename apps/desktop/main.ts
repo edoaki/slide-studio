@@ -9,6 +9,7 @@ import {
   Menu,
   protocol,
   session,
+  shell,
   type OpenDialogOptions,
   type OpenDialogReturnValue,
   type SaveDialogOptions,
@@ -17,13 +18,23 @@ import {
 } from "electron";
 import type {
   CoreErrorCode,
-  DesktopHost,
   PreviewDocument,
-  WorkspaceService,
 } from "../../packages/contracts/src/desktop.js";
+import type { LegacyExportDocumentInput } from "../server/legacy.js";
+import { close_pandoc } from "../../packages/core/src/legacy-pandoc.js";
+import { render_text } from "../../packages/core/src/legacy-render.js";
 import { atomicWriteFile } from "../../packages/renderer/src/output.js";
 import { STUDIO_RENDER_SCHEME } from "../../packages/renderer/src/protocol.js";
-import { startDesktopHost } from "../server/index.js";
+import {
+  startLegacyHost,
+  type LegacyDiagnosticItem,
+  type LegacyHost,
+  type LegacyWorkspace,
+} from "../server/legacy.js";
+import {
+  openLegacyWorkspace,
+  type LegacyWorkspaceService,
+} from "../server/legacy-workspace-service.js";
 
 type ExportFormat = "html" | "pdf";
 
@@ -51,8 +62,10 @@ const MAIN_STRINGS = Object.freeze({
 });
 
 let mainWindow: BrowserWindow | undefined;
-let desktopHost: DesktopHost | undefined;
-let workspace: WorkspaceService | undefined;
+let desktopHost: LegacyHost | undefined;
+let workspaceService: LegacyWorkspaceService | undefined;
+let pendingWorkspaceService: LegacyWorkspaceService | undefined;
+let workspace: LegacyWorkspace | undefined;
 let appPath = "";
 let uiDirectory = "";
 let pandocPath = "";
@@ -94,7 +107,7 @@ function argumentValue(argv: string[], name: string): string | undefined {
 function resolveSourceRoot(appDirectory: string): string {
   let candidate = appDirectory;
   for (let depth = 0; depth < 5; depth++) {
-    if (existsSync(join(candidate, "dist", "packages", "web", "index.html"))) return candidate;
+    if (existsSync(join(candidate, "dist", "packages", "web", "app.html"))) return candidate;
     const parent = dirname(candidate);
     if (parent === candidate) break;
     candidate = parent;
@@ -134,14 +147,6 @@ async function sweepPdfTemporaryDirectories(): Promise<void> {
       })));
   } catch (error) {
     console.error("[desktop] cannot sweep temporary PDF directories", error);
-  }
-}
-
-async function clearUiStorage(): Promise<void> {
-  try {
-    await uiSession?.clearStorageData();
-  } catch (error) {
-    console.error("[desktop] cannot clear preview storage", error);
   }
 }
 
@@ -300,25 +305,19 @@ function installWindowPolicy(window: BrowserWindow): void {
   contents.on("before-input-event", (event, input) => {
     const key = input.key.toLowerCase();
     const reload = key === "f5" || ((input.control || input.meta) && key === "r");
-    if (reload) event.preventDefault();
+    if (reload && !shuttingDown) {
+      // Reload goes through Chromium's unload path, so the legacy UI's
+      // beforeunload guard still asks about unsaved changes. The admin token
+      // lives in per-origin sessionStorage; the current path must be kept.
+      event.preventDefault();
+      contents.reload();
+    }
   });
   contents.on("will-navigate", (...args: unknown[]) => {
     const raw = navigationUrl(args);
     const event = args.find(
       (value) => value !== null && typeof value === "object" && "preventDefault" in value,
     ) as { preventDefault?: () => void } | undefined;
-    if (
-      raw !== undefined
-      && adminOriginValue.length > 0
-      && raw.startsWith(`${adminOriginValue}/`)
-      && !raw.includes("#token=")
-    ) {
-      // The renderer strips the credential fragment at boot. Re-enter through the
-      // bootstrap URL instead of loading an admin page without the token.
-      event?.preventDefault?.();
-      if (!shuttingDown) void contents.loadURL(bootstrapUrl);
-      return;
-    }
     if (!mainNavigationAllowed(raw)) {
       event?.preventDefault?.();
       console.error(`[desktop] blocked navigation: ${redactCredential(raw ?? "<unknown>")}`);
@@ -348,9 +347,12 @@ function installWindowPolicy(window: BrowserWindow): void {
     console.error("[desktop] renderer process gone; reloading the admin UI");
     if (shuttingDown) return;
     setTimeout(() => {
-      if (!shuttingDown && mainWindow !== undefined && !mainWindow.isDestroyed()) {
-        void mainWindow.loadURL(bootstrapUrl);
-      }
+      if (shuttingDown || mainWindow === undefined || mainWindow.isDestroyed()) return;
+      const target = mainWindow.webContents.getURL();
+      // Keep the current admin route; the per-origin sessionStorage token makes
+      // a root bootstrap unnecessary after the initial launch.
+      if (mainNavigationAllowed(target)) void mainWindow.loadURL(target);
+      else void mainWindow.loadURL(bootstrapUrl);
     }, 250);
   });
 
@@ -385,6 +387,7 @@ function createMainWindow(adminOrigin: string, token: string): void {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
+      nodeIntegrationInSubFrames: false,
       webviewTag: false,
       spellcheck: false,
     },
@@ -465,6 +468,78 @@ async function exportDocument(
   });
 }
 
+/** Adapt the legacy export input to the existing PDF/HTML writer. */
+function exportLegacyDocument(
+  input: LegacyExportDocumentInput,
+  format: ExportFormat,
+  title: string,
+): Promise<string | null> {
+  const rendered = input.rendered;
+  const document: PreviewDocument = {
+    html: input.html,
+    version: input.version,
+    slides: rendered?.slides ?? [],
+    warnings: (rendered?.warnings ?? []).map((message) => ({
+      code: "PANDOC",
+      severity: "warning",
+      message,
+    })),
+  };
+  return exportDocument(document, format, title);
+}
+
+function safeExternalUrl(raw: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (
+    parsed.protocol !== "http:"
+    && parsed.protocol !== "https:"
+    && parsed.protocol !== "mailto:"
+  ) {
+    return false;
+  }
+  if (/[\u0000-\u001f]/u.test(raw)) return false;
+  return parsed.protocol === "mailto:"
+    ? parsed.pathname.trim().length > 0
+    : parsed.hostname.length > 0;
+}
+
+async function openExternalUrl(raw: string): Promise<boolean> {
+  if (!safeExternalUrl(raw)) return false;
+  await shell.openExternal(raw);
+  return true;
+}
+
+function legacyDiagnostics(): LegacyDiagnosticItem[] {
+  let pandocOk = false;
+  let pandocDetail = "";
+  try {
+    pandocOk = statSync(pandocPath).isFile();
+    pandocDetail = pandocOk ? pandocPath : `not a file: ${pandocPath}`;
+  } catch (error) {
+    pandocDetail = error instanceof Error ? error.message : String(error);
+  }
+  const chromium = typeof process.versions.chrome === "string" ? process.versions.chrome : "";
+  return [
+    {
+      name: "Pandoc",
+      ok: pandocOk,
+      detail: pandocDetail,
+      fix: MAIN_STRINGS.pandocMissing(pandocPath),
+    },
+    {
+      name: "Chromium",
+      ok: chromium.length > 0,
+      detail: chromium.length > 0 ? `Electron Chromium ${chromium}` : "Chromium is unavailable",
+      fix: "",
+    },
+  ];
+}
+
 async function writePdf(document: PreviewDocument, filePath: string): Promise<string> {
   const [{ parseRenderJob }, { renderDeck, RenderFailure }, { JobDeadline }] = await Promise.all([
     import("../../packages/renderer/src/job.js"),
@@ -513,7 +588,7 @@ async function writePdf(document: PreviewDocument, filePath: string): Promise<st
   }
 }
 
-async function selectWorkspace(): Promise<WorkspaceService | null> {
+async function selectWorkspace(): Promise<LegacyWorkspace | null> {
   const result = await showOpenDialog({
     title: MAIN_STRINGS.chooseWorkspace,
     properties: ["openDirectory", "createDirectory"],
@@ -524,27 +599,54 @@ async function selectWorkspace(): Promise<WorkspaceService | null> {
   if (!isAbsolute(selected)) {
     throw codedError("INVALID_INPUT", "selected workspace folder must be absolute");
   }
-  if (workspace !== undefined && canonicalPath(selected) === canonicalPath(workspace.root)) {
-    return workspace;
+  if (
+    workspaceService !== undefined
+    && canonicalPath(selected) === canonicalPath(workspaceService.root)
+  ) {
+    return workspaceService.workspace;
   }
-  const { openWorkspace } = await import("../../packages/core/src/index.js");
-  const next = await openWorkspace(selected, { pandocPath });
+  const next = await openLegacyWorkspace(selected);
   if (shuttingDown) {
     await next.close().catch((error: unknown) => {
       console.error("[desktop] cannot close a workspace opened during shutdown", error);
     });
     return null;
   }
-  // The server closes the previous service after this callback returns, so keep
-  // the same pointer it will use for shutdown and later folder selections.
+  if (pendingWorkspaceService !== undefined) {
+    await pendingWorkspaceService.close().catch((error: unknown) => {
+      console.error("[desktop] cannot close an uncommitted workspace", error);
+    });
+  }
+  // Ownership transfer is completed by onWorkspaceChanged after the host has
+  // committed this workspace and rejected other in-flight operations.
+  pendingWorkspaceService = next;
+  return next.workspace;
+}
+
+async function legacyWorkspaceChanged(
+  next: LegacyWorkspace,
+  previous: LegacyWorkspace,
+): Promise<void> {
+  const pending = pendingWorkspaceService;
   workspace = next;
-  await clearUiStorage();
-  return next;
+  if (pending === undefined || pending.workspace !== next) {
+    console.error("[desktop] host selected an unknown workspace; old lock was not released");
+    return;
+  }
+  pendingWorkspaceService = undefined;
+  const old = workspaceService;
+  workspaceService = pending;
+  if (old !== undefined && old.workspace === previous && old !== pending) {
+    try {
+      await old.close();
+    } catch (error) {
+      console.error("[desktop] cannot release the previous workspace lock", error);
+    }
+  }
 }
 
 async function start(): Promise<void> {
   try {
-    const { openWorkspace } = await import("../../packages/core/src/index.js");
     appPath = app.isPackaged ? app.getAppPath() : resolveSourceRoot(app.getAppPath());
     uiDirectory = join(appPath, "dist", "packages", "web");
     pdfTemporaryRoot = join(app.getPath("userData"), "tmp");
@@ -555,23 +657,35 @@ async function start(): Promise<void> {
     pandocPath = resolvePandocPath();
     assertPandocAvailable();
 
-    workspace = await openWorkspace(requested.root, {
-      pandocPath,
+    workspaceService = await openLegacyWorkspace(requested.root, {
       sample: requested.sample,
     });
+    workspace = workspaceService.workspace;
     if (shuttingDown) {
-      await workspace.close();
+      await workspaceService.close();
+      workspaceService = undefined;
       workspace = undefined;
       app.exit(0);
       return;
     }
 
-    desktopHost = await startDesktopHost({
-      workspace,
+    desktopHost = await startLegacyHost({
+      workspace: workspaceService.workspace,
       uiDirectory,
+      pandocPath,
+      renderText: render_text,
       selectWorkspace,
-      exportDocument,
-      onShutdown: waitForPdfQueue,
+      onWorkspaceChanged: legacyWorkspaceChanged,
+      openExternal: openExternalUrl,
+      exportDocument: exportLegacyDocument,
+      diagnostics: legacyDiagnostics,
+      onShutdown: async () => {
+        // Accepted host operations have settled by now. Cancel any remaining
+        // Pandoc subprocess and wait for the desktop PDF queue before the
+        // workspace lock is released.
+        await close_pandoc();
+        await waitForPdfQueue();
+      },
     });
     if (shuttingDown) {
       await desktopHost.close();
@@ -612,12 +726,27 @@ async function shutdown(exitCode = 0): Promise<void> {
   } catch (error) {
     console.error("[desktop] PDF queue did not settle cleanly", error);
   }
-  try {
-    await workspace?.close();
-  } catch (error) {
-    console.error("[desktop] cannot close the workspace", error);
+  const pending = pendingWorkspaceService;
+  pendingWorkspaceService = undefined;
+  if (pending !== undefined) {
+    try {
+      await pending.close();
+    } catch (error) {
+      console.error("[desktop] cannot release an uncommitted workspace lock", error);
+    }
   }
+  const service = workspaceService;
+  workspaceService = undefined;
   workspace = undefined;
+  if (service !== undefined) {
+    // The host has drained accepted writes and its onShutdown has closed
+    // Pandoc, so it is now safe to release the cross-process workspace lock.
+    try {
+      await service.close();
+    } catch (error) {
+      console.error("[desktop] cannot release the workspace lock", error);
+    }
+  }
   forceQuit = true;
   app.exit(exitCode);
 }

@@ -33,13 +33,32 @@ import type {
   LegacyRendered,
 } from "../../packages/contracts/src/legacy.js";
 import { atomicWriteFile } from "../../packages/core/src/atomic.js";
+import { pyStrip } from "../../packages/core/src/legacy-cover.js";
+import {
+  cell_markdown,
+  chunk_info,
+  prepared_html,
+  to_markdown,
+  type ChunkEditMap,
+} from "../../packages/core/src/legacy-edit.js";
+import { merge3 } from "../../packages/core/src/legacy-edit-scope.js";
+import { warning_issues } from "../../packages/core/src/legacy-render.js";
+import {
+  image_options,
+  locate,
+  move_chunk,
+  parse,
+  rewrite,
+  set_cell,
+  ValueError,
+} from "../../packages/core/src/legacy-source.js";
+import type { Doc } from "../../packages/core/src/legacy-source.js";
 import { isInsideRoot } from "../../packages/core/src/paths.js";
 import {
   decodeDeckBytes,
   encodeSourceForDeck,
   sha256,
 } from "../../packages/core/src/source.js";
-import { parse } from "../../packages/core/src/legacy-source.js";
 import {
   TEMPLATES,
   check_name,
@@ -60,6 +79,7 @@ const DEFAULT_SSE_QUEUE = 256;
 const DEFAULT_KEEP_ALIVE_MS = 15_000;
 const DEFAULT_RENDER_CONCURRENCY = 2;
 const DEFAULT_RENDER_PENDING = 64;
+const CHUNK_VERSIONS = 4;
 const PREVIEW_FILE = "__slide-studio_preview__.html";
 
 /** Public workspace surface used by the host. Keeping it structural makes test doubles possible. */
@@ -115,6 +135,11 @@ export type LegacySelectWorkspace = () =>
 
 export type LegacyOpenExternal = (url: string) => boolean | Promise<boolean>;
 
+export type LegacyWorkspaceChanged = (
+  next: LegacyWorkspace,
+  previous: LegacyWorkspace,
+) => void | Promise<void>;
+
 export interface LegacyExportDocumentInput {
   deck: string;
   html: string;
@@ -140,6 +165,12 @@ export interface LegacyHostOptions {
   featureHandlers?: LegacyFeatureHandler[];
   /** Native folder picker. The host never closes either workspace itself. */
   selectWorkspace?: LegacySelectWorkspace;
+  /**
+   * Called after a selected workspace has been committed by the host. The
+   * callback receives ownership of `previous`; the host no longer uses it.
+   * The caller should release the previous lock here, not in selectWorkspace.
+   */
+  onWorkspaceChanged?: LegacyWorkspaceChanged;
   /** Native OS browser opening. */
   openExternal?: LegacyOpenExternal;
   /** Native save/export adapter, used by a later export feature route. */
@@ -147,9 +178,8 @@ export interface LegacyHostOptions {
   /** Injected doctor/environment report for `/api/env`. */
   diagnostics?: LegacyDiagnostics;
   /**
-   * Optional structured warning provider. The legacy `render.warning_issues`
-   * helper is not ported to the core renderer yet; when absent the host reports
-   * an empty list and advertises `warning-issues` as pending.
+   * Optional override for warning issues. The default is the real
+   * `legacy-render.warning_issues` helper.
    */
   warningIssues?: (rendered: LegacyRendered | null) => unknown[];
   onShutdown?: () => void | Promise<void>;
@@ -221,6 +251,12 @@ interface DeckState {
   force: boolean;
   themeOnly: boolean;
   promise: Promise<DeckState> | null;
+  chunks: Map<string, ChunkEntry>;
+}
+
+interface ChunkEntry {
+  rendered: LegacyRendered;
+  info: Promise<ChunkEditMap>;
 }
 
 interface PreviewCapability {
@@ -270,17 +306,18 @@ export const LEGACY_WEB_FILES: readonly string[] = Object.freeze([
 
 const PENDING_FEATURES: readonly string[] = Object.freeze([
   "assets", "materials", "library", "bibliography", "bib", "themes", "ai",
-  "chat", "checks", "shots", "chunks", "math", "setup", "home-manage",
+  "chat", "checks", "shots", "math", "setup", "home-manage",
   "export", "download", "topic", "location",
-  "inject", "hooks/locks", "edit-scope", "block-design-migrate",
-  "warning-issues", "home-shots-running", "location-token", "pandoc-lifecycle",
-  "content-origin-secret", "will-frame-navigate", "merge3",
+  "inject", "hooks/locks", "edit-scope",
+  "home-shots-running", "location-token", "pandoc-lifecycle",
+  "content-origin-secret", "will-frame-navigate",
 ]);
 
 const IMPLEMENTED_FEATURES: readonly string[] = Object.freeze([
   "home", "env", "new-deck", "new-topic", "deck-read", "deck-source",
   "memo", "style", "structure", "events", "preview", "theme-preview",
-  "open-external",
+  "open-external", "chunks", "warning-issues", "merge3",
+  "block-design-migrate",
 ]);
 
 const FEATURE_ROUTES: readonly FeatureRoute[] = Object.freeze([
@@ -595,6 +632,14 @@ function safeName(value: string): boolean {
   return /^[A-Za-z0-9_-]+$/u.test(value) && !value.startsWith("_");
 }
 
+function integerField(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === "string" && /^[+-]?\d+$/u.test(value.trim())) {
+    return Number.parseInt(value.trim(), 10);
+  }
+  throw new ValueError("操作が正しくありません");
+}
+
 function cloneHeaders(request: IncomingMessage): Record<string, string | undefined> {
   const headers: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(request.headers)) {
@@ -826,6 +871,7 @@ function baseState(deck: string): DeckState {
     force: false,
     themeOnly: false,
     promise: null,
+    chunks: new Map(),
   };
 }
 
@@ -846,6 +892,209 @@ function isDeckName(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------- block design migration
+
+const BLOCK_DECORATION = new Set([
+  "border",
+  "background-color",
+  "--block-design",
+  "border-top",
+  "border-left",
+  "border-radius",
+  "box-shadow",
+]);
+const BLOCK_KINDS = ["plain", "top", "left", "quote", "bracket", "fold"] as const;
+const BLOCK_DESIGNS: Record<string, Record<string, string>> = {
+  plain: {},
+  top: {},
+  left: {},
+  quote: {},
+  bracket: {},
+  fold: {},
+  shadow: {
+    border: "0 solid transparent",
+    "border-radius": "10px",
+    "background-color": "var(--block-shadow-fill)",
+    "box-shadow": "0 4px 14px var(--block-shadow-color)",
+  },
+  corner: {
+    border: "0 solid transparent",
+    "border-radius": "10px",
+    "border-top": "var(--block-corner-top)",
+    "border-left": "var(--block-corner-left)",
+    "background-color": "var(--block-corner-fill)",
+  },
+};
+const BLOCK_COLOR = "#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?";
+const BLOCK_BORDER = new RegExp(
+  String.raw`^[\d.]+px (?:solid|dashed|dotted|double) ${BLOCK_COLOR}$`,
+  "u",
+);
+const BLOCK_COLOR_FULL = new RegExp(String.raw`^${BLOCK_COLOR}$`, "u");
+const BLOCK_STYLE = /(\{[^{}\n]*?\bstyle=")([^"]*)(")/gu;
+const BLOCK_EXTRA_KEYS = new Set([
+  "--block-design",
+  "border-top",
+  "border-left",
+  "border-radius",
+  "box-shadow",
+]);
+const BLOCK_COLUMN_DECORATION = new Set([...BLOCK_DECORATION, "--block-shadow"]);
+
+function blockProps(style: string): Array<[string, string]> {
+  const pairs: Array<[string, string]> = [];
+  for (const part of style.split(";")) {
+    if (!part.includes(":")) continue;
+    const colon = part.indexOf(":");
+    pairs.push([
+      pyStrip(part.slice(0, colon)),
+      pyStrip(part.slice(colon + 1)),
+    ]);
+  }
+  return pairs;
+}
+
+function blockKind(props: Record<string, string>): string | null | false {
+  const design = props["--block-design"];
+  if (design !== undefined && Object.prototype.hasOwnProperty.call(BLOCK_DESIGNS, design)) {
+    return design;
+  }
+  const border = props.border;
+  const fill = props["background-color"];
+  if (
+    (border === undefined && fill === undefined)
+    || Object.keys(props).some((key) => BLOCK_EXTRA_KEYS.has(key))
+  ) {
+    return false;
+  }
+  if (border !== undefined && !(border === "none" || BLOCK_BORDER.test(border))) {
+    return false;
+  }
+  if (fill !== undefined && !(fill === "transparent" || BLOCK_COLOR_FULL.test(fill))) {
+    return false;
+  }
+  return (border !== undefined && border !== "none")
+    || (fill !== undefined && fill !== "transparent")
+    ? "plain"
+    : null;
+}
+
+function blockDesignValues(kind: string | null): Array<[string, string]> {
+  if (kind === null) return [];
+  return [["--block-design", kind], ...Object.entries(BLOCK_DESIGNS[kind] ?? {})];
+}
+
+function sameRecord(
+  left: Record<string, string>,
+  right: Record<string, string>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) =>
+    Object.prototype.hasOwnProperty.call(right, key) && right[key] === left[key]);
+}
+
+function migrateBlockStyles(text: string): string {
+  return text.replace(BLOCK_STYLE, (_match, prefix: string, style: string, suffix: string) => {
+    const props = blockProps(style);
+    const kind = blockKind(Object.fromEntries(props));
+    if (kind === false) return _match;
+    const rest = [
+      ...props.filter(([key]) => !BLOCK_DECORATION.has(key)),
+      ...blockDesignValues(kind),
+    ];
+    if (rest.length === 0) return _match;
+    if (sameRecord(Object.fromEntries(rest), Object.fromEntries(props))) return _match;
+    return `${prefix}${rest.map(([key, value]) => `${key}:${value}`).join(";")}${suffix}`;
+  });
+}
+
+function cpSlice(value: string, start: number, end: number): string {
+  return Array.from(value).slice(Math.max(0, start), Math.max(0, end)).join("");
+}
+
+/** Port of `block_design.normalize_columns`, applied until stable. */
+function normalizeBlockColumns(text: string): string {
+  let current = text;
+  while (true) {
+    let edits: Array<[number, number, string]> | null = null;
+    for (const page of parse(current).pages) {
+      for (const column of page.walk()) {
+        if (column.kind !== "column" || column.children.length !== 1 || !column.open) continue;
+        const box = column.children[0]!;
+        if (
+          box.kind !== "box"
+          || !box.open
+          || !box.close
+          || !box.attrs
+          || box.attrs.id
+          || box.attrs.classes.length > 0
+        ) {
+          continue;
+        }
+        const outer = Object.fromEntries(blockProps(column.attrs?.kv.style ?? ""));
+        const inner = Object.fromEntries(blockProps(box.attrs.kv.style ?? ""));
+        if (
+          Object.keys(outer).some((key) => BLOCK_COLUMN_DECORATION.has(key))
+          && Object.keys(inner).some((key) => BLOCK_COLUMN_DECORATION.has(key))
+        ) {
+          continue;
+        }
+        if (
+          Object.keys(inner).some((key) =>
+            !["padding", "text-box", "--block-space"].includes(key)
+            && Object.prototype.hasOwnProperty.call(outer, key))
+        ) {
+          continue;
+        }
+        if (Object.entries(box.attrs.kv).some(([key, value]) =>
+          key !== "style"
+          && Object.prototype.hasOwnProperty.call(column.attrs!.kv, key)
+          && column.attrs!.kv[key] !== value)) {
+          continue;
+        }
+        const kv: Record<string, string> = { ...column.attrs!.kv, ...box.attrs.kv };
+        if (Object.keys(outer).length > 0 || Object.keys(inner).length > 0) {
+          const style: Record<string, string> = { ...outer, ...inner };
+          if (Object.prototype.hasOwnProperty.call(outer, "--block-space")) {
+            style["--block-space"] = outer["--block-space"]!;
+          }
+          kv.style = Object.entries(style).map(([key, value]) => `${key}:${value}`).join(";");
+        }
+        const attrs: string[] = [];
+        if (column.attrs!.id) attrs.push(`#${column.attrs!.id}`);
+        for (const name of column.attrs!.classes) attrs.push(`.${name}`);
+        for (const [key, value] of Object.entries(kv)) {
+          attrs.push(
+            `${key}="${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`,
+          );
+        }
+        const openLine = cpSlice(current, column.open[0], column.open[1]);
+        const fence = /^\s*:{3,}/u.exec(openLine)?.[0];
+        if (fence === undefined) continue;
+        edits = [
+          [column.open[0], column.open[1], `${fence} {${attrs.join(" ")}}`],
+          [box.open[0], box.open[1], ""],
+          [box.close[0], box.close[1], ""],
+        ];
+        break;
+      }
+      if (edits !== null) break;
+    }
+    if (edits === null) return current;
+    edits.sort((left, right) => right[0] - left[0] || right[1] - left[1]);
+    for (const [start, end, replacement] of edits) {
+      current = cpSlice(current, 0, start) + replacement + cpSlice(current, end, Number.POSITIVE_INFINITY);
+    }
+  }
+}
+
+/** Migrate per-block decoration colors to the current kind-only source form. */
+function migrateBlockDesign(text: string): string {
+  return normalizeBlockColumns(migrateBlockStyles(text));
 }
 
 /**
@@ -955,10 +1204,12 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       "Feature routes are explicit dispatches; unregistered groups return 501 instead of empty success.",
       "Authored HTML is served only from the content origin; the admin origin never serves /files.",
       "The caller owns the workspace lock; close() drains accepted writes and listeners but not the workspace.",
-      "Legacy themes, AI, checks, shots and export handlers remain pending integration.",
+      "Chunk GET/POST includes markdown/cell/html/delete/move/image conversion with a four-version render cache keyed by raw source bytes.",
+      "Deck reads migrate legacy block styles under the per-deck lock and preserve BOM/CRLF bytes; raw byte hashes remain the source revision.",
+      "Legacy themes, assets, AI, checks, shots and export handlers remain pending integration.",
       "Content origin authentication (Electron secret header) and non-loopback frame navigation blocking belong to desktop integration and are not enabled here.",
       "Content CSP is stricter than the legacy service: remote images/fonts/frames are blocked pending a parity decision.",
-      "Feature route patterns for extension modules are unverified against the legacy route table.",
+      "Desktop download handling and the full output/export bridge remain pending.",
     ],
   };
 
@@ -1135,13 +1386,43 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   }
 
   function warnIssues(rendered: LegacyRendered | null): unknown[] {
-    if (options.warningIssues === undefined) return [];
+    if (rendered === null) return [];
     try {
-      return options.warningIssues(rendered);
+      return options.warningIssues === undefined
+        ? warning_issues(rendered)
+        : options.warningIssues(rendered);
     } catch (error) {
       console.error("[legacy] warning provider failed", error);
       return [];
     }
+  }
+
+  function chunkInfoFor(
+    ws: LegacyWorkspace,
+    deck: string,
+    state: DeckState,
+    rendered: LegacyRendered,
+    version: string,
+  ): Promise<ChunkEditMap> {
+    const found = state.chunks.get(version);
+    if (found !== undefined && found.rendered === rendered) return found.info;
+    const entry: ChunkEntry = {
+      rendered,
+      info: Promise.resolve().then(() => chunk_info(
+        { html: rendered.html, doc: rendered.doc },
+        { pandocPath: options.pandocPath, cwd: ws.deck_dir(deck) },
+      )),
+    };
+    state.chunks.set(version, entry);
+    while (state.chunks.size > CHUNK_VERSIONS) {
+      const oldest = state.chunks.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      state.chunks.delete(oldest);
+    }
+    void entry.info.catch(() => {
+      if (state.chunks.get(version) === entry) state.chunks.delete(version);
+    });
+    return entry.info;
   }
 
   async function renderDeck(
@@ -1523,28 +1804,53 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     ws: LegacyWorkspace,
     deck: string,
   ): Promise<void> {
-    if (!ws.has_deck(deck)) {
-      sendApiError(response, 404, `発表がありません: ${deck}`);
-      return;
-    }
-    const source = await readSource(ws, deck);
-    const state = await renderDeck(ws, deck, { source });
-    const structure = parse(source.text).to_json();
-    ws.touch_recent(deck);
-    sendJson(response, 200, {
-      deck,
-      text: source.text,
-      version: source.version,
-      structure,
-      render: {
-        ok: state.error === null,
-        version: state.version,
-        error: state.error,
-        slides: state.rendered?.slides ?? [],
-        warning_issues: warnIssues(state.rendered),
-      },
-      blank: ws.is_blank(deck),
-      root: ws.root,
+    await withDeckLock(ws, deck, async () => {
+      if (!ws.has_deck(deck)) {
+        sendApiError(response, 404, `発表がありません: ${deck}`);
+        return;
+      }
+      let source = await readSource(ws, deck);
+      // Older GUI versions wrote per-block colors into the source. Migrate
+      // exactly like the reference on open, but keep the raw byte revision
+      // canonical and preserve BOM/CRLF on disk.
+      const migrated = migrateBlockDesign(source.text);
+      if (migrated !== source.text) {
+        const path = ws.qmd(deck);
+        const info = await stat(path);
+        const encoded = encodeSourceForDeck(migrated, {
+          bom: source.bom,
+          eol: source.eol,
+        });
+        if (encoded.byteLength > maxSourceBodyBytes) {
+          throw new LegacyHttpError(413, "原稿が大きすぎます");
+        }
+        await atomicWriteFile(path, encoded, info.mode & 0o777);
+        source = {
+          text: migrated,
+          version: sha256(encoded),
+          bytes: encoded,
+          eol: source.eol,
+          bom: source.bom,
+        };
+      }
+      const state = await renderDeck(ws, deck, { source });
+      const structure = parse(source.text).to_json();
+      ws.touch_recent(deck);
+      sendJson(response, 200, {
+        deck,
+        text: source.text,
+        version: source.version,
+        structure,
+        render: {
+          ok: state.error === null,
+          version: state.version,
+          error: state.error,
+          slides: state.rendered?.slides ?? [],
+          warning_issues: warnIssues(state.rendered),
+        },
+        blank: ws.is_blank(deck),
+        root: ws.root,
+      });
     });
   }
 
@@ -1575,21 +1881,24 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         });
         return;
       }
-      // edit_scope.merge3 is a separate migration boundary. Without it, a
-      // rebased save is only safe when the caller's base text already equals
-      // current.
-      if (rebased && baseText !== current.text) {
-        sendApiError(response, 409, "外で変更されました", {
-          version: current.version,
-          text: current.text,
-        });
-        return;
+      let merged: string | null;
+      if (rebased) {
+        merged = merge3(baseText, text, current.text);
+        if (merged === null) {
+          sendApiError(response, 409, "外で変更されました", {
+            version: current.version,
+            text: current.text,
+          });
+          return;
+        }
+      } else {
+        merged = text;
       }
       let final: string;
       try {
-        final = set_front(text, {});
+        final = set_front(merged, {});
       } catch {
-        final = text;
+        final = merged;
       }
 
       let version = current.version;
@@ -1619,6 +1928,155 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         ...(rebased ? { text: final } : {}),
       });
     });
+  }
+
+  async function handleChunks(
+    request: IncomingMessage,
+    response: ServerResponse,
+    ws: LegacyWorkspace,
+    deck: string,
+    body: unknown,
+  ): Promise<void> {
+    if (!ws.has_deck(deck)) {
+      sendApiError(response, 404, "発表がありません");
+      return;
+    }
+    const state = stateFor(deck);
+    if (state.rendered === null) {
+      await renderDeck(ws, deck);
+    }
+    if (state.rendered === null) {
+      sendApiError(response, 409, "表示が古い");
+      return;
+    }
+    let rendered = state.rendered;
+    const version = state.version;
+    if (request.method === "GET" || request.method === "HEAD") {
+      const info = await chunkInfoFor(ws, deck, state, rendered, version);
+      sendJson(response, 200, {
+        version,
+        structure: rendered.doc.to_json(),
+        chunks: info,
+      });
+      return;
+    }
+
+    const values = recordBody(body);
+    const action = values.action;
+    if (action === "markdown") {
+      if (typeof values.html !== "string") {
+        sendApiError(response, 400, "操作が正しくありません");
+        return;
+      }
+      const original = values.original ?? "";
+      if (typeof original !== "string") {
+        sendApiError(response, 400, "操作が正しくありません");
+        return;
+      }
+      let html = values.html;
+      if (original) html = prepared_html(html, original);
+      const markdown = await to_markdown(html, original, {
+        pandocPath: options.pandocPath,
+        cwd: ws.deck_dir(deck),
+      });
+      sendJson(response, 200, { markdown });
+      return;
+    }
+
+    if (action === "cell") {
+      try {
+        if (typeof values.text !== "string" || typeof values.html !== "string") {
+          throw new ValueError("操作が正しくありません");
+        }
+        const markdown = await cell_markdown(values.html, {
+          pandocPath: options.pandocPath,
+          cwd: ws.deck_dir(deck),
+        });
+        const result = set_cell(
+          parse(values.text),
+          String(values.key),
+          integerField(values.row),
+          integerField(values.col),
+          markdown,
+        );
+        sendJson(response, 200, { text: result });
+      } catch (error) {
+        if (
+          error instanceof ValueError
+          || error instanceof TypeError
+        ) {
+          sendApiError(response, 400, error.message);
+          return;
+        }
+        throw error;
+      }
+      return;
+    }
+
+    let renderedVersion = version;
+    if (values.base !== version) {
+      const cached = typeof values.base === "string"
+        ? state.chunks.get(values.base)?.rendered
+        : undefined;
+      if (cached === undefined) {
+        sendApiError(response, 409, "表示が古いので、更新を待ってください");
+        return;
+      }
+      rendered = cached;
+      renderedVersion = values.base as string;
+    }
+    if (typeof values.text !== "string" || values.text !== rendered.doc.text) {
+      sendApiError(response, 409, "表示が古いので、更新を待ってください");
+      return;
+    }
+
+    try {
+      const doc: Doc = rendered.doc;
+      const key = String(values.key);
+      let result: string;
+      if (action === "html") {
+        const info = await chunkInfoFor(ws, deck, state, rendered, renderedVersion);
+        if (!info[key]?.direct) {
+          throw new ValueError("文字の編集対象が見つかりません");
+        }
+        const chunk = locate(doc, key)[1];
+        const original = cpSlice(doc.text, chunk.start, chunk.end);
+        if (typeof values.html !== "string") {
+          throw new TypeError("操作が正しくありません");
+        }
+        const markdown = await to_markdown(values.html, original, {
+          pandocPath: options.pandocPath,
+          cwd: ws.deck_dir(deck),
+        });
+        result = rewrite(doc, { [key]: markdown });
+      } else if (action === "delete") {
+        result = rewrite(doc, { [key]: "" });
+      } else if (action === "move") {
+        result = move_chunk(
+          doc,
+          key,
+          integerField(values.page),
+          typeof values.before === "string" ? values.before : null,
+        );
+      } else if (action === "image") {
+        const width = values.width === null || values.width === undefined
+          ? null
+          : integerField(values.width);
+        result = image_options(doc, key, width, String(values.align));
+      } else {
+        throw new ValueError("操作が正しくありません");
+      }
+      sendJson(response, 200, { text: result });
+    } catch (error) {
+      if (
+        error instanceof ValueError
+        || error instanceof TypeError
+      ) {
+        sendApiError(response, 400, error.message);
+        return;
+      }
+      throw error;
+    }
   }
 
   async function handleMemo(
@@ -1822,6 +2280,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       }
       switching = true;
       try {
+        const previous = workspace;
         const next = options.selectWorkspace === undefined
           ? null
           : await options.selectWorkspace();
@@ -1836,6 +2295,16 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         envCache = null;
         stopWatch();
         startWatch(next);
+        if (next !== previous && options.onWorkspaceChanged !== undefined) {
+          try {
+            await options.onWorkspaceChanged(next, previous);
+          } catch (error) {
+            // The switch has already been committed. The previous workspace is
+            // the caller's responsibility and the error must not redirect a
+            // successfully selected new workspace.
+            console.error("[legacy] workspace change callback failed", error);
+          }
+        }
         broadcast({ type: "workspace" });
         sendJson(response, 200, {
           root: next.root,
@@ -1866,8 +2335,16 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       }
       if (
         parsed === null
-        || (parsed.protocol !== "http:" && parsed.protocol !== "https:")
-        || parsed.hostname.length === 0
+        || (
+          parsed.protocol !== "http:"
+          && parsed.protocol !== "https:"
+          && parsed.protocol !== "mailto:"
+        )
+        || (
+          parsed.protocol === "mailto:"
+            ? parsed.pathname.trim().length === 0
+            : parsed.hostname.length === 0
+        )
         || typeof target !== "string"
         || /[\u0000-\u001f]/u.test(target)
       ) {
@@ -1989,6 +2466,17 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       }
       const deck = decodeName(deckSource[1] as string, "発表名");
       await handleDeckSource(response, ws, deck, recordBody(body));
+      return;
+    }
+
+    const deckChunks = /^\/api\/deck\/([^/]+)\/chunks$/u.exec(pathname);
+    if (deckChunks) {
+      if (method !== "GET" && method !== "HEAD" && method !== "POST") {
+        sendApiError(response, 405, "method not allowed");
+        return;
+      }
+      const deck = decodeName(deckChunks[1] as string, "発表名");
+      await handleChunks(request, response, ws, deck, body);
       return;
     }
 
@@ -2603,6 +3091,21 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     }
   }
 
+  /**
+   * Accepted request handlers own writes and must settle before shutdown
+   * callbacks run. A client disconnect or a tiny grace period must never let
+   * the workspace lock be released while one of those handlers is still
+   * writing. Render subprocesses have their own bounded timeout (and
+   * `close_pandoc` at the desktop boundary), so only background renders use
+   * the shorter drain below.
+   */
+  async function drainSettled(set: Set<Promise<unknown>>, label: string): Promise<void> {
+    while (set.size > 0) {
+      await Promise.allSettled([...set]);
+    }
+    void label;
+  }
+
   async function close(): Promise<void> {
     if (shutdownPromise !== undefined) return shutdownPromise;
     shutdownPromise = (async () => {
@@ -2615,7 +3118,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       endSse();
       // Track the handler promises themselves. A client disconnect fires
       // `response.close` while the handler may still be inside a write.
-      await drain(inflight, "admin requests");
+      await drainSettled(inflight, "admin requests");
       await drain(pendingRenders, "renders");
       admin.force();
       content.force();
