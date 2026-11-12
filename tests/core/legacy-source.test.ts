@@ -18,6 +18,7 @@ import {
   table_rows,
   unsupported,
   wrapped_source,
+  YAML_ALIAS_LIMIT,
   type Chunk,
 } from "../../packages/core/src/legacy-source.js";
 import { authors, html_block } from "../../packages/core/src/legacy-cover.js";
@@ -447,4 +448,143 @@ test("offsets use Python code-point positions across astral characters", () => {
   const jsonChunk = (jsonPage[0]!.chunks as Array<Record<string, unknown>>)[0]!;
   assert.equal(jsonChunk.text, "😀本文。");
   assert.equal(rewrite(doc, { "p0/0": "変更" }), "## A\n\n変更\n");
+});
+
+test("Python whitespace sets drive the parser regexes", () => {
+  // U+FEFF is JS whitespace but not Python whitespace, so this is not a math
+  // block start: Python splits it into two chunks.
+  const feffMath = "## A\n\n\uFEFF$$\na\n\nb\n$$";
+  const feffDoc = parse(feffMath);
+  assert.deepEqual(feffDoc.pages[0]!.chunks.map((chunk) => chunk.path), ["0", "1"]);
+  assert.ok(!wrapped_source(feffDoc)[0].includes("\\begin{gathered}"));
+
+  // U+0085 is Python whitespace but not JS whitespace, so this is one block.
+  const nelMath = "## A\n\n\u0085$$\na\n\nb\n$$";
+  const nelDoc = parse(nelMath);
+  assert.equal(nelDoc.pages[0]!.chunks.length, 1);
+  assert.ok(wrapped_source(nelDoc)[0].includes("\\begin{gathered}"));
+
+  // Attribute tokens use Python's whitespace boundaries in both directions.
+  assert.equal(parse_attrs("#a\u0085b").id, "a");
+  assert.equal(parse_attrs("#a\uFEFFb").id, "a\uFEFFb");
+
+  // Link definitions use Python's \S.
+  const defs = parse("## A\n\n[x]:\uFEFFhttps://example.com\n\n[y]:\u0085https://example.com\n");
+  assert.deepEqual(defs.pages[0]!.chunks.map((chunk) => chunk.kind), ["def", "text"]);
+
+  // Figure lines and arguments use Python's \s.
+  assert.deepEqual(fig_args("{{<\u0085fig x width=1 >}}"), { ref: "x", width: "1" });
+  assert.equal(fig_args("{{<\uFEFFfig x >}}"), null);
+});
+
+test("an empty columns div is opaque like the Python reference", () => {
+  const text = "## A\n\n::: {.columns}\n:::\n";
+  const doc = parse(text);
+  const chunk = doc.pages[0]!.chunks[0]!;
+  assert.equal(chunk.kind, "opaque");
+  assert.equal(chunk.container, false);
+
+  const [wrapped] = wrapped_source(doc);
+  assert.ok(wrapped.includes("::: {.columns}\n:::"));
+  assert.ok(!wrapped.includes("::: {.columns}\n\n:::"));
+});
+
+test("__proto__ keys are preserved as own properties", () => {
+  // JSON.parse creates a normal own "__proto__" data property, unlike an
+  // object literal (which would change the prototype).
+  const expectedKv = JSON.parse('{"__proto__":"x"}') as Record<string, string>;
+  const attrs = parse_attrs("__proto__=x");
+  assert.deepEqual(attrs.to_json(), { id: "", classes: [], kv: expectedKv });
+  assert.equal(Object.getPrototypeOf(attrs.kv), Object.prototype);
+  assert.ok(Object.prototype.hasOwnProperty.call(attrs.kv, "__proto__"));
+
+  const args = fig_args("{{< fig x __proto__=y >}}")!;
+  assert.equal(Object.getPrototypeOf(args), Object.prototype);
+  assert.ok(Object.prototype.hasOwnProperty.call(args, "__proto__"));
+  assert.equal(args["__proto__"], "y");
+  assert.deepEqual(Object.keys(args).sort(), ["__proto__", "ref"]);
+
+  const doc = parse("## A\n\n::: {__proto__=x}\ntext\n:::\n");
+  const chunk = doc.pages[0]!.chunks[0]!;
+  assert.equal(chunk.kind, "opaque");
+  const chunkAttrs = chunk.attrs!;
+  assert.ok(Object.prototype.hasOwnProperty.call(chunkAttrs.kv, "__proto__"));
+});
+
+test("front matter uses PyYAML 1.1 semantics", () => {
+  const duplicate = parse("---\na: 1\na: 2\n---\n\n## A\n");
+  assert.equal(duplicate.meta_error, "");
+  assert.equal(duplicate.meta.a, 2);
+
+  const scalars = parse(
+    "---\na: yes\nb: no\nc: on\nd: off\ne: 010\nf: 1e3\ng: 1:30\n---\n\n## A\n",
+  );
+  assert.equal(scalars.meta_error, "");
+  assert.deepEqual(scalars.meta, {
+    a: true,
+    b: false,
+    c: true,
+    d: false,
+    e: 8,
+    f: "1e3",
+    g: 90,
+  });
+
+  const merged = parse(
+    "---\nbase: &base\n  x: 1\n  z: 3\nchild:\n  <<: *base\n  y: 2\n---\n\n## A\n",
+  );
+  assert.equal(merged.meta_error, "");
+  assert.deepEqual(merged.meta.child, { x: 1, z: 3, y: 2 });
+
+  const dated = parse([
+    "---",
+    "date: 2024-11-12",
+    "stamp: 2024-11-12 01:30:00",
+    "tz: 2024-11-12T01:30:00+09:00",
+    "---",
+    "",
+    "## A",
+    "",
+  ].join("\n"));
+  assert.equal(dated.meta_error, "");
+  assert.equal(dated.meta.date, "2024-11-12");
+  assert.equal(dated.meta.stamp, "2024-11-12 01:30:00");
+  assert.equal(dated.meta.tz, "2024-11-12 01:30:00+09:00");
+
+  const unknown = parse("---\nx: !expr 1+1\n---\n\n## A\n");
+  assert.deepEqual(unknown.meta, {});
+  assert.match(unknown.meta_error, /front matter を読めません/u);
+  assert.match(unknown.meta_error, /!expr/u);
+
+  const notMap = parse("---\n- a\n---\n\n## A\n");
+  assert.deepEqual(notMap.meta, {});
+  assert.match(notMap.meta_error, /辞書ではありません/u);
+});
+
+test("front matter resolves many aliases but rejects alias bombs with a diagnostic", () => {
+  // More than the yaml package's default limit of 100 aliases must work.
+  const aliases = Array.from({ length: 150 }, () => "*a").join(", ");
+  const many = parse(`---\nbase: &a shared\nitems: [${aliases}]\n---\n\n## A\n`);
+  assert.equal(many.meta_error, "");
+  assert.equal((many.meta.items as unknown[]).length, 150);
+
+  const bomb = [
+    "a: &a [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
+    "b: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a, *a]",
+    "c: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b, *b]",
+    "d: &d [*c, *c, *c, *c, *c, *c, *c, *c, *c, *c]",
+    "items: [*d, *d]",
+  ].join("\n");
+  const rejected = parse(`---\n${bomb}\n---\n\n## A\n`);
+  assert.deepEqual(rejected.meta, {});
+  assert.match(rejected.meta_error, /別名/u);
+  assert.ok(rejected.meta_error.includes(String(YAML_ALIAS_LIMIT)));
+});
+
+test("locate reads adjacent Unicode decimal digit runs like Python int()", () => {
+  const doc = parse("## A\n\n本文。\n\n## B\n\n本文2。\n");
+  const [zeroPage, zeroChunk] = locate(doc, "p𝟘/0");
+  assert.equal(zeroPage.index, 0);
+  assert.equal(zeroChunk.path, "0");
+  assert.equal(locate(doc, "p𝟙/0")[0].index, 1);
 });

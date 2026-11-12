@@ -8,10 +8,17 @@
  * those code-point offsets; untouched text is returned verbatim.
  */
 
-import { parse as parseYaml } from "yaml";
+import {
+  parseDocument,
+  Scalar,
+  visit,
+  type ScalarTag,
+  type Tags,
+} from "yaml";
 import {
   authors,
   isPlainObject,
+  PY_WS,
   pyLstrip,
   pyRstrip,
   pyStrip,
@@ -26,6 +33,12 @@ export type { LegacyAuthor } from "./legacy-cover.js";
 // Python's `\w` covers Unicode letters/numbers plus "_"; JS `\w` is ASCII-only,
 // even with the `u` flag, so the patterns below spell out Python's character
 // set. Python's `\d` is likewise expressed as Unicode decimal digits.
+
+// Python's `\s` is `str.isspace()`, which differs from JavaScript's `\s` on
+// U+001C–U+001F and U+0085 (Python: whitespace) and U+FEFF (JavaScript only).
+// `PY_WS` is the character-class body; S/NS are the positive/negative classes.
+const S = `[${PY_WS}]`;
+const NS = `[^${PY_WS}]`;
 
 const W_INNER = String.raw`\p{L}\p{N}_`;
 const WH = String.raw`[${W_INNER}-]`;
@@ -49,43 +62,50 @@ export const DIV_CLOSE = new RegExp(String.raw`^ {0,3}:{3,}[ \t]*${END}`, "u");
 export const HEADING = new RegExp(String.raw`^(#{1,2})[ \t]+(${DOT}*?)[ \t]*${END}`, "u");
 export const ATTR_TAIL = new RegExp(String.raw`[ \t]*\{([^{}]*)\}[ \t]*${END}`, "u");
 export const FIG_LINE = new RegExp(
-  String.raw`^\{\{<\s*fig\s+(${DOT}*?)\s*>\}\}${END}`,
+  String.raw`^\{\{<${S}*fig${S}+(${DOT}*?)${S}*>\}\}${END}`,
   "u",
 );
 export const IMAGE_LINE = new RegExp(
   String.raw`^!\[[^\]]*\]\([^)]*\)(\{[^}]*\})?${END}`,
   "u",
 );
-export const FOOTNOTE_DEF = new RegExp(String.raw`^ {0,3}\[\^[^\]\s]+\]:`, "u");
-export const LINK_DEF = new RegExp(String.raw`^ {0,3}\[[^\]^][^\]]*\]:[ \t]*\S`, "u");
+export const FOOTNOTE_DEF = new RegExp(String.raw`^ {0,3}\[\^[^\]${PY_WS}]+\]:`, "u");
+export const LINK_DEF = new RegExp(String.raw`^ {0,3}\[[^\]^][^\]]*\]:[ \t]*${NS}`, "u");
 export const RAW_HTML = new RegExp(String.raw`^ {0,3}<(?:[A-Za-z]${WH}*|!--)`, "u");
 export const LIST_KIND = new RegExp(String.raw`^(?:([-*+])|${DIGIT}+([.)]))[ \t]`, "u");
 export const PAGE_ID = new RegExp(String.raw`^[a-z0-9][a-z0-9-]*${END}`, "u");
 export const BOX_KEYS = new Set(["style", "data-step"]);
 export const COVER_PARTS = new Set(["cover-title", "cover-subtitle"]);
-export const SHORTCODE = new RegExp(String.raw`\{\{<\s*(${WH}+)`, "gu");
+export const SHORTCODE = new RegExp(String.raw`\{\{<${S}*(${WH}+)`, "gu");
 export const CROSSREF = new RegExp(
   String.raw`(?<![${W_INNER}@])@(fig|tbl|sec|eq|lst|thm)-${WH}+`,
   "gu",
 );
 export const ATTR_TOKEN = new RegExp(
-  String.raw`#([^\s}]+)|\.([^\s}=]+)|([^\s=}]+)=(?:"((?:[^"\\]|\\${DOT})*)"|'([^']*)'|([^\s}]*))`,
+  String.raw`#([^${PY_WS}}]+)|\.([^${PY_WS}}=]+)|([^${PY_WS}=}]+)=(?:"((?:[^"\\]|\\${DOT})*)"|'([^']*)'|([^${PY_WS}}]*))`,
   "gu",
 );
 export const MATH_ENV = /\\(?:begin|end)\{/u;
-export const PURE_MATH = /(\s*\$\$)(.*?)(\$\$\s*)/su;
-export const TABLE_RULE = /\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*/u;
+export const PURE_MATH = new RegExp(String.raw`(${S}*\$\$)(.*?)(\$\$${S}*)`, "su");
+export const TABLE_RULE = new RegExp(
+  String.raw`${S}*\|?${S}*:?-+:?${S}*(?:\|${S}*:?-+:?${S}*)*\|?${S}*`,
+  "u",
+);
 export const CELL_PART = new RegExp(
   "\\\\" + DOT
     + "|(`+)" + DOT + "+?(?<!`)\\1(?!`)"
     + "|\\$\\$" + DOT + "+?\\$\\$"
-    + "|\\$(?!\\s)(?:\\\\" + DOT + "|[^$\\n])*?(?<!\\s)\\$(?!\\p{Nd})"
+    + "|\\$(?!" + S + ")(?:\\\\" + DOT + "|[^$\\n])*?(?<!" + S + ")\\$(?!\\p{Nd})"
     + "|</?[A-Za-z][^<>\\n]*>|\\|",
   "gu",
 );
-const CODE_EXEC = /(?:^|(?<=\n)) {0,3}`{3,}\s*\{(?!=)[\p{L}\p{N}_-]+/gu;
-const SINGLE_LINE_MATH = new RegExp(String.raw`^\s*\$\$${DOT}*\$\$\s*${END}`, "u");
-const TRAILING_MATH_BREAK = new RegExp(String.raw`\s*\\\\\s*${END}`, "u");
+const CODE_EXEC = new RegExp(
+  "(?:^|(?<=\\n)) {0,3}`{3,}" + S + "*\\{(?!=)[\\p{L}\\p{N}_-]+",
+  "gu",
+);
+const SINGLE_LINE_MATH = new RegExp(String.raw`^${S}*\$\$${DOT}*\$\$${S}*${END}`, "u");
+const TRAILING_MATH_BREAK = new RegExp(String.raw`${S}*\\\\${S}*${END}`, "u");
+const BLOCK_MATH_START = new RegExp(String.raw`^${S}*\$\$`, "u");
 const TRAILING_HASHES = new RegExp(String.raw`[ \t]+#+[ \t]*${END}`, "u");
 
 // ---------------------------------------------------------------- Unicode
@@ -161,10 +181,12 @@ function decimalDigitValue(code: number): number {
   const character = String.fromCodePoint(code);
   const isDigit = new RegExp(String.raw`^\p{Nd}$`, "u");
   if (!isDigit.test(character)) return 0;
-  // Unicode decimal digits form contiguous runs of ten values (0-9).
+  // Unicode decimal digits form contiguous runs of ten values (0-9), but
+  // several runs can be adjacent (e.g. U+1D7CE–U+1D7FF holds five runs).
+  // Python's int("𝟘") is 0, so reduce the offset within the run modulo 10.
   let start = code;
   while (start > 0 && isDigit.test(String.fromCodePoint(start - 1))) start -= 1;
-  return code - start;
+  return (code - start) % 10;
 }
 
 // ---------------------------------------------------------------- 属性
@@ -181,6 +203,21 @@ export class Attrs {
   }
 }
 
+/**
+ * Python dicts allow `__proto__` as an ordinary key. Plain JavaScript object
+ * assignment treats it as the prototype setter and silently drops it, so use
+ * an own data property. This keeps the object's prototype and JSON shape
+ * identical to a normal `{}` (important for `to_json()` and deep equality).
+ */
+function setOwnString(target: Record<string, string>, key: string, value: string): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+}
+
 export function parse_attrs(inner: string): Attrs {
   const attrs = new Attrs();
   for (const match of findAll(ATTR_TOKEN, inner)) {
@@ -194,7 +231,11 @@ export function parse_attrs(inner: string): Attrs {
         : match[5] !== undefined
           ? match[5]
           : match[6] ?? "";
-      attrs.kv[match[3]!] = value.replace(/\\"/gu, '"').replace(/\\\\/gu, "\\");
+      setOwnString(
+        attrs.kv,
+        match[3]!,
+        value.replace(/\\"/gu, '"').replace(/\\\\/gu, "\\"),
+      );
     }
   }
   return attrs;
@@ -424,13 +465,130 @@ const FRONT_MATTER = new RegExp(
   "su",
 );
 
+// The yaml package's 1.1 schema is close to PyYAML, but two scalar resolvers
+// differ in ways that change `meta`:
+//   - its bool tag accepts a bare y/n (PyYAML only accepts yes/no/true/false/on/off);
+//   - its EXP float tag accepts `1e3` (PyYAML requires a decimal point and a
+//     signed exponent, so `1e3` stays a string).
+// Replace those tags while keeping the rest of the 1.1 schema (merge,
+// sexagesimal ints, timestamps, octal, ...).
+const PYYAML_BOOL_TAG: ScalarTag = {
+  identify: (value) => typeof value === "boolean",
+  default: true,
+  tag: "tag:yaml.org,2002:bool",
+  test: /^(?:yes|Yes|YES|no|No|NO|true|True|TRUE|false|False|FALSE|on|On|ON|off|Off|OFF)$/u,
+  resolve: (source) => new Scalar(/^(?:yes|Yes|YES|true|True|TRUE|on|On|ON)$/u.test(source)),
+};
+
+const PYYAML_FLOAT_TAG: ScalarTag = {
+  identify: (value) => typeof value === "number",
+  default: true,
+  tag: "tag:yaml.org,2002:float",
+  format: "EXP",
+  test: /^(?:[-+]?(?:[0-9][0-9_]*)\.[0-9_]*|\.[0-9_]+)(?:[eE][-+][0-9]+)?$/u,
+  resolve: (source) => new Scalar(Number.parseFloat(source.replace(/_/gu, ""))),
+};
+
+function pyYamlTags(tags: Tags): Tags {
+  const kept = tags.filter((tag) => {
+    if (typeof tag === "string") return true;
+    if (tag.tag === "tag:yaml.org,2002:bool") return false;
+    return !(tag.tag === "tag:yaml.org,2002:float" && (tag as ScalarTag).format === "EXP");
+  });
+  return [...kept, PYYAML_BOOL_TAG, PYYAML_FLOAT_TAG];
+}
+
+/**
+ * PyYAML expands aliases without a practical limit, but unbounded expansion is
+ * a memory-exhaustion attack in a desktop app. 1000 is far above normal
+ * documents (including those with more than 100 aliases) while still rejecting
+ * exponential alias bombs.
+ */
+export const YAML_ALIAS_LIMIT = 1000;
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+/** Format a YAML 1.1 timestamp the way Python's `str(date/datetime)` does. */
+function pythonTimestampString(source: string): string | null {
+  const dateOnly = /^(\d{4})-(\d{1,2})-(\d{1,2})$/u.exec(source);
+  if (dateOnly) {
+    return `${dateOnly[1]}-${pad2(Number(dateOnly[2]))}-${pad2(Number(dateOnly[3]))}`;
+  }
+  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[Tt]|[ \t]+)(\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d*))?(?:[ \t]*(Z|([-+])(\d{1,2})(?::(\d{2}))?))?$/u
+    .exec(source);
+  if (!match) return null;
+
+  const fraction = (match[7] ?? "").slice(0, 6).padEnd(6, "0");
+  const microseconds = fraction ? Number(fraction) : 0;
+  let result = `${match[1]}-${pad2(Number(match[2]))}-${pad2(Number(match[3]))} `
+    + `${pad2(Number(match[4]))}:${pad2(Number(match[5]))}:${pad2(Number(match[6]))}`;
+  if (microseconds) result += `.${fraction}`;
+  if (match[8] === "Z") {
+    result += "+00:00";
+  } else if (match[9]) {
+    result += `${match[9]}${pad2(Number(match[10]))}:${pad2(Number(match[11] ?? "0"))}`;
+  }
+  return result;
+}
+
+/** Fallback for timestamps without their original source text. */
+function pythonTimestampFromDate(value: Date): string {
+  const date = `${String(value.getUTCFullYear()).padStart(4, "0")}-`
+    + `${pad2(value.getUTCMonth() + 1)}-${pad2(value.getUTCDate())}`;
+  const time = [value.getUTCHours(), value.getUTCMinutes(), value.getUTCSeconds()];
+  const milliseconds = value.getUTCMilliseconds();
+  if (time.every((part) => part === 0) && milliseconds === 0) return date;
+  const clock = time.map(pad2).join(":");
+  return milliseconds
+    ? `${date} ${clock}.${String(milliseconds).padStart(6, "0")}`
+    : `${date} ${clock}`;
+}
+
+/**
+ * `yaml` resolves 1.1 timestamps to `Date`, losing the date-vs-datetime and
+ * timezone text. Keep the source scalar and replace it with Python's `str()`
+ * form before converting the document to plain JS.
+ */
+function applyPythonTimestamps(document: ReturnType<typeof parseDocument>): void {
+  visit(document, {
+    Scalar(_key, node) {
+      const value = node.value;
+      if (!(value instanceof Date)) return;
+      node.value = node.source
+        ? pythonTimestampString(node.source) ?? pythonTimestampFromDate(value)
+        : pythonTimestampFromDate(value);
+    },
+  });
+}
+
+function yamlDiagnostics(document: ReturnType<typeof parseDocument>): string {
+  const messages = document.errors.map((error) => error.message);
+  for (const warning of document.warnings) {
+    if (warning.code === "TAG_RESOLVE_FAILED") messages.push(warning.message);
+  }
+  return messages.join("; ");
+}
+
 function frontMatter(text: string): [number, Record<string, unknown>, string] {
   if (!text.startsWith("---")) return [0, {}, ""];
   const match = FRONT_MATTER.exec(text);
   if (!match) return [0, {}, ""];
   const end = utf16ToCodePoint(text, match[0].length);
   try {
-    const loaded = parseYaml(match[1] ?? "");
+    // PyYAML's safe_load uses YAML 1.1: merge keys, yes/no booleans, octal,
+    // sexagesimal numbers, timestamps, and last-key-wins duplicates.
+    const document = parseDocument(match[1] ?? "", {
+      version: "1.1",
+      uniqueKeys: false,
+      prettyErrors: false,
+      customTags: pyYamlTags,
+    });
+    const diagnostics = yamlDiagnostics(document);
+    if (diagnostics) return [end, {}, `front matter を読めません: ${diagnostics}`];
+    applyPythonTimestamps(document);
+    const loaded: unknown = document.toJS({ maxAliasCount: YAML_ALIAS_LIMIT });
     // Python uses `yaml.safe_load(...) or {}`, so every falsey value becomes {}.
     const value = pyTruthy(loaded) ? loaded : {};
     if (!isPlainObject(value)) return [end, {}, "front matter が辞書ではありません"];
@@ -442,6 +600,13 @@ function frontMatter(text: string): [number, Record<string, unknown>, string] {
     }
     return [end, value, ""];
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Excessive alias count")) {
+      return [
+        end,
+        {},
+        `front matter を読めません: 別名（*）の展開回数が上限 ${YAML_ALIAS_LIMIT} を超えました`,
+      ];
+    }
     return [end, {}, `front matter を読めません: ${String(error)}`];
   }
 }
@@ -679,7 +844,7 @@ function blocks(lines: _Lines, scan: _Scan, start: number, end: number): Array<[
       }
       continue;
     }
-    if (/^\s*\$\$/u.test(value) && !SINGLE_LINE_MATH.test(value)) {
+    if (BLOCK_MATH_START.test(value) && !SINGLE_LINE_MATH.test(value)) {
       let close: number | null = null;
       for (let next = index + 1; next < end; next += 1) {
         if (lines.line(next).includes("$$")) {
@@ -760,7 +925,7 @@ function classify(lines: _Lines, scan: _Scan, first: number, last: number, path:
         );
         columns.push(column);
       }
-      if (validColumns) {
+      if (validColumns && columns.length > 0) {
         chunk.kind = "columns";
         chunk.children = columns;
         return chunk;
@@ -802,7 +967,7 @@ export function fig_args(line: string): Record<string, string> | null {
   const match = FIG_LINE.exec(pyStrip(line));
   if (!match) return null;
   const token = new RegExp(
-    String.raw`(${WH}+)=(?:"((?:[^"\\]|\\${DOT})*)"|'([^']*)'|(\S+))|("(?:[^"\\]|\\${DOT})*"|\S+)`,
+    String.raw`(${WH}+)=(?:"((?:[^"\\]|\\${DOT})*)"|'([^']*)'|(${NS}+))|("(?:[^"\\]|\\${DOT})*"|${NS}+)`,
     "gu",
   );
   const out: Record<string, string> = {};
@@ -813,11 +978,15 @@ export function fig_args(line: string): Record<string, string> | null {
     const bare = item[4] ?? "";
     const positional = item[5] ?? "";
     if (key) {
-      out[key] = (doubleQuoted || (!singleQuoted && !bare))
-        ? doubleQuoted
-        : singleQuoted || bare;
+      setOwnString(
+        out,
+        key,
+        (doubleQuoted || (!singleQuoted && !bare))
+          ? doubleQuoted
+          : singleQuoted || bare,
+      );
     } else if (!("ref" in out)) {
-      out.ref = positional.replace(/^"+|"+$/gu, "");
+      setOwnString(out, "ref", positional.replace(/^"+|"+$/gu, ""));
     }
   }
   return "ref" in out ? out : null;
@@ -1204,7 +1373,7 @@ export function image_options(
   let attrs = match ? match[1]! : "";
   const keys = width === null ? "fig-align" : "width|fig-align";
   attrs = pyStrip(attrs.replace(
-    new RegExp(String.raw`(?:^|\s)(?:${keys})=(?:"[^"]*"|'[^']*'|\S+)`, "gu"),
+    new RegExp(String.raw`(?:^|${S})(?:${keys})=(?:"[^"]*"|'[^']*'|${NS}+)`, "gu"),
     "",
   ));
   const base = match ? raw.slice(0, match.index) : raw;

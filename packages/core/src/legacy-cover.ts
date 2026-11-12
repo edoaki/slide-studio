@@ -56,7 +56,7 @@ function pyRepr(value: unknown): string {
 
 // Python's str.isspace() set. It is close to JS \s but deliberately excludes
 // U+FEFF (a JS whitespace character, not a Python one).
-const PY_WS = String.raw`\t\n\v\f\r \x1c-\x1f\x85\p{Z}`;
+export const PY_WS = String.raw`\t\n\v\f\r \x1c-\x1f\x85\p{Z}`;
 const PY_LSTRIP = new RegExp(String.raw`^[${PY_WS}]+`, "u");
 const PY_RSTRIP = new RegExp(String.raw`[${PY_WS}]+$`, "u");
 
