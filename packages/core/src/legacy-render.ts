@@ -877,7 +877,8 @@ export async function render_text(
   await ensureFigurePages(ws, deck, doc);
   const parsed = performance.now();
 
-  const result = await runLegacyPandoc(safeWrapped, folder, extra, origin, options.pandocPath);
+  // Theme samples are virtual decks; Pandoc still needs an existing cwd.
+  const result = await runLegacyPandoc(safeWrapped, existsSync(folder) ? folder : ws.root, extra, origin, options.pandocPath);
   const converted = performance.now();
 
   const missing = [...new Set(

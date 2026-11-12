@@ -487,7 +487,10 @@ export async function renderDeck(
         throw new Error(`deck.pdfSteps(${slide}) returned no steps`);
       }
 
-      for (const value of selected) {
+      const captureSteps = job.allSteps
+        ? await deadline.race(contents.executeJavaScript(`Array.from({length: deck.maxStep(${slide}) + 1}, (_, i) => i)`, true)) as number[]
+        : selected;
+      for (const value of captureSteps) {
         const step = Number(value);
         if (!Number.isInteger(step) || step < 0) {
           throw new Error(`deck.pdfSteps(${slide}) returned an invalid step: ${String(value)}`);
@@ -522,7 +525,7 @@ export async function renderDeck(
           screenshotFiles.push(relative);
         }
 
-        pdfPages.push(await deadline.race(contents.printToPDF({
+        if (job.pdf !== false && selected.includes(step)) pdfPages.push(await deadline.race(contents.printToPDF({
           printBackground: true,
           pageSize: { width: PDF_WIDTH_INCHES, height: PDF_HEIGHT_INCHES },
           margins: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -543,6 +546,7 @@ export async function renderDeck(
     }
 
     throwIfTracked();
+    if (job.pdf === false) return { slides: count, pdfPages: 0, steps, pdfFile: "", screenshotFiles };
     if (pdfPages.length === 0) throw new Error("no PDF steps were selected");
 
     const merged = await mergePdfPages(pdfPages);

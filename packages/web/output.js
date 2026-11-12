@@ -1,5 +1,5 @@
 // 書き出し前に全体を検査。エラー一覧を確認してから、そのまま書き出すこともできる。
-import { api, esc, onEvent } from './api.js';
+import { api, uploadFetch, esc, onEvent } from './api.js';
 import { renderIssues } from './checks.js';
 import { svg } from './icons.js';
 import { S } from './strings.js';
@@ -81,6 +81,19 @@ export function makeOutput(ctx) {
           return;
         }
         body.innerHTML = `<p class="done">${svg('check')}${S.buildDone}</p><div class="downloads">${result.files.map(f => `<a class="btn" href="${esc(f.url)}" download="${esc(f.name)}">${svg('download')}${esc(f.name)}</a>`).join('')}</div>`;
+        body.querySelectorAll('.downloads a').forEach(link => {
+          link.onclick = async event => {
+            event.preventDefault();
+            try {
+              const response = await uploadFetch(link.getAttribute('href'));
+              if (!response.ok) throw new Error((await response.json()).error || String(response.status));
+              const url = URL.createObjectURL(await response.blob());
+              const save = document.createElement('a'); save.href = url; save.download = link.download;
+              document.body.append(save); save.click(); save.remove();
+              setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (error) { body.textContent = error.message; body.classList.add('error'); }
+          };
+        });
         body.querySelector('.downloads a')?.click();
       } catch (err) { if (alive) { body.textContent = err.message; body.classList.add('error'); } }
       finally {

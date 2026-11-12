@@ -364,13 +364,13 @@ function validateWindowsName(value: string): void {
   }
 }
 
-function check_creation_name(value: unknown, what = "名前"): string {
+export function check_creation_name(value: unknown, what = "名前"): string {
   const name = check_name(value, what);
   validateWindowsName(name);
   return name;
 }
 
-function checkLookupName(value: unknown, what: string): string {
+export function checkLookupName(value: unknown, what: string): string {
   if (
     typeof value !== "string"
     || !value
@@ -2350,5 +2350,5 @@ const PORTABLE_README = `# スライドの保管フォルダ
 
 ## 書き出し
 
-Slide Studio のアプリ画面から HTML と PDF を書き出します。コマンドラインからの書き出しは準備中です。このフォルダに含まれる原稿・図・テーマは、アプリを入れていない環境でもテキストエディタで編集できます。
+Slide Studio のアプリ画面から HTML と PDF を書き出せます。ソース版では、そのリポジトリで \`npm run cli -- build <発表名> --root <このフォルダの絶対パス>\` を実行して書き出すこともできます。このフォルダに含まれる原稿・図・テーマは、アプリを入れていない環境でもテキストエディタで編集できます。
 `;

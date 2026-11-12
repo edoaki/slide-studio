@@ -1,19 +1,19 @@
 # Slide Studio
 
-従来のSlide Studioを、見た目・全機能・操作を保ったままElectronへ移植しています。現在は移植作業中で、従来版の代替として使える状態には達していません。途中で作成した簡易画面は採用せず、旧版の画面資産を引き継ぐ構成に修正しています。新しい作業ツリーにはPython・uvを必要としません。
+従来のSlide Studioの画面を使う、TypeScript・Electron版です。ソース起動、ブラウザー起動、インストール版で同じ編集画面と保存処理を使います。Python・uvは必要ありません。従来版との全機能・全操作の照合は継続中です。確認済みの範囲と残作業は [検証記録](docs/migration/full-parity-progress.json) に記録しています。
 
 ## アプリ版
 
 - macOS（Apple Silicon）：`Slide-Studio-0.1.0-mac-arm64.dmg` を開き、`Slide Studio.app` を Applications にコピーします。
 - Windows（x64）：`Slide-Studio-0.1.0-win-x64-Setup.exe` を実行します。
 
-インストーラーは下記のビルドコマンドで `release/` に生成します。現時点の生成物は簡易画面を含む途中の検証用で、完成版ではありません。macOSはアドホック署名、Windowsは未署名です。Apple Developer ID・公証、Windows署名、正式Releaseでの配布は未対応です。Windowsでの実行確認とIntel Macの検証はまだ行っていません。
+インストーラーは下記のビルドコマンドで `release/` に生成します。従来画面を組み込んだDMGをこのMacにインストールし、発表作成、下書き保存、直接編集、プレビュー、HTML／PDF書き出しを確認しています。macOSはアドホック署名、Windowsは未署名です。Apple Developer ID・公証、Windows署名、正式Releaseでの配布は未対応です。Windowsでの実行確認とIntel Macの検証はまだ行っていません。
 
 アプリにはPandocを同梱します。利用者によるNode.js・Python・uv・Pandocのインストールは不要です。
 
 ## ソースから起動
 
-Node.js 24.18.xとnpmを使います。移行中のコードは `migration/electron` ブランチにあります。
+Node.js 24.18.xとnpmを使います。移行中のコードは `migration/electron` ブランチにあります。この作業ツリーの最新の変更には、GitHubへ未反映のものがあります。下記の取得先とローカル版の検証状態を混同しないでください。
 
 ```sh
 git clone --branch migration/electron https://github.com/edoaki/slide-studio.git
@@ -24,7 +24,7 @@ npm start
 
 初回起動時にPandoc 3.9を公式配布元からダウンロードし、固定したSHA-256と照合します。依存関係とPandocの取得にはネット接続が必要です。その後の基本編集はローカルで動作します。
 
-起動後はサンプルを開くか、タイトルを入力して新しい発表を作成します。原稿を編集して保存し、HTML／PDFボタンから書き出せます。「保管フォルダ」で別の保存先に切り替えられます。
+ホーム画面の「新しい発表」から、タイトル、トピック、テーマを選んで作成します。原稿やスライド上の文字を編集すると保存され、上部の書き出しボタンからHTML／PDFを書き出せます。「保管フォルダ」で別の保存先に切り替えられます。
 
 既存フォルダを指定する場合：
 
@@ -32,7 +32,15 @@ npm start
 npm start -- --root /absolute/path/to/workspace
 ```
 
-現在のソース版と検証用アプリは同じ試作の編集処理を使います。従来版との同等性は未達です。既定の保存先は別で、macOSではそれぞれ `~/Library/Application Support/Slide Studio Dev` と `~/Library/Application Support/Slide Studio` の下に作成します。同じ保管フォルダを指定すれば原稿を共有できますが、同時に開くことはできません。
+ソース版とインストール版で同じ保管フォルダを指定すれば原稿を共有できます。同じフォルダの書き込みは一つのホストが管理します。起動中のアプリへのCLI検査・相談は、保管フォルダ内の要求ファイルを介して実行します。
+
+ブラウザーで同じ画面を開く場合：
+
+```sh
+npm run browser -- --root /absolute/path/to/workspace
+```
+
+描画・検査・PDF生成には同梱のElectronを使います。別のChromiumをダウンロードする必要はありません。
 
 ## インストーラーを作る
 
@@ -48,9 +56,24 @@ npm run dist:win
 ```sh
 npm test
 npm run typecheck
+npm run test:desktop:e2e
+npm run test:bridge:e2e
 ```
 
-描画用CLIは、素材を埋め込んだSlide Studio形式の単一HTMLを入力に取ります。ジョブJSONの入力・出力は絶対パス、出力先は未作成のディレクトリを指定します。
+発表の作成、従来原稿の取り込み、検査、書き出しには次のCLIを使います。
+
+```sh
+npm run cli -- new intro --topic research --root /absolute/path/to/workspace
+npm run cli -- import /absolute/path/to/slides --topic research --root /absolute/path/to/workspace
+npm run cli -- check intro --root /absolute/path/to/workspace
+npm run cli -- check --figure research/chart --root /absolute/path/to/workspace
+npm run cli -- build intro --root /absolute/path/to/workspace
+npm run cli -- --help
+```
+
+`build` はHTMLとPDFを書き出します。`--html-only` はHTMLだけを選び、`--force` は検査エラーがあっても書き出します。ただし、素材の欠落などで単一HTMLを作れない場合は停止します。AI用の `consult` と、画像・指摘の確認を記録する `audit` も同じCLIに含まれます。
+
+描画サービス単体の検証には、素材を埋め込んだSlide Studio形式の単一HTMLを使います。ジョブJSONの入力・出力は絶対パス、出力先は未作成のディレクトリを指定します。
 
 ```json
 {
@@ -66,11 +89,11 @@ npm run typecheck
 npm run render:spike -- --job /absolute/path/render-job.json
 ```
 
-PDF、各stepのPNG、検査結果の `manifest.json` を保存します。旧版のCLIコマンドすべてが使える状態ではありません。
+PDF、各stepのPNG、検査結果の `manifest.json` を保存します。
 
 ## 移行の状況とライセンス
 
-PDFの旧版との差分検証は継続中です。AI連携、履歴・復元、旧版の直接編集UIなども今回の完了条件に含めて移植を進めています。従来のPython版は `../slide-studio-old` の `legacy/python` ブランチ（基準コミット `ca1f148`）に保存しています。
+PDFの旧版との差分検証と、既存テスト全件との照合は継続中です。AI連携、履歴・復元、直接編集、素材・参考資料・文献・テーマ管理は同じホストに接続しています。実AIの全プロバイダーでの疎通を、テスト用の応答による検証だけで合格にはしていません。従来のPython版は `../slide-studio-old` の `legacy/python` ブランチ（基準コミット `ca1f148`）に保存しています。
 
 ソースは公開リポジトリで提供しますが、現行ライセンスはPolyForm Noncommercial 1.0.0で、OSI定義のOSSではありません。ライセンス変更は行っていません。同梱するPandocのライセンスとソース参照は [NOTICE.md](NOTICE.md) を参照してください。
 

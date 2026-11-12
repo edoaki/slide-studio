@@ -8,8 +8,6 @@ import { S } from './strings.js';
 import * as op from './block-ops.js';
 import * as nav from './block-nav.js';
 import { structureOf } from './structure.js';
-import { makeHandles } from './block-handles.js';
-import { makeDrag } from './block-drag.js';
 import { makeTextFormat, COLOR_CLASSES } from './text-format.js';
 import { tip } from './tip.js';
 import { decorationTools } from './decoration.js';
@@ -27,10 +25,11 @@ const PAD_ICON = { inner: 'padInner', outer: 'padOuter', gap: 'padGap' };
 // Stage 2 pushes this explicit keymap into the frame. Only plain navigation /
 // padding keys are consumed synchronously; modified keys (source writes) stay
 // in the parent and are not part of this lease.
-const BRIDGE_KEYMAP = Object.freeze(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyF', 'Escape']
-  .map(code => Object.freeze({
-    code, shift: false, alt: false, ctrl: false, meta: false, preventDefault: true,
-  })));
+const BRIDGE_KEYMAP = Object.freeze([
+ ...['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','Escape','Enter','Delete','Backspace'].map(code=>({code,shift:false,alt:false,ctrl:false,meta:false,preventDefault:true})),
+ ...['KeyW','KeyA','KeyS','KeyD'].flatMap(code=>[{code,shift:true,alt:false,ctrl:false,meta:false,preventDefault:true},{code,shift:false,alt:true,ctrl:false,meta:false,preventDefault:true}]),
+ ...[true,false].flatMap(shift=>[{code:'KeyZ',shift,alt:false,ctrl:false,meta:true,preventDefault:true},{code:'KeyZ',shift,alt:false,ctrl:true,meta:false,preventDefault:true}]),
+]);
 
 export function makeBlocks(ctx) {
   const viewport = ctx.root.querySelector('#viewport'), stage = ctx.root.querySelector('#stage'), msg = ctx.root.querySelector('#hintMsg');
@@ -62,9 +61,45 @@ export function makeBlocks(ctx) {
 
   // ------------------------------------------------------------ bridge (Stage 2)
   const bridgeEdit = () => ctx.preview.edit || null;
-  const legacyEdit = () => {
-    try { return ctx.preview.win?.slideStudioEdit || null; } catch { return null; }
+  let textLease = null, textSnapshot = null, textSequence = 0, textClient = null, offText = null, finishingText = Promise.resolve();
+  function attachText() {
+    const client = ctx.preview.client;
+    if (!client || client === textClient) return;
+    offText?.(); textClient = client;
+    client.on('text.heading',event=>{if(event.sourceVersion===frameSourceVersion()&&live())startHeading(event.point);});
+    offText = client.on('text.state', event => {
+      if (!session || event.lease !== textLease || event.sourceVersion !== frameSourceVersion() || event.sequence <= textSequence) return;
+      textSequence = event.sequence; textSnapshot = event.state;
+      if (event.kind === 'input') input(event.html);
+      else if (event.kind === 'cell') { moveCell(event.cell); }
+      else if (event.kind === 'finished') finishingText = finished(event.html, {created:event.created});
+      else if (event.kind === 'link') format.openLink();
+      format.update(); place();
+    });
+  }
+  async function textCommand(action, value, text) {
+    const result = await ctx.preview.client.request('text.command', {lease:textLease,action,value,text});
+    if (action !== 'linkState') { textSnapshot = result; format.update(); }
+    if (action === 'finish') await finishingText;
+    return result;
+  }
+  function beginText(key, html, opts = {}) {
+    attachText(); textLease = crypto.randomUUID(); textSequence = 0;
+    return ctx.preview.client.request('text.begin', {lease:textLease,sourceVersion:frameSourceVersion(),key,html,...opts,cells:data?.chunks[key]?.cells}).then(state => {textSnapshot=state;format.update();place();}).catch(error => {endSession();toast(error.message);});
+  }
+  const remoteText = {
+    start: (key,html,opts) => beginText(key,html,opts),
+    startHeading: point => beginText(null,'',{heading:true,point}),
+    cellAt: (key,point) => ctx.preview.client.request('text.cellAt',{key,point}),
+    finish: () => textCommand('finish'), focus: () => textCommand('focus'),
+    command: action => textCommand(action), color: value => textCommand('color',value),
+    size: value => textCommand('size',Number(value)), stepSize: value => textCommand('stepSize',value),
+    clearFormat: () => textCommand('clearFormat'), linkState: () => textCommand('linkState'),
+    setLink: (value,text) => textCommand('setLink',value,text),
+    formatState: () => textSnapshot?.format, align: () => textSnapshot?.align,
+    colors: () => textSnapshot?.colors ?? {}, create: (key,where) => beginText(key,'',{create:where}),
   };
+  const legacyEdit = () => ctx.preview.client ? remoteText : null;
   const frameSourceVersion = () => ctx.preview.edit?.sourceVersion ?? ctx.preview.sourceVersion ?? null;
   const knownKey = key => key == null ? null : (fresh() && op.find(st, key) ? key : null);
   let bridgeLayout = null;
@@ -169,29 +204,13 @@ export function makeBlocks(ctx) {
     }
   }
   function handleBridgeKey(intent) {
-    if (!intent.trusted || intent.isComposing) return;
-    // The Stage 2 keymap only contains unmodified navigation/padding keys.
-    // Any future forwarding that can write must additionally check live(),
-    // the current source revision and parent user activation before writing.
-    if (intent.mods.meta || intent.mods.ctrl || intent.mods.alt || intent.mods.shift) return;
-    if (intent.type === 'keyup') {
-      holdKey({ code: intent.code, type: 'keyup' });
-      return;
-    }
-    if (!selected || editing || readOnly) return;
-    if (intent.code === 'Escape') { select(null); return; }
-    if (HOLD[intent.code]) { holdKey({ code: intent.code, type: 'keydown' }); return; }
-    const dir = DIRS[intent.code];
-    if (dir) { moveSelection(dir); return; }
-    if (intent.code === 'KeyQ') {
-      const key = fresh() && nav.upKey(st, selected);
-      if (key) select(key);
-      return;
-    }
-    if (intent.code === 'KeyE') {
-      const key = fresh() && nav.downKey(st, selected, memory);
-      if (key) select(key);
-    }
+    if(!intent.trusted||intent.isComposing||intent.sourceVersion!==frameSourceVersion())return;
+    const event={...intent,shiftKey:intent.mods.shift,altKey:intent.mods.alt,ctrlKey:intent.mods.ctrl,metaKey:intent.mods.meta,target:document.body,preventDefault(){}};
+    if(intent.type==='keyup'){holdKey(event);return;}
+    if(!selected||editing||readOnly)return;
+    const writingKey=intent.mods.alt||intent.mods.shift||intent.mods.meta||intent.mods.ctrl||['Delete','Backspace','Enter'].includes(intent.key);
+    if(writingKey&&!live())return;
+    keydown(event);
   }
   ctx.preview.onEditLayout?.(handleBridgeLayout);
   ctx.preview.onEditIntent?.(handleBridgeIntent);
@@ -211,18 +230,67 @@ export function makeBlocks(ctx) {
   const frameKey = () => { const c = found()?.chunk, o = c && op.outer(c); return o && o !== c ? o.key : null; };
   let readOnly = false;
   const live = () => !readOnly && data && data.version === frameSourceVersion() && data.version === ctx.version && ctx.text === ctx.saved && !ctx.dirty && !ctx.conflict && !ctx.locked && ctx.renderOk;
-  const handles = makeHandles(viewport);
-  const format = makeTextFormat(() => ctx.preview.win, value => {
-    const s = session, el = ctx.preview.win?.document.querySelector('.slide-studio-editing');
-    if (!s || s.created || !el) return;
+  let blockClient=null, offBlock=null, blockSequence=0, configuredBlockVersion=null, lastDrop=null, dropSequence=0, blockGesture=false;
+  let externalStrip=null;
+  function outsideDrop(event) {
+    externalStrip?.classList.remove('drop');externalStrip=null;
+    if(event.phase==='cancel'||!knownKey(event.key))return;
+    const frame=ctx.preview.frame?.getBoundingClientRect();if(!frame)return;
+    const button=document.elementFromPoint(frame.left+event.point.x,frame.top+event.point.y)?.closest('#pagestrip button[data-index]');
+    if(!button)return;
+    const spec={pageEnd:ctx.preview.pageOfSlide(+button.dataset.index)};
+    if(!validOperation('move',event.key,spec)||!op.moves(ctx.text,st,event.key,spec))return;
+    if(event.phase==='drop')write(op.move(ctx.text,st,event.key,spec));
+    else {externalStrip=button;button.classList.add('drop');}
+  }
+  function validOperation(name,key,value) {
+    if(!knownKey(key))return false;
+    if(name==='setSize')return value===null||Number.isFinite(value)&&value>=0&&value<=100000;
+    if(name==='setPad'||name==='setSpace')return value===null||typeof value==='string'&&/^-?[0-9.]+px(?: -?[0-9.]+px){0,3}$/.test(value);
+    if(name==='setColumnWidths')return value===null||Array.isArray(value)&&value.length<=1000&&value.every(v=>Number.isFinite(v)&&v>=0&&v<=100);
+    if(name==='setCoverLayout')return value&&Object.entries(value).every(([k,v])=>['left','top','width','min-height'].includes(k)&&(v===null||typeof v==='string'&&/^-?[0-9.]+px$/.test(v)));
+    if(name==='setTextOptions')return value&&Object.entries(value).every(([k,v])=>k==='--table-cols'&&(v===null||typeof v==='string'&&/^[0-9. ]{1,10000}$/.test(v)));
+    if(name==='move')return value&&((knownKey(value.key)&&['before','after'].includes(value.side))||knownKey(value.into)||Number.isInteger(value.pageEnd)&&value.pageEnd>=0&&value.pageEnd<st.pages.length);
+    return false;
+  }
+  function configureBlocks(on=true) {
+    const client=ctx.preview.client;if(!client||!data||!st||data.version!==frameSourceVersion())return;
+    if(client!==blockClient){offBlock?.();blockClient=client;configuredBlockVersion=null;blockSequence=0;blockGesture=false;offBlock=client.on('block.intent',event=>{
+      if(!live()||!fresh()||event.sourceVersion!==frameSourceVersion()||event.sequence<=blockSequence)return;
+      blockSequence=event.sequence;
+      if(event.kind==='gesture')blockGesture=event.active;
+      if(event.kind==='outside')outsideDrop(event);
+      if(event.kind==='select'&&knownKey(event.key))select(event.key);
+      if(event.kind==='operation'&&validOperation(event.name,event.key,event.value))write(op[event.name](ctx.text,st,event.key,event.value));
+      if(event.kind==='padded')padded(event.padKind,event.value);
+      if(event.kind==='layout')place();
+    });}
+    const sourceVersion=frameSourceVersion(),payload={sourceVersion,key:on?knownKey(selected):null,live:!!live()&&fresh()&&!editing,color:layerColor(selected)||'#2167a8',padMode:padNow()};
+    if(configuredBlockVersion!==sourceVersion){payload.text=data.structure.text??ctx.saved;payload.structure=data.structure;}
+    client.request('block.configure',payload).then(()=>{configuredBlockVersion=sourceVersion;}).catch(()=>{});
+  }
+  const handles={clear:()=>configureBlocks(false),get dragging(){return blockGesture;},destroy:()=>offBlock?.()};
+  const format = makeTextFormat(() => null, value => {
+    const s = session;
+    if (!s || s.created) return;
     s.align = value; s.sent = null;
-    el.style.textAlign = value;
-    input(el.outerHTML);
-  });
-  const drag = makeDrag(viewport, {
-    env: () => ({ win: ctx.preview.win, frame: ctx.preview.frame, preview: ctx.preview, st, selected, live: !!live() && fresh() && !editing }),
-    select: key => select(key), commit: r => write(r),
-  });
+    textCommand('align',value).catch(error=>toast(error.message));
+  }, remoteText);
+  const drag = {
+    get dragging(){return blockGesture;},
+    attach:()=>configureBlocks(),
+    cancel(){const was=blockGesture;blockGesture=false;externalStrip?.classList.remove('drop');externalStrip=null;ctx.preview.client?.request('block.cancel',{}).catch(()=>{});return was;},
+    async newAt(x,y){
+      const seq=++dropSequence,fr=ctx.preview.frame?.getBoundingClientRect();if(!fr||!live())return null;
+      const button=document.elementFromPoint(x,y)?.closest('#pagestrip button[data-index]');
+      if(button)return {spec:{pageEnd:ctx.preview.pageOfSlide(+button.dataset.index)}};
+      if(x<fr.left||x>fr.right||y<fr.top||y>fr.bottom){this.clearNew();return null;}
+      const target=await ctx.preview.client.request('block.dropAt',{x:x-fr.left,y:y-fr.top});
+      if(seq!==dropSequence)return null;lastDrop=target;return target;
+    },
+    clearNew(){dropSequence++;lastDrop=null;ctx.preview.client?.request('block.clear',{}).catch(()=>{});},
+    destroy(){this.clearNew();},
+  };
 
   const coverAuthors = makeCoverAuthors(viewport, {
     ctx, live: () => !!live() && !busy && !editing,
@@ -276,6 +344,8 @@ export function makeBlocks(ctx) {
   }
   // 新しい表示を読み込んだらすぐにクリックを受け付ける（ブロックの情報は後から届いた時点で反映する）
   function attach() {
+    attachText();
+    ctx.preview.client?.request('edit.themeValues',{}).then(values=>{cachedTheme=values;draw();}).catch(()=>{});
     configureFrame();
     bridgeSelect();
     designing();
@@ -303,8 +373,7 @@ export function makeBlocks(ctx) {
     if (c && op.isPadWrap(c)) key = c.children[0].key;
     if ((text || point?.lineEnd) && again && key && key === selected && c?.kind === 'text') {
       const info = data?.chunks[key];
-      const at = info?.cells && point ? ctx.preview.win?.slideStudioEdit?.cellAt(key, point) : null;
-      if (info?.cells ? armed === key && at && info.cells[at.r]?.[at.c]?.direct : info?.direct) { start(key, point); return; }
+      if (info?.cells ? armed === key && point : info?.direct) { start(key, point); return; }
     }
     // 別のブロックへ移ったら余白のつまみはやめる（書いたあとに選び直すときは続ける）
     // 描き直したあとに選び直す予定（follow）より、押して選んだブロックを優先する
@@ -361,8 +430,8 @@ export function makeBlocks(ctx) {
     legacyEdit()?.start(key, data.chunks[key].html, { plain: cover, point }); draw();
   }
   // 表はセルごとに直す。対応するセルがない場合は表の編集画面を開く
-  function startCell(key, point) {
-    const w = legacyEdit(), at = point && w?.cellAt(key, point);
+  async function startCell(key, point) {
+    const w = legacyEdit(), at = point && await w?.cellAt(key, point);
     if (!at) return;
     const info = data.chunks[key].cells[at.r]?.[at.c];
     if (!info?.direct) { const f = found(); ctx.plugins.some(p => p.enterBlock?.(f.chunk, ctx.text.slice(f.chunk.start, f.chunk.end))); return; }
@@ -510,9 +579,9 @@ export function makeBlocks(ctx) {
       anchor = col ? col.key : o.key;
       make = (md, s) => op.addColumn(ctx.text, s, key, side, md);
     }
-    if (!w.create(anchor, where)) return;
     editing = true; ctx.preview.defer = true;
     session = { created: true, make };
+    await w.create(anchor, where);
     addEventListener('pointerdown', outside, true);
     draw();
   }
@@ -648,8 +717,8 @@ export function makeBlocks(ctx) {
       const size = document.createElement('input');
       size.type = 'number'; size.min = '8'; size.max = '200'; size.step = '1'; size.className = 'fmt-size';
       tip(size, S.fmt.size); size.disabled = disabled;
-      const w = ctx.preview.win, part = op.coverPart(c), el = w?.slideStudioEdit?.elements(part.key)?.[0];
-      if (el) size.value = String(Math.round(parseFloat(w.getComputedStyle(el).fontSize)));
+      const part = op.coverPart(c), shown = bridgeGeometry(part.key)?.fontSize;
+      if (shown) size.value = String(Math.round(shown));
       const key = selected;
       const change = () => {
         if (!size.value || !size.checkValidity()) return;
@@ -666,16 +735,15 @@ export function makeBlocks(ctx) {
     if (op.canStep(c) && !cover) {
       const change = options => queue(s => write(op.setStep(ctx.text, s, selected, options)));
       const choices = op.stepChoices(ctx.text, st, selected);
-      choices.number = k => ctx.preview.win?.deck?.stageNumber(k);
-      bar.append(sep(), stepTools(button, choices, change, disabled, k => ctx.preview.win?.slideStudioEdit?.markStep(k)));
+      choices.number = k => ctx.preview.api?.stageNumber(k);
+      bar.append(sep(), stepTools(button, choices, change, disabled, k => ctx.preview.client?.request('edit.markStep',{step:k??null}).catch(()=>{})));
     }
     if (c.kind === 'text') {
       const alignBase = alignBaseOf(c);
       bar.append(alignButton(button, op.textOptions(c, alignBase).align, align => queue(s => write(op.setTextOptions(ctx.text, s, selected, { align, alignBase }))), disabled));
     }
     if (op.isTable(ctx.text, c)) {
-      const options = op.tableOptions(c), table = ctx.preview.win?.slideStudioEdit?.table(selected);
-      const shown = table ? parseFloat(ctx.preview.win.getComputedStyle(table).fontSize) : 0;
+      const options = op.tableOptions(c), shown = bridgeGeometry(selected)?.fontSize ?? 0;
       const set = values => queue(s => write(op.setTextOptions(ctx.text, s, selected, values)));
       bar.append(sep(), tableTools(button, {
         size: parseFloat(options['--table-size']) || shown, bold: !!options['--table-weight'], custom: Object.keys(options).length > 0,
@@ -722,24 +790,15 @@ export function makeBlocks(ctx) {
   // デザインの色と太さはテーマの変数。動かしている間はスライドの :root にだけ当て、確定するとテーマの CSS に書く
   const themeName = () => ctx.structure?.meta.theme || 'default';
   let themeSaving = Promise.resolve();
-  let drawnTheme = '';
-  function designThemeValues() {
-    const win = ctx.preview.win, root = win?.getComputedStyle(win.document.documentElement);
-    return Object.fromEntries(DESIGN_VARS.map(k => [k, root?.getPropertyValue(k).trim() || '']));
-  }
+  let drawnTheme = '', cachedTheme = {};
+  function designThemeValues() { return cachedTheme; }
   function designTheme() {
     const values = designThemeValues();
     drawnTheme = JSON.stringify(values);
     return {
       name: themeName(), locked: false,
       values,
-      preview: updates => { const r = ctx.preview.win?.document.documentElement; for (const [k, v] of Object.entries(updates)) {
-        r?.style.setProperty(k, v);
-        if (/^--block-(quote|bracket|fold)-line$/.test(k)) {
-          const m = v.match(/^([\d.]+px) \w+ (#[\da-f]{8})$/i), stem = k.replace(/-line$/, '');
-          if (m) { r?.style.setProperty(`${stem}-accent`, m[2]); r?.style.setProperty(`${stem}-width`, m[1]); }
-        }
-      } drawnTheme = JSON.stringify(designThemeValues()); },
+      preview: updates => { cachedTheme = {...cachedTheme,...updates}; ctx.preview.client?.request('edit.themePreview',{values:updates}).catch(()=>{}); drawnTheme = JSON.stringify(cachedTheme); },
       save: updates => { themeSaving = themeSaving.then(() => saveTheme(updates)); },
     };
   }
@@ -752,7 +811,7 @@ export function makeBlocks(ctx) {
     return r;
   }
   async function saveTheme(updates) {
-    const name = themeName(), clear = () => { for (const k of Object.keys(updates)) { const style = ctx.preview.win?.document.documentElement.style; style?.removeProperty(k); if (/^--block-(quote|bracket|fold)-line$/.test(k)) { style?.removeProperty(k.replace(/-line$/, '-accent')); style?.removeProperty(k.replace(/-line$/, '-width')); } } };
+    const name = themeName(), clear = () => ctx.preview.client?.request('edit.themePreview',{values:Object.fromEntries(Object.keys(updates).map(k=>[k,null]))}).catch(()=>{});
     try {
       const r = await putTheme(name, { vars: updates });
       const at = css => async () => { await putTheme(name, { css }); draw(); };
@@ -765,30 +824,13 @@ export function makeBlocks(ctx) {
   function union(key) {
     return bridgeUnion(key);
   }
-  function editingRect() {
-    if (!editing) return null;
-    try {
-      const ed = ctx.preview.win?.document?.querySelector('.slide-studio-editing');
-      return ed ? ed.getBoundingClientRect() : null;
-    } catch { return null; }
-  }
+  function editingRect() { return editing ? textSnapshot?.rect ?? null : null; }
   // 今のつまみ：押している R・F、カーソルを合わせたボタン、押したボタンの順
   function padNow() {
     const side = hold ?? peek ?? (padMode ? padSide : null);
     return side === 'inner' && found()?.chunk.kind === 'columns' ? 'gap' : side;
   }
-  function drawHandles() {
-    if (editing || !selected) { handles.clear(); return; }
-    // Stage 3 handles still perform direct frame DOM work. They are not
-    // migrated in this stage; don't call them against a cross-origin frame.
-    if (!ctx.preview.edit) { handles.clear(); return; }
-    try {
-      handles.draw({
-        win: ctx.preview.win, frame: ctx.preview.frame, st, key: selected, kind: found()?.chunk.kind, color: layerColor(selected),
-        padMode: padNow(), ended: mode => { if (mode !== padNow()) place(); }, live: !!live() && fresh() && !busy, write: r => write(r), padded,
-      });
-    } catch { handles.clear(); }
-  }
+  function drawHandles() { configureBlocks(!editing && !!selected); }
   // 選んだブロック（編集中はその文字）の上、入らなければ下に置く。座標はスライドの iframe の中から取る
   function place() {
     if (session?.heading) { bar.hidden = true; handles.clear(); return; }
@@ -898,7 +940,7 @@ export function makeBlocks(ctx) {
       select(c ? op.inner(c).key : null);
     }, keydown,
     destroy() {
-      dead = true; clearTimeout(session?.timer); removeEventListener('pointerdown', outside, true);
+      offText?.(); dead = true; clearTimeout(session?.timer); removeEventListener('pointerdown', outside, true);
       removeEventListener('keydown', onKey, true); removeEventListener('keyup', onKey, true); removeEventListener('blur', onBlur);
       removeEventListener('pointerdown', rememberPress, true); removeEventListener('pointercancel', cancelPress, true);
       resize.disconnect(); removeEventListener('click', away); bar.remove(); coverAuthors.destroy(); handles.destroy(); drag.destroy(); format.destroy(); delete stage.dataset.blocks;

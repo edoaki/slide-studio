@@ -20,6 +20,8 @@ npm run test:renderer
 |---|---|
 | デスクトップ起動・ネイティブダイアログ | `apps/desktop/` |
 | ローカルHTTP API | `apps/server/` |
+| GUIと同じ保存処理を使うCLI | `apps/cli/`、`scripts/cli.mjs` |
+| AIの通信・実行管理・ログイン・取得と更新 | `packages/ai/` |
 | 原稿・保存・Pandoc変換 | `packages/core/` |
 | 編集画面 | `packages/web/` |
 | 共通契約 | `packages/contracts/` |
@@ -32,7 +34,7 @@ npm run test:renderer
 | 出力先の保護・atomic write | `packages/renderer/src/output.ts` |
 | 一時プロファイルを管理するランチャー | `scripts/migration/render-spike.mjs` |
 | ビルド資産のコピー | `scripts/build-renderer.mjs` |
-| 単体・実機テスト | `tests/renderer/` |
+| 単体・HTTP・実機テスト | `tests/core/`、`tests/ai/`、`tests/desktop/`、`tests/bridge/`、`tests/renderer/`、`tests/e2e/` |
 | 比較用の原稿・図・単一HTML | `tests/fixtures/` |
 
 ## 検証
@@ -57,7 +59,13 @@ SLIDE_STUDIO_RENDERER_E2E=1 npm run test:renderer
 - 見た目に関わる変更は利用者の確認前に「確認待ち」とする。
 - 実装担当・レビュー担当の運用は [移行計画](docs/electron-migration-plan.md) に従う。
 
-デスクトップの実機テストは `SLIDE_STUDIO_DESKTOP_E2E=1 npm run test:desktop:e2e` で実行します。`SLIDE_STUDIO_TEST_APP` にインストール済みアプリの実行ファイルを指定すると、同じテストをアプリ版に対して実行できます。
+デスクトップの操作テストは `npm run test:desktop:e2e` で実行します。macOSではChromeを使うブラウザー版の操作テストも含みます。`SLIDE_STUDIO_TEST_APP` にインストール済みアプリの実行ファイル、またはmacOSの `.app` を指定すると、`legacy-workflow.test` と `desktop.test` をインストール版に対して実行できます。他のテストはソース版を対象とします。
+
+```sh
+SLIDE_STUDIO_TEST_APP="$HOME/Applications/Slide Studio.app" node --test dist/tests/e2e/legacy-workflow.test.js dist/tests/e2e/desktop.test.js
+```
+
+テストは一時フォルダに原稿とプロファイルを作り、通常の保管フォルダを変更しません。AIの単体テストはテスト用プロセスを使います。実AIへの推論リクエストは送信しません。公式CLIの取得確認と、Codexサンドボックス内からの検査依頼は別の検証として記録します。
 
 ## Python版との比較
 

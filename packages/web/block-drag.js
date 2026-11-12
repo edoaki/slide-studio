@@ -6,14 +6,14 @@ import * as op from './block-ops.js';
 const START = 4; // 持つまでに動かす距離（px）
 
 // env()：{ win, frame, st, selected, live }。select(key)、commit(result)
-export function makeDrag(host, { env, select, commit }) {
+export function makeDrag(host, { env, select, commit, apply, outside }) {
   const layer = document.createElement('div');
   layer.className = 'bd-layer'; host.append(layer);
   let press = null, drag = null, doc = null, strip = null;
 
   const inside = (r, x, y) => r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
   const rectOf = (w, key) => {
-    const rs = (w.slideStudioEdit?.elements(key) || []).map(e => e.getBoundingClientRect()).filter(r => r.width || r.height);
+    const rs = ((env().edit ?? w.slideStudioEdit)?.elements(key) || []).map(e => e.getBoundingClientRect()).filter(r => r.width || r.height);
     if (!rs.length) return null;
     return { left: Math.min(...rs.map(r => r.left)), top: Math.min(...rs.map(r => r.top)), right: Math.max(...rs.map(r => r.right)), bottom: Math.max(...rs.map(r => r.bottom)) };
   };
@@ -86,29 +86,29 @@ export function makeDrag(host, { env, select, commit }) {
   }
   function down(e) {
     const { win: w, st, selected, live } = env();
-    if (e.button || e.metaKey || e.ctrlKey || !live || w.document.querySelector('.slide-studio-editing')) return;
+    if (!e.isTrusted || e.button || e.metaKey || e.ctrlKey || !live || w.document.querySelector('.slide-studio-editing')) return;
     const el = e.target.closest?.('[data-slide-studio]');
     const sel = selected && inside(rectOf(w, selected), e.clientX, e.clientY) ? selected : null;
-    const key = sel || (el && w.slideStudioEdit.leafAt(el, e.clientX, e.clientY).dataset.slideStudio);
+    const key = sel || (el && (env().edit ?? w.slideStudioEdit).leafAt(el, e.clientX, e.clientY).dataset.slideStudio);
     if (!key) return;
     press = { key, x: e.clientX, y: e.clientY, id: e.pointerId, target: e.target };
   }
   function move(e) {
-    if (!press) return;
+    if (!e.isTrusted || !press) return;
     if (!drag) {
       if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < START) return;
       const { win: w, selected } = env();
       drag = { key: press.key, target: null };
       const cover = op.coverPart(op.find(env().st, press.key)?.chunk);
       if (cover) {
-        const el = w.slideStudioEdit.elements(cover.key)[0], cs = w.getComputedStyle(el);
+        const el = (env().edit ?? w.slideStudioEdit).elements(cover.key)[0], cs = w.getComputedStyle(el);
         drag.cover = { el, style: el.getAttribute('style'), left: parseFloat(cs.left) || 0, top: parseFloat(cs.top) || 0,
           scale: w.document.querySelector('#stage').getBoundingClientRect().width / 1280 };
       }
       if (selected !== press.key) select(press.key);
       host.dataset.operating = '';
       try { press.target.setPointerCapture?.(press.id); } catch { /* 取れなくても動かせる */ }
-      w.slideStudioEdit.elements(op.outer(op.find(env().st, drag.key)?.chunk || {}).key || drag.key).forEach(x => x.classList.add('slide-studio-drag-src'));
+      (env().edit ?? w.slideStudioEdit).elements(op.outer(op.find(env().st, drag.key)?.chunk || {}).key || drag.key).forEach(x => x.classList.add('slide-studio-drag-src'));
     }
     e.preventDefault();
     if (drag.cover) {
@@ -118,9 +118,13 @@ export function makeDrag(host, { env, select, commit }) {
       return;
     }
     const fr = env().frame.getBoundingClientRect();
-    const outside = e.clientX < 0 || e.clientY < 0 || e.clientX > fr.width || e.clientY > fr.height;
-    const s = outside ? stripAt(e) : null;
-    drag.target = s ? { strip: s.strip, spec: { pageEnd: env().preview.pageOfSlide(s.index) } } : outside ? null : dropAt(e.clientX, e.clientY, drag.key);
+    const isOutside = e.clientX < 0 || e.clientY < 0 || e.clientX > fr.width || e.clientY > fr.height;
+    if (outside) {
+      drag.external = isOutside ? {x:e.clientX,y:e.clientY} : null;
+      outside(isOutside ? 'move' : 'cancel', drag.key, {x:e.clientX,y:e.clientY});
+    }
+    const s = isOutside && !outside ? stripAt(e) : null;
+    drag.target = s ? { strip: s.strip, spec: { pageEnd: env().preview.pageOfSlide(s.index) } } : isOutside ? null : dropAt(e.clientX, e.clientY, drag.key);
     if (drag.target?.spec?.pageEnd == null && drag.target?.strip) drag.target = null;
     if (drag.target && !op.moves(env().st.text, env().st, drag.key, drag.target.spec)) drag.target = null;
     show(drag.target);
@@ -130,17 +134,18 @@ export function makeDrag(host, { env, select, commit }) {
     if (!d) return;
     delete host.dataset.operating;
     env().win.document.querySelectorAll('.slide-studio-drag-src').forEach(x => x.classList.remove('slide-studio-drag-src'));
-    env().win.slideStudioEdit.swallowClick();
+    (env().edit ?? env().win.slideStudioEdit).swallowClick();
     show(null);
+    if (outside && d.external) outside(ok ? 'drop' : 'cancel', d.key, d.external);
     if (d.cover) {
       const c = d.cover;
-      if (ok && c.values) { const { st } = env(); commit(op.setCoverLayout(st.text, st, d.key, c.values)); }
+      if (ok && c.values) { const { st } = env(); if(apply)apply('setCoverLayout',d.key,c.values);else commit(op.setCoverLayout(st.text, st, d.key, c.values)); }
       else if (c.style == null) c.el.removeAttribute('style'); else c.el.setAttribute('style', c.style);
       return;
     }
     if (ok && d.target) {
       const { st } = env(), r = op.move(st.text, st, d.key, d.target.spec);
-      if (r && !r.error) commit(r);
+      if (r && !r.error) { if(apply)apply('move',d.key,d.target.spec);else commit(r); }
     }
   }
   const up = () => end(true), cancel = () => end(false);
@@ -150,7 +155,7 @@ export function makeDrag(host, { env, select, commit }) {
     newAt(x, y) {
       const { win: w, frame, st, live } = env();
       let target = null;
-      if (live && w?.slideStudioEdit && st) {
+      if (live && w && (env().edit ?? w.slideStudioEdit) && st) {
         const fr = frame.getBoundingClientRect();
         if (inside(fr, x, y)) target = dropAt(x - fr.left, y - fr.top, null);
         else { const s = stripAt({ clientX: x, clientY: y }, true); if (s) target = { strip: s.strip, spec: { pageEnd: env().preview.pageOfSlide(s.index) } }; }

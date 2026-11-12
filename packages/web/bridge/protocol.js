@@ -1,3 +1,4 @@
+import { DESIGN_VARS } from '../block-design.js';
 // Shared, dependency-free contract for the staged secure preview bridge.
 // This file is the runtime half of packages/contracts/src/edit-bridge.ts. Keep
 // the protocol string and message shapes in sync; the TypeScript contract is
@@ -6,7 +7,7 @@ export const PROTOCOL = 'slide-studio-edit/1';
 
 export const EVENT_TYPES = Object.freeze([
   'ready', 'deckchange', 'layout', 'key', 'link.open', 'failure',
-  'edit.layout', 'edit.intent',
+  'edit.layout', 'edit.intent', 'text.state', 'text.heading', 'cover.intent', 'block.intent',
 ]);
 
 // Stage 1 only forwards presentation keys. Keep this an allowlist; do not
@@ -17,7 +18,7 @@ export const KEY_ALLOWLIST = Object.freeze(['Escape', 'f']);
 // HTML, JavaScript, selectors, filesystem paths or an arbitrary remote URL.
 export const COMMAND_METHODS = Object.freeze([
   'go', 'move', 'jump', 'goStage', 'resize', 'setFilter', 'theme.swap', 'finish', 'pageWheel',
-  'edit.configure', 'edit.select', 'edit.hover', 'edit.designing', 'edit.measure', 'edit.locks',
+  'edit.configure', 'edit.select', 'edit.hover', 'edit.designing', 'edit.measure', 'edit.locks', 'edit.issues', 'edit.markStep', 'text.begin', 'text.command', 'text.cellAt', 'edit.themeValues', 'edit.themePreview', 'cover.inspect', 'cover.configure', 'cover.select', 'block.configure', 'block.dropAt', 'block.clear', 'block.cancel',
 ]);
 
 const MAX_SLIDES = 10000;
@@ -147,6 +148,7 @@ export function validateSnapshot(value, expected) {
   if (!value.slides.every(validSlide)) return false;
   if (typeof value.background !== 'string' || value.background.length > 512) return false;
   if (!isFiniteNumber(value.scale) || value.scale < 0 || value.scale > 1000) return false;
+  if (value.hasReferences !== undefined && !isBoolean(value.hasReferences)) return false;
   if (value.sourceVersion !== undefined && !isSafeString(value.sourceVersion, { max: 4096 })) return false;
   if (value.stageAt !== undefined && !isFiniteInteger(value.stageAt, 0, MAX_STEPS)) return false;
   if (value.stageNumbers !== undefined) {
@@ -173,6 +175,7 @@ export function parseSnapshot(value, expected) {
       return slide;
     }),
   };
+  if (value.hasReferences !== undefined) snapshot.hasReferences = value.hasReferences;
   if (value.sourceVersion !== undefined) snapshot.sourceVersion = value.sourceVersion;
   if (value.stageAt !== undefined) snapshot.stageAt = value.stageAt;
   if (Array.isArray(value.stageNumbers)) {
@@ -203,6 +206,38 @@ function validNullableKey(value) {
 
 function validEditLayer(value) {
   return EDIT_LAYER_VALUES.includes(value);
+}
+
+function validEditEnvelope(data) {
+  return isRecord(data) && isSafeString(data.sourceVersion,{max:256}) && isFiniteInteger(data.sequence,1);
+}
+function validCoverState(state) {
+  if (!isRecord(state) || !validateEditRect(state.rect) || !isRecord(state.values) || !isRecord(state.formats)) return false;
+  if (!['left','top'].every(k => Number.isFinite(state[k]) && Math.abs(state[k]) <= MAX_EDIT_COORD)) return false;
+  if (!['size','affSize'].every(k => isRecord(state.formats[k]) && Number.isFinite(state.formats[k].size) && state.formats[k].size > 0 && state.formats[k].size <= 10000 && isBoolean(state.formats[k].bold))) return false;
+  return Object.entries(state.values).every(([k,v]) => {
+    if (k === 'position') return ['bottom','left','right'].includes(v);
+    if (k === 'font' || k === 'affFont') return ['','sans','serif','mono'].includes(v);
+    if (k === 'bold' || k === 'affBold') return isBoolean(v);
+    if (k === 'x' || k === 'y') return Number.isFinite(v) && Math.abs(v) <= MAX_EDIT_COORD;
+    return ['size','affSize'].includes(k) && Number.isFinite(v) && v > 0 && v <= 10000;
+  });
+}
+function validTextState(state) {
+  if (state === null) return true;
+  if (!isRecord(state) || !validateEditRect(state.rect) || !['left','center','right','justify','start','end'].includes(state.align)) return false;
+  if (typeof state.html !== 'string' || state.html.length > 1000000 || !isRecord(state.colors) || !isRecord(state.format)) return false;
+  return Object.keys(state.colors).length <= 5 && Object.values(state.colors).every(v=>typeof v==='string'&&v.length<=1024)
+    && Number.isFinite(state.format.px) && state.format.px > 0 && state.format.px <= 10000 && isBoolean(state.format.bold) && isBoolean(state.format.italic);
+}
+function validBlockIntent(data) {
+  if (!validEditEnvelope(data) || data.trusted !== true) return false;
+  if (data.kind === 'layout') return true;
+  if (data.kind === 'gesture') return isBoolean(data.active);
+  if (data.kind === 'outside') return ['move','drop','cancel'].includes(data.phase) && isEditKey(data.key) && isRecord(data.point) && Number.isFinite(data.point.x) && Number.isFinite(data.point.y) && Math.abs(data.point.x)<100000 && Math.abs(data.point.y)<100000;
+  if (data.kind === 'select') return isEditKey(data.key);
+  if (data.kind === 'padded') return ['columns','box','text','image','fig','column'].includes(data.padKind) && (data.value===null || typeof data.value==='string' && /^-?[0-9.]+px(?: -?[0-9.]+px){0,3}$/.test(data.value));
+  return data.kind === 'operation' && isEditKey(data.key) && ['setSize','setPad','setSpace','setColumnWidths','setCoverLayout','setTextOptions','move'].includes(data.name) && JSON.stringify(data).length < 100000;
 }
 
 export function validateEditRect(value) {
@@ -247,6 +282,7 @@ export function parseEditLayout(value) {
     blocks: value.blocks.map(block => ({
       key: block.key,
       align: block.align,
+      ...(Number.isFinite(block.fontSize) ? {fontSize:block.fontSize} : {}),
       rects: block.rects.map(rect => ({
         left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
       })),
@@ -385,6 +421,32 @@ export function validateParams(method, params) {
         && isFiniteInteger(params.deltaMode, 0, 2)
         && isBoolean(params.shiftKey) && isBoolean(params.altKey)
         && isBoolean(params.ctrlKey) && isBoolean(params.metaKey);
+    case 'block.configure': return isSafeString(params.sourceVersion,{max:256}) && validNullableKey(params.key) && isBoolean(params.live) && ['inner','outer','gap',null].includes(params.padMode) && typeof params.color === 'string' && /^(?:#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s]+\))$/.test(params.color) && (params.structure == null || isRecord(params.structure) && typeof params.text === 'string' && params.text.length <= 2000000 && JSON.stringify(params.structure).length < 4000000);
+    case 'block.dropAt': return ['x','y'].every(k=>Number.isFinite(params[k])&&Math.abs(params[k])<1000000);
+    case 'block.clear': case 'block.cancel': return Object.keys(params).length === 0;
+    case 'cover.inspect': return Object.keys(params).length === 0;
+    case 'cover.configure': return isBoolean(params.enabled);
+    case 'cover.select': return isBoolean(params.selected);
+    case 'edit.themeValues': return Object.keys(params).length === 0;
+    case 'edit.themePreview': return isRecord(params.values) && Object.keys(params.values).length <= 100 && Object.entries(params.values).every(([k,v]) => DESIGN_VARS.includes(k) && (v === null || typeof v === 'string' && v.length <= 1024 && !/[;{}]|url\s*\(/i.test(v)));
+    case 'text.begin':
+      return isSafeString(params.lease, {max:128}) && isSafeString(params.sourceVersion, {max:256})
+        && (params.heading === true || validNullableKey(params.key)) && typeof params.html === 'string' && params.html.length <= 1000000
+        && (params.point == null || ['x','y'].every(k => Number.isFinite(params.point[k]) && Math.abs(params.point[k]) < 1000000))
+        && (params.cell == null || ['r','c'].every(k => Number.isInteger(params.cell[k]) && params.cell[k] >= 0 && params.cell[k] < 10000))
+        && (params.create == null || ['before','after','start','end','col-before','col-after','wrap-left','wrap-right'].includes(params.create))
+        && (params.cells == null || JSON.stringify(params.cells).length <= 1000000);
+    case 'text.cellAt':
+      return validNullableKey(params.key) && params.point && ['x','y'].every(k => Number.isFinite(params.point[k]));
+    case 'text.command':
+      if (!isSafeString(params.lease, {max:128})) return false;
+      if (['finish','focus','bold','italic','clearFormat','linkState'].includes(params.action)) return true;
+      if (params.action === 'color') return params.value == null || /^(?:#[0-9a-fA-F]{3,8}|accent|good|warn|highlight)$/.test(params.value);
+      if (params.action === 'size') return Number.isFinite(params.value) && params.value > 0 && params.value <= 1000;
+      if (params.action === 'stepSize') return params.value === -1 || params.value === 1;
+      if (params.action === 'align') return ['left','center','right','justify'].includes(params.value);
+      if (params.action === 'setLink') return (params.value == null || isSafeString(params.value, {allowEmpty:true,max:8192})) && (params.text == null || isSafeString(params.text, {allowEmpty:true,max:100000}));
+      return false;
     case 'edit.configure':
       return validateEditConfigure(params);
     case 'edit.select':
@@ -393,6 +455,9 @@ export function validateParams(method, params) {
       return validNullableKey(params.key);
     case 'edit.designing':
       return isBoolean(params.active);
+    case 'edit.markStep': return params.step === null || Number.isSafeInteger(params.step) && params.step >= 0 && params.step <= 10000;
+    case 'edit.issues':
+      return Array.isArray(params.rects) && params.rects.length <= 256 && params.rects.every(r => r && ['x','y','w','h'].every(k => Number.isFinite(r[k]) && Math.abs(r[k]) < 1000000)) && ['error','warning'].includes(params.level);
     case 'edit.locks':
       return Array.isArray(params.figures) && params.figures.length <= 10000
         && params.figures.every(key => isSafeString(key, { max: 4096 }))
@@ -483,6 +548,10 @@ export function validateEvent(value, expected) {
     return isBoolean(data.mods.shift) && isBoolean(data.mods.alt)
       && isBoolean(data.mods.ctrl) && isBoolean(data.mods.meta);
   }
+  if (value.event === 'block.intent') return validBlockIntent(value.data);
+  if (value.event === 'cover.intent') return validEditEnvelope(value.data) && value.data.trusted === true && ['select','layout','commit'].includes(value.data.kind) && validCoverState(value.data.state);
+  if (value.event === 'text.heading') return isRecord(value.data) && value.data.trusted === true && isSafeString(value.data.sourceVersion,{max:256}) && isRecord(value.data.point) && ['x','y'].every(k=>Number.isFinite(value.data.point[k]));
+  if (value.event === 'text.state') return validEditEnvelope(value.data) && validTextState(value.data.state) && isSafeString(value.data.lease, {max:128}) && isSafeString(value.data.sourceVersion, {max:256}) && Number.isSafeInteger(value.data.sequence) && ['input','selection','finished','cell','link'].includes(value.data.kind) && (value.data.html == null || typeof value.data.html === 'string' && value.data.html.length <= 1000000) && JSON.stringify(value.data).length <= 1500000;
   if (value.event === 'edit.layout') return validateEditLayout(value.data);
   if (value.event === 'edit.intent') return validateEditIntent(value.data);
   // layout data is intentionally opaque in stage 1; it is still identity

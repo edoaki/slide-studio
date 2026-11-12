@@ -1,0 +1,87 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "integer"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "item",
+          "ok",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "questions": {
+      "type": "array",
+      "description": "利用者に選んでもらう確認（1回に3つまで）。無ければ空の配列。",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "integer",
+            "description": "どの指示についての確認か（指示の番号。1件だけなら 1）"
+          },
+          "text": {
+            "type": "string",
+            "description": "質問の文"
+          },
+          "options": {
+            "type": "array",
+            "description": "選択肢（2〜4個）",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": "選択肢の短い名前"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "選ぶとどうなるか（短く。無ければ空文字）"
+                }
+              },
+              "required": [
+                "label",
+                "description"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "multiple": {
+            "type": "boolean",
+            "description": "複数選べるなら true"
+          }
+        },
+        "required": [
+          "item",
+          "text",
+          "options",
+          "multiple"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "summary",
+    "results",
+    "questions"
+  ],
+  "additionalProperties": false
+}

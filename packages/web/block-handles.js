@@ -12,6 +12,7 @@ export function makeHandles(host) {
   const layer = document.createElement('div');
   layer.className = 'bh-layer'; host.append(layer);
   let env = null, drag = null, placed = [];
+  const commit = (name,key,value) => env.apply ? env.apply(name,key,value) : env.write(op[name](env.st.text,env.st,key,value));
 
   const scale = () => { const s = env.win.document.querySelector('#stage'); return s ? s.getBoundingClientRect().width / 1280 : 1; };
   // iframe の中の位置を host の中の位置にする
@@ -20,7 +21,7 @@ export function makeHandles(host) {
     const fr = env.frame.getBoundingClientRect(), hr = host.getBoundingClientRect();
     return { left: fr.left - hr.left + r.left, top: fr.top - hr.top + r.top, width: r.width, height: r.height };
   };
-  const els = key => env.win.slideStudioEdit?.elements(key) || [];
+  const els = key => (env.edit ?? env.win.slideStudioEdit)?.elements(key) || [];
   // 選択の枠の線（outline）の中心を囲む矩形。余白の包みの中の段落は、枠を出している包みの線
   const union = list => {
     const rs = list.map(e => {
@@ -48,7 +49,7 @@ export function makeHandles(host) {
     const h = document.createElement('div');
     h.className = `bh ${cls}`; h.setAttribute('role', 'slider'); h.setAttribute('aria-label', label); h.title = label;
     h.addEventListener('pointerdown', e => {
-      if (e.button) return;
+      if (!e.isTrusted || e.button) return;
       e.preventDefault(); e.stopPropagation();
       h.setPointerCapture(e.pointerId); h.classList.add('on'); host.dataset.operating = '';
       const up = () => end(true), wins = [window, env.win].filter(Boolean);
@@ -57,13 +58,13 @@ export function makeHandles(host) {
       drag = { x: e.clientX, y: e.clientY, s: scale(), move: onDrag(), h, off: () => { wins.forEach(w => w.removeEventListener('pointerup', up, true)); h.removeEventListener('lostpointercapture', up); } };
     });
     h.addEventListener('pointermove', e => {
-      if (drag?.h !== h) return;
+      if (!e.isTrusted || drag?.h !== h) return;
       if (!(e.buttons & 1)) { end(true); return; }
       drag.move.move((e.clientX - drag.x) / drag.s, (e.clientY - drag.y) / drag.s, e.shiftKey);
       relayout();
     });
     h.addEventListener('pointercancel', () => end(false));
-    h.addEventListener('dblclick', e => { e.preventDefault(); onReset(); });
+    h.addEventListener('dblclick', e => { if(!e.isTrusted)return;e.preventDefault(); onReset(); });
     layer.append(h);
     placed.push([h, at]);
     relayout();
@@ -95,10 +96,10 @@ export function makeHandles(host) {
             values = { width:px(Math.max(40, r.width / s + dx)), 'min-height':px(Math.max(0, r.height / s + dy)) };
             for (const [k, v] of Object.entries(values)) target.style.setProperty(k, v);
           },
-          done() { if (values) env.write(op.setCoverLayout(env.st.text, env.st, key, values)); },
+          done() { if (values) commit('setCoverLayout', key, values); },
           cancel() { if (original == null) target.removeAttribute('style'); else target.setAttribute('style', original); },
         };
-      }, () => env.write(op.setCoverLayout(env.st.text, env.st, key, { width:null, 'min-height':null })));
+      }, () => commit('setCoverLayout', key, { width:null, 'min-height':null }));
       return;
     }
     if (c.kind === 'image' || c.kind === 'fig') {
@@ -124,10 +125,10 @@ export function makeHandles(host) {
                 target.style.setProperty('--fig-height', `${v}px`);
               }
             },
-            done() { if (v != null) env.write(op.setSize(env.st.text, env.st, key, v)); },
+            done() { if (v != null) commit('setSize', key, v); },
             cancel() { if (originalStyle == null) target.removeAttribute('style'); else target.setAttribute('style', originalStyle); },
           };
-        }, () => env.write(op.setSize(env.st.text, env.st, key, null)));
+        }, () => commit('setSize', key, null));
       }
       // 図・画像でも列幅を変えられるよう、角に加えて左右の境目を出す。
     }
@@ -136,13 +137,13 @@ export function makeHandles(host) {
         const h0 = el.getBoundingClientRect().height / scale(); let v = null;
         return {
           move(dx, dy) { v = Math.max(MIN.box, Math.round(h0 + dy)); el.style.minHeight = `${v}px`; },
-          done() { if (v != null) env.write(op.setSize(env.st.text, env.st, key, v)); },
+          done() { if (v != null) commit('setSize', key, v); },
           cancel() { el.style.minHeight = ''; },
         };
-      }, () => env.write(op.setSize(env.st.text, env.st, key, null)));
+      }, () => commit('setSize', key, null));
       return;
     }
-    if (op.isTable(env.st.text, c)) { tableHandles(env.win.slideStudioEdit.table(env.key)); return; }
+    if (op.isTable(env.st.text, c)) { tableHandles((env.edit ?? env.win.slideStudioEdit).table(env.key)); return; }
     // 列、列の中のブロック：左右の辺で隣の列との幅の比
     if (c.kind === 'columns') return;
     const cols = op.columnsOf(env.st, key); if (!cols || cols.children.length < 2) return;
@@ -163,10 +164,10 @@ export function makeHandles(host) {
             ws = op.pushRatios(start, j, x0 + dx * s / row.width * 100, Math.min(10, Math.floor(100 / start.length)));
             colEls.forEach((e, k) => { if (e) { e.style.width = `${ws[k]}%`; e.style.flex = '0 1 auto'; } });
           },
-          done() { if (ws) env.write(op.setColumnWidths(env.st.text, env.st, key, ws)); },
+          done() { if (ws) commit('setColumnWidths', key, ws); },
           cancel() { colEls.forEach(e => { if (e) e.style.width = e.style.flex = ''; }); },
         };
-      }, () => env.write(op.setColumnWidths(env.st.text, env.st, key, null)));
+      }, () => commit('setColumnWidths', key, null));
     }
   }
 
@@ -183,7 +184,7 @@ export function makeHandles(host) {
       const cs = env.win.getComputedStyle(box);
       return box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     };
-    const save = () => { env.write(op.setTextOptions(env.st.text, env.st, key, { '--table-cols': null })); };
+    const save = () => { commit('setTextOptions', key, { '--table-cols': null }); };
     for (let j = 1; j <= n; j++) {
       const last = j === n;
       handle('table-col', last ? S.sizeHandle.tableEdge : S.sizeHandle.edge, () => {
@@ -204,7 +205,7 @@ export function makeHandles(host) {
             cells.forEach((td, k) => { td.style.width = `${ws[k]}px`; });
             styled.slice(1).forEach(td => { td.style.whiteSpace = 'normal'; });
           },
-          done() { if (ws) env.write(op.setTextOptions(env.st.text, env.st, key, { '--table-cols': ws.join(' ') })); },
+          done() { if (ws) commit('setTextOptions', key, { '--table-cols': ws.join(' ') }); },
           cancel() {
             styled.forEach((e, k) => { if (before[k] == null) e.removeAttribute('style'); else e.setAttribute('style', before[k]); });
             if (group && !group.isConnected) { if (table.caption) table.caption.after(group); else table.prepend(group); }
@@ -277,12 +278,12 @@ export function makeHandles(host) {
           done() {
             if (!changed) return;
             // 0で止まった操作や元へ戻した操作では、不要な余白の囲みを作らない。
-            if (current.some((v, i) => v !== pad[i])) env.write(op.setSpace(env.st.text, env.st, key, padCss(current)));
+            if (current.some((v, i) => v !== pad[i])) commit('setSpace', key, padCss(current));
             else apply(original);
           },
           cancel() { apply(original); current = [...pad]; show(); },
         };
-      }, () => env.write(op.setSpace(env.st.text, env.st, key, null)));
+      }, () => commit('setSpace', key, null));
     });
   }
   function padHandles(c) {
@@ -298,10 +299,10 @@ export function makeHandles(host) {
           let v = null;
           return {
             move(dx) { v = Math.max(0, Math.round(gap + 2 * dx)); el.style.setProperty('--gutter', `${v}px`); },
-            done() { if (v != null) { env.write(op.setPad(env.st.text, env.st, key, `${v}px`)); env.padded('columns', `${v}px`); } },
+            done() { if (v != null) { commit('setPad', key, `${v}px`); env.padded('columns', `${v}px`); } },
             cancel() { el.style.removeProperty('--gutter'); },
           };
-        }, () => env.write(op.setPad(env.st.text, env.st, key, null)));
+        }, () => commit('setPad', key, null));
         void n;
       });
       return;
@@ -388,11 +389,11 @@ export function makeHandles(host) {
           done() {
             if (!p) return;
             const value = padCss(p);
-            env.write(op.setPad(env.st.text, env.st, key, value)); env.padded(kind, value, p);
+            commit('setPad', key, value); env.padded(kind, value, p);
           },
           cancel() { restore(); current = [...pad]; show(pad); },
         };
-      }, () => env.write(op.setPad(env.st.text, env.st, key, null)));
+      }, () => commit('setPad', key, null));
     }
   }
 

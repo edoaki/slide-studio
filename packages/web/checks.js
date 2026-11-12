@@ -9,7 +9,7 @@ export function makeChecks(ctx) {
   const strip = ctx.root.querySelector('#pagestrip');
   const nextIssue = new Map();
   const issues = () => [...(state.result?.errors || []), ...(state.result?.warnings || [])];
-  function clear() { ctx.preview.win?.document.querySelectorAll('.slide-studio-check-box').forEach(n => n.remove()); }
+  function clear() { ctx.preview.client?.request('edit.issues', {rects:[],level:'warning'}).catch(() => {}); }
   // 問題のページ・step を開き、場所を枠（エラーは赤・警告は黄）で囲む（場所が無ければ撮った画像を出す）。
   // 書き出しの一覧から開くときは、その検査の結果を result で渡す
   async function show(x, result = state.result) {
@@ -23,16 +23,7 @@ export function makeChecks(ctx) {
     await ctx.preview.go(x.slide, x.step || 0);
     if (!alive || result?.version?.qmd !== ctx.version || result === state.result && state.stale) return;
     clear();
-    const d = ctx.preview.win?.document;
-    if (!d) return;
-    // 場所は書き出しと同じ 1280×720 の座標なので、同じ大きさで縮めて置かれる #stage の中に描く
-    const stage = d.getElementById('stage') || d.body;
-    for (const r of x.rects || []) {
-      const n = d.createElement('div'); n.className = 'slide-studio-check-box';
-      Object.assign(n.style, {position: 'absolute', left: `${r.x - 3}px`, top: `${r.y - 3}px`, width: `${r.w + 6}px`, height: `${r.h + 6}px`, boxSizing: 'border-box',
-        border: `3px solid ${x.level === 'error' ? '#dc2626' : '#d97706'}`, borderRadius: '3px', pointerEvents: 'none', zIndex: '99999'});
-      stage.append(n);
-    }
+    await ctx.preview.client?.request('edit.issues', {rects:x.rects || [],level:x.level === 'error' ? 'error' : 'warning'});
     if (x.image && !x.rects?.length) {
       const img = document.createElement('img'); img.className = 'check-issue-image'; img.alt = x.message;
       img.src = `/files/.slide-studio/build/${encodeURIComponent(ctx.deck)}/${x.image}?v=${result.checked_at}`;

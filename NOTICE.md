@@ -6,4 +6,6 @@ The desktop application includes Pandoc 3.9 as a separate executable. Pandoc is 
 
 Electron and Chromium notices are included in the packaged application's license resources. Third-party JavaScript dependencies retain their own license files in node_modules within app.asar.
 
+The native AI runtime downloader uses node-tar 7.5.23 (ISC license) to extract verified release archives. Its license and dependency licenses are included with the packaged JavaScript modules. AI executables are downloaded from their respective official publishers into user data; they are not relicensed as Slide Studio code.
+
 The macOS internal test build uses ad-hoc signing, not Developer ID signing or notarization. The Windows installer is unsigned. No automatic updates or remote publishing are enabled.

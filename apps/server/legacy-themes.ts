@@ -55,6 +55,7 @@ export class LegacyThemes {
     contentOrigin: () => string;
     changed?: (ws: Workspace, name: string) => void;
     locked?: (ws: Workspace, name: string) => boolean;
+    shots?: (ws:Workspace,name:string)=>void;
   }) {}
   #css(ws: Workspace, name: string): string {
     const path = resolveExistingInside(ws.root, join(ws.themes,`${check_name(name,'テーマ')}.css`),'テーマ');
@@ -71,9 +72,10 @@ export class LegacyThemes {
   }
   detail(ws: Workspace, name: string): Record<string,unknown> {
     const css = this.#css(ws,name), original = ws.theme_default(name);
+    const shots=this.#shots(ws,name,css);if(!shots.length)this.options.shots?.(ws,name);
     const decks = ws.list_decks().filter(deck=>ws.deck_theme(deck)===name);
     return { name, vars: read_vars(css), version: sha256(css), modified: original===null?null:css!==original,
-      removable: name!=='default'&&!decks.length, shots:this.#shots(ws,name,css),locked:!!this.options.locked?.(ws,name),decks };
+      removable: name!=='default'&&!decks.length, shots,locked:!!this.options.locked?.(ws,name),decks };
   }
   handle(ws: Workspace, request: LegacyFeatureRequest): Promise<LegacyFeatureResponse|null> {
     if (!/^\/api\/themes(?:\/[^/]+)?$/u.test(request.pathname)) return Promise.resolve(null);

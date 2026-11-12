@@ -14,6 +14,8 @@ import { reset_cover_positions } from "../../apps/server/legacy-themes.js";
 import { parse } from "../../packages/core/src/legacy-source.js";
 import { sha256 } from "../../packages/core/src/source.js";
 import { Workspace } from "../../packages/core/src/legacy-workspace.js";
+import { Providers, type ProviderStatus } from "../../packages/ai/src/providers.js";
+import type { Runner } from "../../packages/ai/src/workflow.js";
 import {
   startLegacyHost,
   type LegacyHost,
@@ -162,6 +164,8 @@ async function launch(
     maxSourceBodyBytes?: number;
     maxUploadBodyBytes?: number;
     shutdownGraceMs?: number;
+    aiProviders?: Providers;
+    aiRunner?: Runner;
   } = {},
 ): Promise<HostFixture> {
   const workspace = await createWorkspace(t);
@@ -182,6 +186,8 @@ async function launch(
     maxUploadBodyBytes: overrides.maxUploadBodyBytes,
     shutdownGraceMs: overrides.shutdownGraceMs,
     onShutdown: overrides.onShutdown,
+    aiProviders: overrides.aiProviders,
+    aiRunner: overrides.aiRunner,
   });
   t.after(async () => host.close());
   return { host, workspace, uiDirectory };
@@ -474,8 +480,9 @@ test("dispatches feature routes before the generic POST action and never fakes s
   assert.equal(check.status, 501);
   assert.equal((check.json as { feature: string }).feature, "check");
   assert.equal(host.handoff.status, "in_progress");
-  assert.ok(host.pending.includes("library"));
-  assert.ok(host.pending.includes("ai"));
+  assert.ok(host.handoff.implemented.includes("library"));
+  assert.ok(host.handoff.implemented.includes("ai"));
+  assert.ok(host.pending.includes("checks"));
 });
 
 test("streams authenticated SSE and closes the stream on shutdown", async (t) => {
@@ -1016,4 +1023,58 @@ test('materials API uploads binary files, opens locally, moves, deletes and rest
   assert.equal((await op('move',{path:'結果',to:'../bad'})).status,400);
   assert.equal((await op('chmod',{})).status,404);
   assert.equal((await adminRequest(host,'/api/deck/missing/materials')).status,404);
+});
+
+test('original chat API sends a memo, guards its edits, reviews, and restores the snapshot', async t => {
+  class FixtureProviders extends Providers {
+    override async detectAll(): Promise<ProviderStatus[]> {
+      return [{id:'codex',name:'Fixture',ok:true,reason:'',message:'',default:'test',models:[{id:'test',name:'Fixture',efforts:['medium'],effort:'medium',context:100000}]}];
+    }
+  }
+  let entered!: () => void, release!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const {host,workspace} = await launch(t, {
+    aiProviders: new FixtureProviders(join(tmpdir(), 'unused-fixture-ai')),
+    aiRunner: async (_id, ws, options) => {
+      if (options.role === 'review') return {final:{summary:'確認済み',issues:[]}};
+      entered(); await gate;
+      await writeFile(ws.memo('deck-1'),'# 作成した下書き\n');
+      options.onEvent({session:'fixture-session'});
+      return {final:{reply:'下書きを作成しました',slides:'この内容を3枚にする',rebuild:false,questions:[]}};
+    },
+  });
+  workspace.new_deck('deck-1','topic');
+  const memoBefore=await adminRequest(host,'/api/deck/deck-1/memo');
+  const originalMemo=memoBefore.json as {text:string;version:string};
+  const base='/api/deck/deck-1/chat';
+  const initial=await adminRequest(host,base);
+  assert.equal(initial.status,200);
+  const state=initial.json as {tabs:Array<{id:string;mode:string}>};
+  const tab=state.tabs.find(t=>t.mode==='memo')!;
+  const sent=await adminRequest(host,`${base}/tabs/${tab.id}/send`,{method:'POST',json:{base:originalMemo.version,items:[{key:'memo',text:'下書きを作る'}]}});
+  assert.equal(sent.status,200,sent.text);
+  const rid=(sent.json as {id:string}).id;
+  await started;
+  try {
+    const locked=await adminRequest(host,'/api/deck/deck-1/memo',{method:'PUT',json:{base:sha256(''),text:'競合する編集'}});
+    assert.equal(locked.status,409);
+    const manage=await adminRequest(host,'/api/home/manage',{method:'POST',json:{action:'delete',deck:'deck-1'}});
+    assert.equal(manage.status,409);
+  } finally { release(); }
+  let completed: {rounds:Array<{id:string;state:string;handoff?:{pending:boolean}}>}|undefined;
+  for(let attempt=0;attempt<100;attempt++) {
+    completed=(await adminRequest(host,base)).json as typeof completed;
+    if(completed!.rounds[0]?.state==='done')break;
+    await new Promise(resolve=>setTimeout(resolve,10));
+  }
+  assert.equal(completed!.rounds[0]?.state,'done');
+  assert.equal(completed!.rounds[0]?.handoff?.pending,true);
+  const preview=await adminRequest(host,`${base}/rounds/${rid}/restore`);
+  assert.equal(preview.status,200,preview.text);
+  assert.deepEqual((preview.json as {files:string[]}).files,['decks/deck-1/memo.md']);
+  const restored=await adminRequest(host,`${base}/rounds/${rid}/restore`,{method:'POST',json:{}});
+  assert.equal(restored.status,200,restored.text);
+  assert.equal(await readFile(workspace.memo('deck-1'),'utf8'),originalMemo.text);
+  await host.close();
 });

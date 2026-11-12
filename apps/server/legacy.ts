@@ -22,9 +22,11 @@ import {
   open,
   readFile,
   realpath,
+  readdir,
   stat,
 } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type {
   LegacyFeatureHandler,
   LegacyFeatureRequest,
@@ -61,10 +63,23 @@ import {
 } from "../../packages/core/src/source.js";
 import {
   TEMPLATES,
+  THEME_VARIABLES,
+  theme_variables,
   check_name,
+  checkLookupName,
   set_front,
   type Workspace,
 } from "../../packages/core/src/legacy-workspace.js";
+import { LegacyOutput } from "./legacy-output.js";
+import type { LegacyInspect } from "../../packages/contracts/src/legacy-output.js";
+import * as aiRoles from "../../packages/core/src/legacy-ai-roles.js";
+import * as deckManage from "../../packages/core/src/legacy-deck-manage.js";
+import { LegacyChat } from "./legacy-chat.js";
+import type { Providers } from "../../packages/ai/src/providers.js";
+import type { Runner } from "../../packages/ai/src/workflow.js";
+import { RequestBridge } from "../../packages/ai/src/bridge.js";
+import * as audit from "./legacy-audit.js";
+import { LegacyInsertion } from "./legacy-insertion.js";
 import { handleAssets } from "./legacy-assets.js";
 import { handleMaterials } from "./legacy-materials.js";
 import { MAX_BYTES as MATERIALS_MAX_BYTES } from "../../packages/core/src/legacy-materials.js";
@@ -158,6 +173,7 @@ export type LegacyExportDocument = (
 ) => string | null | Promise<string | null>;
 
 export interface LegacyHostOptions {
+  adminPort?: number;
   /** The caller owns the workspace lock and calls `Workspace.ensure()`. */
   workspace: LegacyWorkspace;
   /** Directory containing the restored legacy `app.html` and `/web` assets. */
@@ -169,6 +185,8 @@ export interface LegacyHostOptions {
   featureHandlers?: LegacyFeatureHandler[];
   /** Native folder picker. The host never closes either workspace itself. */
   selectWorkspace?: LegacySelectWorkspace;
+  openWorkspace?: (path:string, mode:"new"|"existing") => Promise<LegacyWorkspace>;
+  recentWorkspaces?: () => string[];
   /**
    * Called after a selected workspace has been committed by the host. The
    * callback receives ownership of `previous`; the host no longer uses it.
@@ -180,6 +198,10 @@ export interface LegacyHostOptions {
   openPath?: (path: string) => Promise<void>;
   /** Native save/export adapter, used by a later export feature route. */
   exportDocument?: LegacyExportDocument;
+  inspect?: LegacyInspect;
+  aiStorage?: string;
+  aiProviders?: Providers;
+  aiRunner?: Runner;
   /** Injected doctor/environment report for `/api/env`. */
   diagnostics?: LegacyDiagnostics;
   /**
@@ -310,20 +332,13 @@ export const LEGACY_WEB_FILES: readonly string[] = Object.freeze([
   "themes.js", "tip.js", "toc-settings.js", "topic.js",
 ]);
 
-const PENDING_FEATURES: readonly string[] = Object.freeze([
-  "library", "bibliography", "bib", "theme-shots", "ai",
-  "chat", "checks", "shots", "math", "setup", "home-manage",
-  "export", "download", "topic", "location",
-  "inject", "hooks/locks", "edit-scope",
-  "home-shots-running", "location-token", "pandoc-lifecycle",
-  "content-origin-secret", "will-frame-navigate",
-]);
-
 const IMPLEMENTED_FEATURES: readonly string[] = Object.freeze([
   "home", "env", "new-deck", "new-topic", "deck-read", "deck-source",
   "memo", "style", "structure", "events", "preview", "theme-preview",
   "open-external", "chunks", "warning-issues", "merge3",
-  "block-design-migrate", "themes", "materials", "assets",
+  "block-design-migrate", "themes", "materials", "assets", "library", "math", "bibliography", "bib",
+  "ai", "chat", "setup", "home-manage", "topic", "location", "inject", "hooks/locks", "edit-scope",
+  "location-token", "pandoc-lifecycle", "content-origin-secret", "will-frame-navigate",
 ]);
 
 const FEATURE_ROUTES: readonly FeatureRoute[] = Object.freeze([
@@ -629,7 +644,7 @@ function decodeSegment(raw: string, label: string): string {
 function decodeName(raw: string, label: string): string {
   const value = decodeSegment(raw, label);
   try {
-    return check_name(value, label);
+    return checkLookupName(value, label);
   } catch {
     throw new LegacyHttpError(400, `${label}が正しくありません`);
   }
@@ -674,7 +689,7 @@ function absolutizeContentUrls(
   if (typeof value === "string") {
     if (
       (parentKey !== undefined && CONTENT_URL_KEYS.has(parentKey))
-      || parentKey === "shots"
+      || parentKey === "shots" || parentKey === "slides"
     ) {
       if (value.startsWith("/files/") || value.startsWith("/theme/")) {
         return `${contentOrigin}${value}`;
@@ -821,7 +836,7 @@ function injectPreview(
 }
 
 function isShellPath(pathname: string): boolean {
-  if (pathname === "/" || pathname === "/agents") return true;
+  if (pathname === "/" || pathname === "/agents" || pathname === "/location") return true;
   if (/^\/deck\/[^/]+$/u.test(pathname)) return true;
   if (/^\/topic\/[^/]+$/u.test(pathname)) return true;
   if (pathname.startsWith("/figure/")) return true;
@@ -837,7 +852,7 @@ function matchesFeature(method: string, pathname: string): FeatureRoute | null {
   return null;
 }
 
-function listen(server: Server): Promise<number> {
+function listen(server: Server, port = 0): Promise<number> {
   return new Promise((resolvePort, reject) => {
     const onError = (error: Error): void => {
       server.removeListener("listening", onListening);
@@ -854,7 +869,7 @@ function listen(server: Server): Promise<number> {
     };
     server.once("error", onError);
     server.once("listening", onListening);
-    server.listen(0, LOOPBACK);
+    server.listen(port, LOOPBACK);
   });
 }
 
@@ -896,7 +911,7 @@ function isPublicSegment(part: string): boolean {
 
 function isDeckName(value: string): boolean {
   try {
-    check_name(value);
+    checkLookupName(value, "発表名");
     return true;
   } catch {
     return false;
@@ -1111,6 +1126,7 @@ function migrateBlockDesign(text: string): string {
  * `.slide-studio` is private except for the runtime assets figures load.
  */
 function fileScope(parts: readonly string[]): readonly string[] | null {
+  if (parts.length === 6 && parts[0] === ".slide-studio" && parts[1] === "build" && isDeckName(parts[2]!) && parts[3] === "shots" && /^[a-f0-9]{64}$/u.test(parts[4]!) && /^p[0-9]+-s[0-9]+\.png$/u.test(parts[5]!)) return parts.slice(0, 5);
   if (
     parts.length > 2
     && parts[0] === ".slide-studio"
@@ -1192,6 +1208,8 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   const states = new Map<string, DeckState>();
   const sseClients = new Set<SseClient>();
   const inflight = new Set<Promise<void>>();
+  const requestTasks = new Map<IncomingMessage, Promise<void>>();
+  const mutations = new Set<IncomingMessage>();
   const pendingRenders = new Set<Promise<unknown>>();
   const deckLocks = new Map<string, Promise<unknown>>();
   let envCache: LegacyDiagnosticItem[] | null = null;
@@ -1201,11 +1219,33 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   let closed = false;
   let draining = false;
   let switching = false;
+  let managing = false;
+  let latestManage: {root:string;token:string;record:deckManage.ManageRecord}|null = null;
   let epoch = 0;
   let shutdownPromise: Promise<void> | undefined;
+  let cliBridge: RequestBridge | undefined;
 
+  const output = new LegacyOutput({ pandocPath: options.pandocPath, inspect: options.inspect, broadcast });
+  const chat = new LegacyChat({
+    storage: options.aiStorage ?? join(homedir(), ".slide-studio", "ai"), providers: options.aiProviders, runner: options.aiRunner, broadcast, openExternal: async url => await options.openExternal?.(url) ?? false,
+    check: async (ws, deck, mode) => {
+      if (mode !== "theme") return output.check(ws, deck);
+      const name = ws.deck_theme(deck), css = await readFile(join(ws.themes, `${name}.css`), "utf8");
+      const variables = theme_variables(css), missing = THEME_VARIABLES.filter(v => !variables.includes(v));
+      return {kind: "theme", errors: missing.length ? [{kind: "theme", message: `テーマ themes/${name}.css に必須の変数がありません: ${missing.join(", ")}`}] : [], warnings: []};
+    },
+    reviewContext: async (ws, deck, mode) => mode === "memo" ? null : audit.run(ws, deck, output),
+    changed: (ws, paths) => {
+      if (ws !== workspace || closed) return;
+      broadcast({type: "files", paths});
+      for (const deck of affectedDecks(ws, paths)) scheduleRender(ws, deck, true, true);
+    },
+  });
+  const insertion = new LegacyInsertion({ pandocPath: options.pandocPath, changed: path => broadcast({ type: "files", paths: [path] }) });
   const themes = new LegacyThemes({
     contentOrigin: () => contentOrigin,
+    shots: options.inspect ? (ws,name) => output.scheduleTheme(ws,name) : undefined,
+    locked: (ws, name) => chat.existing(ws)?.themeLocked(name) ?? false,
     changed: (ws, name) => {
       if (ws !== workspace) return;
       const paths = [`themes/${name}.css`];
@@ -1213,18 +1253,42 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       for (const deck of affectedDecks(ws, paths)) scheduleRender(ws, deck, true, true);
     },
   });
-  const pending = [...PENDING_FEATURES];
+  const pending = options.inspect ? [] : ["theme-shots", "checks", "shots", "export", "download", "home-shots-running"];
+  async function startCliBridge(ws: LegacyWorkspace) {
+    cliBridge = await new RequestBridge(ws.root, async (body, signal) => {
+      if (body.operation === "audit_tools") return {result: audit.TOOLS};
+      if (body.operation === "consult") {
+        if (typeof body.tab !== "string" || typeof body.question !== "string") throw Error("相談の形式が正しくありません");
+        const workflow = chat.existing(ws as Workspace);
+        if (!workflow) throw Error("相談できるのは AI が作業している間だけです");
+        return {answer: await workflow.consult(body.tab, body.question, signal)};
+      }
+      if (body.operation === "audit_run" || body.operation === "audit_review" || body.operation === "audit_status") {
+        if (typeof body.deck !== "string" || !ws.has_deck(body.deck)) throw Error("発表がありません");
+        if (body.operation === "audit_run") return {result: await audit.run(ws as Workspace, body.deck, output)};
+        if (typeof body.audit_id !== "string") throw Error("監査 ID がありません");
+        return {result: body.operation === "audit_review" ? await audit.review(ws as Workspace, body.deck, body.audit_id, body.review) : audit.status(ws as Workspace, body.deck, body.audit_id)};
+      }
+      if (body.operation !== undefined && body.operation !== "check") throw Error("検査の操作が正しくありません");
+      if (body.figure === undefined && (typeof body.deck !== "string" || !ws.has_deck(body.deck))) throw Error("発表がありません");
+      if (body.figure !== undefined && typeof body.figure !== "string") throw Error("図の指定が正しくありません");
+      const result = typeof body.figure === "string" ? await output.checkFigure(ws as Workspace, body.figure) : await output.check(ws as Workspace, body.deck as string);
+      const errors = body.page ? result.errors.filter(i => !i.page_id || i.page_id === body.page) : result.errors;
+      const warnings = body.page ? result.warnings.filter(i => !i.page_id || i.page_id === body.page) : result.warnings;
+      return {result: {...result, errors, warnings}, errors: errors.length, summary: `検査：エラー ${errors.length}・警告 ${warnings.length}\n` + [...errors, ...warnings].map(i => i.message).join("\n")};
+    }).start();
+  }
   const handoff: LegacyHostHandoff = {
     status: "in_progress",
     pending: [...pending],
-    implemented: [...IMPLEMENTED_FEATURES],
+    implemented: [...IMPLEMENTED_FEATURES, ...(options.inspect ? ["theme-shots", "checks", "shots", "export", "download", "home-shots-running"] : [])],
     notes: [
       "Feature routes are explicit dispatches; unregistered groups return 501 instead of empty success.",
       "Authored HTML is served only from the content origin; the admin origin never serves /files.",
       "The caller owns the workspace lock; close() drains accepted writes and listeners but not the workspace.",
       "Chunk GET/POST includes markdown/cell/html/delete/move/image conversion with a four-version render cache keyed by raw source bytes.",
       "Deck reads migrate legacy block styles under the per-deck lock and preserve BOM/CRLF bytes; raw byte hashes remain the source revision.",
-      "Legacy AI, checks, shots and export handlers remain pending integration; themes, materials and asset management are connected.",
+      "Original UI handlers are connected; output routes require the caller's Electron inspection service. Full legacy test parity and live provider verification remain separate validation gates.",
       "Content origin authentication (Electron secret header) and non-loopback frame navigation blocking belong to desktop integration and are not enabled here.",
       "Content CSP is stricter than the legacy service: remote images/fonts/frames are blocked pending a parity decision.",
       "Desktop download handling and the full output/export bridge remain pending.",
@@ -1331,7 +1395,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   function broadcast(event: Record<string, unknown>): void {
     if (sseClients.size === 0) return;
     for (const client of [...sseClients]) {
-      if (!client.queue.push(event)) {
+      if (!client.queue.push(absolutizeContentUrls(event, contentOrigin) as Record<string, unknown>)) {
         // Losing events can leave the UI stuck (especially a render event).
         // End the stream so the client reconnects and refetches state.
         cleanupSse(client);
@@ -1500,6 +1564,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
             state.version = source.version;
             state.error = null;
             state.rendered = rendered;
+            if (options.inspect) output.schedule(ws as Workspace, deck);
             broadcast({
               type: "render",
               deck,
@@ -1650,6 +1715,19 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       route: feature.name,
       ...extras,
     } as LegacyFeatureRequest & { route: string; deck?: string; op?: string };
+    for (const handler of options.featureHandlers ?? []) {
+      const result = await handler(featureRequest);
+      if (result !== null) {
+        sendFeatureResponse(response, result, contentOrigin);
+        return;
+      }
+    }
+    const chatResult = await chat.handle(workspace as Workspace, featureRequest);
+    if (chatResult !== null) { sendFeatureResponse(response, chatResult, contentOrigin); return; }
+    const outputResult = options.inspect ? await output.handle(workspace as Workspace, featureRequest) : null;
+    if (outputResult !== null) { sendFeatureResponse(response, outputResult, contentOrigin); return; }
+    const insertionResult = await insertion.handle(workspace as Workspace, featureRequest);
+    if (insertionResult !== null) { sendFeatureResponse(response, insertionResult, contentOrigin); return; }
     const assetResult = await handleAssets(workspace as Workspace, featureRequest, path => broadcast({ type: "files", paths: [path] }));
     if (assetResult !== null) { sendFeatureResponse(response, assetResult, contentOrigin); return; }
     const materialResult = await handleMaterials(workspace as Workspace, featureRequest, {
@@ -1664,13 +1742,6 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     if (themeResult !== null) {
       sendFeatureResponse(response, themeResult, contentOrigin);
       return;
-    }
-    for (const handler of options.featureHandlers ?? []) {
-      const result = await handler(featureRequest);
-      if (result !== null) {
-        sendFeatureResponse(response, result, contentOrigin);
-        return;
-      }
     }
     sendApiError(
       response,
@@ -1936,6 +2007,9 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
 
       let version = current.version;
       if (final !== current.text) {
+        if (chat.existing(ws as Workspace)?.locked(deck, "slides", current.text, final)) {
+          sendApiError(response, 409, "この対象は AI が作業中です"); return;
+        }
         const path = ws.qmd(deck);
         const info = await stat(path);
         let encoded: Buffer;
@@ -1950,6 +2024,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         if (encoded.byteLength > maxSourceBodyBytes) {
           throw new LegacyHttpError(413, "原稿が大きすぎます");
         }
+        await chat.existing(ws as Workspace)?.userSaved(deck, current.text, final);
         await atomicWriteFile(path, encoded, info.mode & 0o777);
         version = sha256(encoded);
       }
@@ -2129,12 +2204,13 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
           const current = memo.read(ws as Workspace, deck);
           sendJson(response, 200, {
             ...current,
-            locked: false,
+            locked: chat.existing(ws as Workspace)?.locked(deck, "memo") ?? false,
             slides_body: memo.from_slides(ws as Workspace, deck),
           });
           return;
         }
         const values = recordBody(body);
+        if (chat.existing(ws as Workspace)?.locked(deck, "memo")) {sendApiError(response, 409, "下書きは AI が作業中です"); return;}
         if (typeof values.text !== "string") {
           sendApiError(response, 400, "下書きがありません");
           return;
@@ -2144,6 +2220,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
           200,
           memo.write(ws as Workspace, deck, values.text, values.base),
         );
+        chat.existing(ws as Workspace)?.userWrote(deck, `decks/${deck}/memo.md`);
       } catch (error) {
         if (error instanceof memo.MemoConflict) {
           sendApiError(response, 409, error.message, { ...error.current });
@@ -2258,6 +2335,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
 
     const pathname = url.pathname;
     const ws = workspace;
+    if (managing) { sendApiError(response, 409, "発表の整理中です"); return; }
     if (switching && !(pathname === "/api/workspace/select" && method === "POST")) {
       sendApiError(response, 409, "ワークスペースを切り替えています");
       return;
@@ -2288,6 +2366,40 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       ? (mediaType === "application/json" ? {} : undefined)
       : (mediaType === "application/json" ? parseJson(raw) : undefined);
 
+    if (pathname === "/api/home/manage" && method === "POST") {
+      if (chat.busy || cliBridge?.busy || managing || switching) {
+        sendApiError(response, 409, "表示の更新が終わってから操作してください"); return;
+      }
+      managing = true;
+      try {
+        await Promise.allSettled([...requestTasks].filter(([other]) => other !== request && !((other.method === "GET" || other.method === "HEAD") && /^\/api\/ai\//u.test(other.url ?? ""))).map(([,task])=>task));
+        await Promise.allSettled([...pendingRenders]);await output.settle();
+        if(chat.busy||cliBridge?.busy)throw Error("AI の作業が終わってから操作してください");
+        await chat.forget(ws as Workspace);
+        const values = body as Record<string, unknown> | undefined;
+        if (!values) throw new Error("操作が正しくありません");
+        if (values.action === "undo") {
+          if (!latestManage || latestManage.root !== ws.root || values.token !== latestManage.token) throw new Error("元に戻せる操作がありません");
+          await deckManage.undo(ws as Workspace, latestManage.record);
+          latestManage = null;
+        } else {
+          if (typeof values.deck !== "string") throw new Error("発表名が正しくありません");
+          let record: deckManage.ManageRecord;
+          if (values.action === "rename") {
+            if (typeof values.name !== "string" || (values.title != null && typeof values.title !== "string")) throw new Error("名前を入力してください");
+            record = await deckManage.rename(ws as Workspace, values.deck, values.name, values.title == null ? undefined : values.title as string);
+          } else if (values.action === "delete") record = await deckManage.remove(ws as Workspace, values.deck);
+          else throw new Error("操作が正しくありません");
+          latestManage = {root:ws.root, token:randomBytes(24).toString("hex"), record};
+        }
+        states.clear(); capabilities.clear(); epoch += 1;
+        broadcast({type:"files",paths:[]});
+        sendJson(response, 200, {token:latestManage?.token ?? null});
+      } catch (error) { sendApiError(response, 400, error instanceof Error ? error.message : String(error)); }
+      finally { managing = false; }
+      return;
+    }
+
     if (pathname === "/api/workspace") {
       if (method !== "GET" && method !== "HEAD") {
         sendApiError(response, 405, "method not allowed");
@@ -2300,14 +2412,27 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       return;
     }
 
-    if (pathname === "/api/workspace/select") {
+    if (pathname === "/api/location" && (method === "GET" || method === "HEAD")) {
+      sendJson(response, 200, {current:ws.root,recent:options.recentWorkspaces?.() ?? [ws.root]}); return;
+    }
+    if (pathname === "/api/location/folders" && (method === "GET" || method === "HEAD")) {
+      try {
+        const input=url.searchParams.get("path") || homedir();
+        const path=await realpath(input === "~" ? homedir() : input.startsWith("~/") ? join(homedir(),input.slice(2)) : input);
+        const folders:string[]=[];
+        for(const entry of await readdir(path,{withFileTypes:true})) if(!entry.name.startsWith(".") && (entry.isDirectory() || entry.isSymbolicLink() && (await stat(join(path,entry.name)).catch(()=>null))?.isDirectory())) folders.push(entry.name);
+        sendJson(response,200,{path,parent:dirname(path),folders:folders.sort(),suggested:join(homedir(),"Slides")});
+      } catch(error) {sendApiError(response,400,error instanceof Error ? error.message : String(error));}
+      return;
+    }
+    if (pathname === "/api/workspace/select" || pathname === "/api/location" && method === "POST") {
       if (method !== "POST") {
         sendApiError(response, 405, "method not allowed");
         return;
       }
-      // The current select request is itself tracked; any other in-flight
-      // handler or render makes a switch unsafe.
-      if (inflight.size > 1 || pendingRenders.size > 0) {
+      // Folder listing can still be in flight when the user submits. Drain
+      // those reads after closing admission, rather than rejecting the click.
+      if (mutations.size > 1 || chat.busy || cliBridge?.busy) {
         sendApiError(response, 409, "処理中のためワークスペースを切り替えできません", {
           code: "BUSY",
         });
@@ -2315,15 +2440,25 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       }
       switching = true;
       try {
+        await Promise.allSettled([...requestTasks].filter(([other]) => other !== request && !((other.method === "GET" || other.method === "HEAD") && /^\/api\/ai\//u.test(other.url ?? ""))).map(([, task]) => task));
+        await Promise.allSettled([...pendingRenders]);await output.settle();
+        if (pendingRenders.size || output.busy || chat.busy || cliBridge?.busy) throw new LegacyHttpError(409, "処理中のためワークスペースを切り替えできません");
         const previous = workspace;
-        const next = options.selectWorkspace === undefined
+        const values=body as Record<string,unknown>|undefined;
+        if(pathname === "/api/location" && (!values || typeof values.path !== "string" || !["new","existing"].includes(String(values.mode)))) throw new LegacyHttpError(400,"保管場所を指定してください");
+        if(pathname === "/api/location" && !options.openWorkspace) throw new LegacyHttpError(503,"保管場所の切り替えが接続されていません");
+        const next = pathname === "/api/location" ? await options.openWorkspace!(values!.path as string,values!.mode as "new"|"existing") : options.selectWorkspace === undefined
           ? null
           : await options.selectWorkspace();
         if (next === null) {
           sendJson(response, 200, { cancelled: true });
           return;
         }
+        await chat.forget(previous as Workspace);
+        await cliBridge?.close();
         workspace = next;
+        await startCliBridge(next);
+        latestManage = null;
         epoch += 1;
         capabilities.clear();
         states.clear();
@@ -2344,7 +2479,12 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         sendJson(response, 200, {
           root: next.root,
           decks: next.list_decks(),
+          ok: true,
+          url: "/",
         });
+      } catch(error) {
+        if(pathname !== "/api/location") throw error;
+        sendApiError(response,400,error instanceof Error ? error.message : String(error));
       } finally {
         switching = false;
       }
@@ -2398,6 +2538,24 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       return;
     }
 
+    if (pathname === "/api/ai/roles" && (method === "GET" || method === "HEAD")) {
+      sendJson(response,200,aiRoles.catalog(ws as Workspace));return;
+    }
+    const roleExtra=/^\/api\/ai\/roles\/([^/]+)\/extra$/u.exec(pathname);
+    if(roleExtra && method === "PUT") {
+      try {sendJson(response,200,{extra:aiRoles.set_extra(ws as Workspace,decodeURIComponent(roleExtra[1]!),isRecord(body)?body.text:undefined)});}
+      catch(error){sendApiError(response,400,error instanceof Error?error.message:String(error));}
+      return;
+    }
+
+    if (pathname === "/api/setup" && method === "POST") {
+      const diagnostics=options.diagnostics;
+      envCache=typeof diagnostics === "function" ? await diagnostics() : diagnostics ?? [];
+      const runtime=envCache.filter(item=>["Chromium","Pandoc"].includes(item.name));
+      if(runtime.length < 2 || runtime.some(item=>!item.ok)) {sendApiError(response,503,"同梱の描画環境を確認できません。アプリを再インストールしてください");return;}
+      sendJson(response,200,{ok:true,items:runtime}); return;
+    }
+
     if (pathname === "/api/env") {
       if (method !== "GET" && method !== "HEAD") {
         sendApiError(response, 405, "method not allowed");
@@ -2430,7 +2588,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       }
       const recent: Array<Record<string, unknown>> = ws.recent().map((item) => {
         const deck = String(item.deck ?? "");
-        const shots: unknown[] = [];
+        const shots: unknown[] = options.inspect ? output.saved(ws as Workspace, deck).slides.map(row => row[0]).filter(Boolean) : [];
         return {
           ...item,
           blank: ws.is_untouched(deck),
@@ -2656,7 +2814,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     }
     let html: Buffer;
     try {
-      html = await readFile(join(options.uiDirectory, "app.html"));
+      html = await readFile(join(options.uiDirectory, new URL(request.url ?? "/", adminOrigin).pathname === "/location" ? "location.html" : "app.html"));
     } catch {
       sendApiError(response, 404, "not found");
       return;
@@ -3086,13 +3244,17 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   }
 
   const adminServer = createServer((request, response) => {
+    if (isMutation(request.method ?? "GET")) mutations.add(request);
     const promise = handleAdmin(request, response).catch((error: unknown) => {
       console.error("[legacy] admin handler escaped", error);
       sendFailure(response, error);
     });
     inflight.add(promise);
+    requestTasks.set(request, promise);
     void promise.finally(() => {
       inflight.delete(promise);
+      requestTasks.delete(request);
+      mutations.delete(request);
     }).catch(() => undefined);
   });
   const contentServer = createServer((request, response) => {
@@ -3100,7 +3262,8 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   });
 
   try {
-    const adminPort = await listen(adminServer);
+    if (options.adminPort !== undefined && (!Number.isInteger(options.adminPort) || options.adminPort < 0 || options.adminPort > 65535)) throw Error("ポート番号が正しくありません");
+    const adminPort = await listen(adminServer, options.adminPort);
     adminOrigin = `http://${LOOPBACK}:${adminPort}`;
     const contentPort = await listen(contentServer);
     contentOrigin = `http://${LOOPBACK}:${contentPort}`;
@@ -3162,8 +3325,11 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       const admin = beginClose(adminServer);
       const content = beginClose(contentServer);
       endSse();
+      await cliBridge?.close();
       // Track the handler promises themselves. A client disconnect fires
       // `response.close` while the handler may still be inside a write.
+      await chat.close();
+      await output.close();
       await drainSettled(inflight, "admin requests");
       await drain(pendingRenders, "renders");
       admin.force();
@@ -3176,6 +3342,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     return shutdownPromise;
   }
 
+  await startCliBridge(workspace);
   return {
     adminOrigin,
     contentOrigin,

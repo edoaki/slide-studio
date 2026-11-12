@@ -1,5 +1,5 @@
 {
-  "status": "partial_foundation_validated_full_migration_in_progress",
+  "status": "in_progress_integrated_original_ui",
   "reference": "ca1f148dced6d207dab3f69474bc848560ff738c",
   "source": {
     "commit": "5d80176",
@@ -81,10 +81,10 @@
     "note": "Index counts test functions, not executed or parametrized cases"
   },
   "delivery": {
-    "status": "not_ready",
-    "installed_dmg": "superseded reduced UI build; not a parity deliverable",
-    "windows_exe": "superseded reduced UI cross-build; runtime untested",
-    "github_clean_clone": "pending"
+    "status": "local_integration_verified_distribution_refresh_pending",
+    "installed_dmg": "Original UI installed from DMG in ~/Applications/Slide Studio.app; create, memo save, reopen, direct editing and HTML/PDF verified. Latest integration refinements are being repackaged.",
+    "windows_exe": "Original UI NSIS cross-build generated; runtime verification explicitly deferred.",
+    "github_clean_clone": "Local clean-clone verification in progress; no remote publication claimed."
   },
   "integrated_foundation_tests": {
     "passed": 45,
@@ -132,7 +132,7 @@
     "tests": 54,
     "status": "review repairs pass native tests; seven extra old render goldens find raw-tags/cover-authors differences queued for repair"
   },
-  "distribution_status": "Previous installed app and release artifacts are superseded reduced UI. Do not distribute; rebuild after complete parity.",
+  "distribution_status": "Original UI replaces the reduced prototype in the local DMG/EXE. Full legacy parity, signing and public release are not claimed.",
   "bridge_and_api_tests": {
     "tests": 23,
     "passed": 23,
@@ -219,5 +219,50 @@
       "AI topic locks and history hooks"
     ],
     "additional_renderer_runtime_tests": "4 skipped because the optional renderer integration environment was not enabled; not counted as verified"
+  },
+  "integration_2026_11_13": {
+    "implementation": "Self-implemented TypeScript/Electron; no external implementation agent",
+    "connected": [
+      "original home and editor",
+      "memo editing",
+      "native provider RPC/process lifecycle and pooling",
+      "AI send/review/fix/cancel/continue/handoff",
+      "persistent chat and snapshot restore",
+      "runtime download/hash verification/update/rollback/login",
+      "sandbox file bridge and macOS built-in JavaScript launcher",
+      "background checks and cached screenshots",
+      "theme thumbnails",
+      "direct text/cover/image editing and cross-frame drag",
+      "home rename/delete/undo",
+      "new/import/figure/check/build/audit/consult CLI",
+      "browser mode using bundled Electron rendering"
+    ],
+    "automated": {
+      "unit_http_contract": {
+        "tests": 424,
+        "passed": 417,
+        "skipped": 7,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/full-regression-release-candidate.txt"
+      },
+      "original_ui": {
+        "tests": 7,
+        "passed": 7,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/full-ui-release-candidate.txt"
+      }
+    },
+    "real_runtime": {
+      "codex": "Official 0.167.2 package downloaded, published hash verified, extracted and --version started in scratch storage.",
+      "sandbox": "macOS Codex sandbox ran the private bridge launcher, preserving Japanese and quoted arguments, JSON, stdout and exit code; no inference request.",
+      "cli": "Imported original NCO fixture, built standalone HTML/PDF, and checked nco/social-problems with zero errors/warnings."
+    },
+    "remaining": [
+      "Complete the 377-case legacy UI test correspondence; integration coverage is not a claim that every old test passes.",
+      "Live authenticated inference for each provider and full OS capability classification.",
+      "Finish edge rendering goldens and PDF visual/text comparison.",
+      "Windows runtime and Intel Mac runtime verification are not performed; Windows is deferred by user.",
+      "Developer ID/notarization, Windows signing and public GitHub release are not configured."
+    ]
   }
 }

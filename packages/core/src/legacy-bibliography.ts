@@ -387,10 +387,21 @@ export async function verify(ws: Workspace, deck: string, key: string): Promise<
   await verify_path(ws.bib(deck), key);
 }
 
+/** Locate parsed records sequentially so identical text in comments is never edited. */
+function locatedEntries(text: string): Array<[string | null, string, number]> {
+  let cursor = 0;
+  return entries(text).map(([key, raw]) => {
+    const start = text.indexOf(raw, cursor);
+    if (start < 0) throw new ValueError("文献の位置を確認できません");
+    cursor = start + raw.length;
+    return [key, raw, start];
+  });
+}
+
 /** Remove only the selected record's unverified marker. */
 export async function verify_path(path: string, key: string): Promise<void> {
   const text = readFileSync(path, "utf8");
-  for (const [entryKey, raw] of entries(text)) {
+  for (const [entryKey, raw, offset] of locatedEntries(text)) {
     if (entryKey !== key) continue;
     let updated = raw;
     const ranges = [...fields(raw)];
@@ -401,7 +412,7 @@ export async function verify_path(path: string, key: string): Promise<void> {
         updated = updated.slice(0, start) + updated.slice(end);
       }
     }
-    await writeAtomic(path, text.replace(raw, () => updated));
+    await writeAtomic(path, text.slice(0, offset) + updated + text.slice(offset + raw.length));
     return;
   }
   throw new KeyError(key);
@@ -434,7 +445,7 @@ export async function update_path(
   }
 
   const text = readFileSync(path, "utf8");
-  for (const [entryKey, raw] of entries(text)) {
+  for (const [entryKey, raw, offset] of locatedEntries(text)) {
     if (entryKey !== key) continue;
     if (raw !== original) {
       throw new ValueError("文献が更新されています。開き直してから編集してください");
@@ -474,7 +485,7 @@ export async function update_path(
     if (parsed.length !== 1 || parsed[0]![0] !== key || !expected) {
       throw new ValueError("文献の入力を確認してください（括弧の対応など）");
     }
-    await writeAtomic(path, text.replace(raw, () => updated));
+    await writeAtomic(path, text.slice(0, offset) + updated + text.slice(offset + raw.length));
     return;
   }
   throw new KeyError(key);
@@ -503,7 +514,7 @@ export function clean(value: string): string {
 export function with_arxiv_venue(text: string): string {
   let output = text;
   try {
-    for (const [key, raw] of entries(text)) {
+    for (const [key, raw, offset] of locatedEntries(text).reverse()) {
       if (key === null || key.startsWith("@string:")) continue;
       const found: Record<string, string> = {};
       for (const [name, value] of fields(raw)) found[name] = clean(value);
@@ -518,7 +529,7 @@ export function with_arxiv_venue(text: string): string {
       const body = raw.slice(0, -1).replace(/[\t\n\v\f\r \x1c-\x1f\x85\p{Z}]+$/u, "");
       const separator = body.endsWith(",") ? "" : ",";
       const replacement = `${body}${separator}\n  howpublished = {arXiv:${number}}\n${raw.slice(-1)}`;
-      output = output.replace(raw, () => replacement);
+      output = output.slice(0, offset) + replacement + output.slice(offset + raw.length);
     }
   } catch (error) {
     if (error instanceof ValueError) return text;

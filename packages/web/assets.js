@@ -21,7 +21,7 @@ export function makeAssets(ctx) {
   const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem('slide-studio.' + k); localStorage.setItem('slide-studio.' + k, v); } catch { /* 保存できなくても動く */ } return null; };
   let data = null, loading = null, kind = pref('assetKind') === 'images' ? 'images' : 'html', dead = false, timer = 0;
   const chosen = new Set(); // 選んでいる素材の path（いま見ている種類の中だけ）
-  let anchor = null, dialog = null, previewDialog = null, selecting = false;
+  let anchor = null, dialog = null, previewDialog = null, selecting = false, removing = false;
 
   // ------------------------------------------------------------ 左の欄の［素材］タブと種類（HTML｜画像）
   const kinds = document.createElement('div');
@@ -58,7 +58,7 @@ export function makeAssets(ctx) {
         try { data = await api(`/api/deck/${deck}/assets`); } catch (e) { if (!data) toast(`${A.listError}：${e.message}`); }
       } while (again && !dead);
       loading = null;
-      if (!dead) render();
+      if (!dead && !removing) render();
       return data;
     })();
     return loading;
@@ -223,6 +223,7 @@ export function makeAssets(ctx) {
     if (!items.length) return;
     const ok = await confirmRemove(items);
     if (ok) {
+      removing = true;
       try {
         let { items: trashed } = await rawOp('delete', { paths: items.map(x => x.path) });
         ctx.recordHistory({
@@ -232,6 +233,7 @@ export function makeAssets(ctx) {
         chosen.clear(); anchor = null; selecting = false;
         toast(A.removed(items.length));
       } catch (e) { toast(e.message); }
+      finally { removing = false; }
       await reload();
     }
     (view.querySelector('.as-card.sel') || view).focus({ preventScroll: true });
@@ -311,13 +313,14 @@ export function makeAssets(ctx) {
       press.card.classList.add('dragging'); document.body.classList.add('as-dragging');
     }
     drag.ghost.style.transform = `translate(${e.clientX + 10}px, ${e.clientY + 10}px)`;
-    drag.target = ctx.blocks?.dropAt(e.clientX, e.clientY) ?? null;
+    const current=drag;current.pending=Promise.resolve(ctx.blocks?.dropAt(e.clientX,e.clientY)).then(target=>{if(drag===current)current.target=target;return target;});
   });
-  function end(ok) {
+  async function end(ok) {
     const d = drag, p = press; drag = null; press = null;
     if (!d) return;
     dragged = true; setTimeout(() => { dragged = false; });
     d.ghost.remove(); p.card.classList.remove('dragging'); document.body.classList.remove('as-dragging');
+    if(ok&&d.pending)d.target=await d.pending;
     ctx.blocks?.dropClear();
     if (ok && d.target) ctx.insert?.dropItem(d.item, d.target);
   }

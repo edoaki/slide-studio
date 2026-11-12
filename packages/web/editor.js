@@ -454,7 +454,7 @@ export function mountEditor(root, deck) {
       ctx.rendering = false; ctx.renderOk = ev.ok; ctx.render = ev;
       if (ev.ok) {
         // CSS だけ差し替えたときは読み込み直さないので、差し替え後に描いた色を読む機能へ知らせる
-        if (ev.theme_only && preview.frame && !preview.pending && !preview.win.document.querySelector('.references-slide .csl-entry')) preview.setTheme(ev.theme, ev.version).then(() => ctx.plugins.forEach(p => p.previewThemed?.()));
+        if (ev.theme_only && preview.frame && !preview.pending && preview.client?.snapshot?.hasReferences === false) preview.setTheme(ev.theme, ev.version).then(() => ctx.plugins.forEach(p => p.previewThemed?.()));
         else preview.load(ev.version);
       }
       await refreshStructure();

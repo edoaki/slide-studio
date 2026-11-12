@@ -132,7 +132,7 @@ test("creates the legacy layout, bundled themes, runtime and agent guidance", as
   const readme = readFileSync(join(root, "README.md"), "utf8");
   assert.doesNotMatch(readme, /slide-studio build/u);
   assert.doesNotMatch(readme, /uv run|Python 3/u);
-  assert.match(readme, /準備中/u);
+  assert.match(readme, /npm run cli -- build/u);
   assert.equal(existsSync(join(root, "build.py")), false);
   assert.equal(
     OLD_PORTABLE_READMES.has(sha(readFileSync(join(TEMPLATES, "portable", "README.md"), "utf8"))),

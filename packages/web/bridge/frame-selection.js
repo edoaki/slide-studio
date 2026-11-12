@@ -244,7 +244,8 @@ export function createFrameSelection(win, doc, {
     for (const key of keys) {
       if (count >= MAX_EDIT_KEYS) break;
       count += 1;
-      blocks.push({ key, rects: rectsFor(key), align: alignFor(key) });
+      const el=elements(key)[0], fontSize=el ? parseFloat(win.getComputedStyle(el.querySelector('table')||el).fontSize)||0 : 0;
+      blocks.push({ key, rects: rectsFor(key), align: alignFor(key), fontSize });
     }
     const selectionKey = frameKey ?? selected;
     const selection = selectionKey == null ? null : unionRects(rectsFor(selectionKey));
@@ -305,6 +306,8 @@ export function createFrameSelection(win, doc, {
   function keyRule(event) {
     if (!enabled) return null;
     if (event.isComposing || event.keyCode === 229 || editableEvent(event)) return null;
+    // The parent cannot inspect a selection in this isolated content frame.
+    if ((event.key === 'Delete' || event.key === 'Backspace') && doc.getSelection()?.isCollapsed === false) return null;
     const code = typeof event.code === 'string' ? event.code : '';
     if (!code) return null;
     for (let i = 0; i < keymap.length; i += 1) {
@@ -495,6 +498,7 @@ export function createFrameSelection(win, doc, {
     },
     measure,
     schedule,
+    hasKey(key) { return keys.has(key); },
     get enabled() { return enabled; },
     get selected() { return selected; },
     get frameKey() { return frameKey; },

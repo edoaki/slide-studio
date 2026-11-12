@@ -15,10 +15,12 @@
     "render:spike": "npm run build && node scripts/migration/render-spike.mjs",
     "build": "node scripts/build-renderer.mjs --clean && tsc && node scripts/build-renderer.mjs",
     "dev:desktop": "npm start",
+    "browser": "npm run build && node scripts/dev-desktop.mjs --studio-browser",
+    "cli": "npm run build && node scripts/cli.mjs",
     "setup:pandoc": "node scripts/setup-pandoc.mjs",
-    "test": "npm run build && node --test dist/tests/renderer/*.test.js dist/tests/core/*.test.js dist/tests/desktop/*.test.js dist/tests/packaging/*.test.js dist/tests/bridge/*.test.js",
+    "test": "npm run build && node --test --test-concurrency=4 dist/tests/ai/*.test.js dist/tests/renderer/*.test.js dist/tests/core/*.test.js dist/tests/desktop/*.test.js dist/tests/packaging/*.test.js dist/tests/bridge/*.test.js",
     "test:desktop": "npm run build && node --test dist/tests/desktop/*.test.js",
-    "test:desktop:e2e": "npm run build && node --test dist/tests/e2e/*.test.js",
+    "test:desktop:e2e": "npm run build && node --test --test-concurrency=1 dist/tests/e2e/*.test.js",
     "start": "npm run build && node scripts/dev-desktop.mjs",
     "dist:mac": "npm run build && node scripts/package-desktop.mjs --mac",
     "dist:win": "npm run build && node scripts/package-desktop.mjs --win",
@@ -28,6 +30,7 @@
   "dependencies": {
     "cheerio": "1.2.0",
     "pdf-lib": "1.17.1",
+    "tar": "7.5.23",
     "yaml": "2.9.1"
   },
   "devDependencies": {

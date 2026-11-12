@@ -11,6 +11,7 @@ export interface FrameSnapshot extends FrameIdentity {
   /** Committed source revision represented after a successful theme-only swap.
    * The transport identity/version remains the immutable bootstrap revision. */
   sourceVersion?: string;
+  hasReferences?: boolean;
 }
 export type NavigationCommand =
   | { method: "go"; params: { index: number; step: number } }
@@ -27,6 +28,7 @@ export type NavigationCommand =
 export interface EditRect { left: number; top: number; right: number; bottom: number }
 export interface EditGeometry {
   key: string; rects: EditRect[]; align: "left" | "center" | "right";
+  fontSize?: number;
 }
 export interface EditLayout {
   sourceVersion: string; sequence: number; scale: number;
@@ -45,8 +47,29 @@ export type SelectionCommand =
   | { method: "edit.select"; params: { key: string | null; frameKey: string | null } }
   | { method: "edit.hover"; params: { key: string | null } }
   | { method: "edit.designing"; params: { active: boolean } }
+  | { method: "edit.issues"; params: { rects: Array<{x:number;y:number;w:number;h:number}>; level: "error" | "warning" } }
   | { method: "edit.locks"; params: { figures: string[]; color: string } }
   | { method: "edit.measure"; params: Record<string, never> };
+export interface EditPoint { x:number; y:number; lineEnd?:boolean }
+export interface CellPosition { r:number; c:number }
+export type TextCommand =
+  | { method:"text.begin"; params:{lease:string;sourceVersion:string;key:string|null;html:string;plain?:boolean;heading?:boolean;point?:EditPoint;cell?:CellPosition;cells?:Array<Array<{direct:boolean;html:string}>>;create?:"before"|"after"|"start"|"end"|"col-before"|"col-after"|"wrap-left"|"wrap-right"} }
+  | { method:"text.cellAt"; params:{key:string;point:EditPoint} }
+  | { method:"text.command"; params:{lease:string} & (
+      {action:"finish"|"focus"|"bold"|"italic"|"clearFormat"|"linkState"}
+      | {action:"color";value:string|null}
+      | {action:"size";value:number}
+      | {action:"stepSize";value:-1|1}
+      | {action:"align";value:"left"|"center"|"right"|"justify"}
+      | {action:"setLink";value:string|null;text?:string}) };
+export type LayoutCommand =
+  | {method:"edit.themeValues"|"cover.inspect"|"block.clear"|"block.cancel";params:Record<string,never>}
+  | {method:"edit.themePreview";params:{values:Record<string,string|null>}}
+  | {method:"edit.markStep";params:{step:number|null}}
+  | {method:"cover.configure";params:{enabled:boolean}}
+  | {method:"cover.select";params:{selected:boolean}}
+  | {method:"block.configure";params:{sourceVersion:string;key:string|null;live:boolean;padMode:"inner"|"outer"|"gap"|null;color:string;text?:string;structure?:Record<string,unknown>}}
+  | {method:"block.dropAt";params:EditPoint};
 export type SelectionIntent = {
   sourceVersion: string; sequence: number;
 } & (
@@ -62,7 +85,7 @@ export type SelectionIntent = {
 export interface FrameHello {
   protocol: typeof EDIT_BRIDGE_PROTOCOL; type: "hello"; nonce: string;
 }
-export type FrameRequest = (NavigationCommand | SelectionCommand) & FrameIdentity & {
+export type FrameRequest = (NavigationCommand | SelectionCommand | TextCommand | LayoutCommand) & FrameIdentity & {
   protocol: typeof EDIT_BRIDGE_PROTOCOL; type: "request"; id: number;
 };
 export interface FrameResponse extends FrameIdentity {
@@ -71,8 +94,9 @@ export interface FrameResponse extends FrameIdentity {
 }
 export type FrameEvent = FrameIdentity & {
   protocol: typeof EDIT_BRIDGE_PROTOCOL; type: "event";
-  event: "ready" | "deckchange" | "layout" | "key" | "link.open" | "failure" | "edit.layout" | "edit.intent";
+  event: "ready" | "deckchange" | "layout" | "key" | "link.open" | "failure" | "edit.layout" | "edit.intent" | "text.state" | "text.heading" | "cover.intent" | "block.intent";
   data: unknown;
 };
-// Later edit operations require their own schemas and trusted-gesture leases.
+// Text sessions carry source revisions and single-session leases; frame events
+// describe edits while the host revalidates and performs manuscript writes.
 // No generic eval/function/selector-to-admin/URL-open/HTTP command is permitted.

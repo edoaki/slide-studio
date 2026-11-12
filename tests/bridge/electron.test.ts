@@ -239,6 +239,7 @@ async function startServers(): Promise<{
         send(response, 200, "text/javascript; charset=utf-8", harnessSource);
         return;
       }
+      if (url.pathname === "/block-design.js") { send(response, 200, "text/javascript; charset=utf-8", await readFile(join(root,"packages/web/block-design.js"),"utf8")); return; }
       if (url.pathname === "/bridge/protocol.js") {
         send(response, 200, "text/javascript; charset=utf-8", protocolSource);
         return;

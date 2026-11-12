@@ -347,3 +347,17 @@ test("require_ready rejects the old figures/topics overlap", async (t) => {
   await migrate(ws);
   assert.equal(existsSync(join(root, "figures")), true);
 });
+
+test('record edits never replace identical record text inside a preceding comment', async t => {
+  const path=join(scratch(t),'reference.bib');
+  const raw='@article{one, title={Original}, slide-studio-status={unverified}, archiveprefix={arXiv}, eprint={1234.5678}}';
+  const prefix=`% ${raw}\n`;
+  write(path,prefix+raw+'\n');
+  await update_path(path,'one',{title:'Changed'},raw);
+  assert.ok(readFileSync(path,'utf8').startsWith(prefix));
+  write(path,prefix+raw+'\n');await verify_path(path,'one');
+  assert.ok(readFileSync(path,'utf8').startsWith(prefix));
+  assert.equal(listing(path)[0]?.unverified,false);
+  const enriched=with_arxiv_venue(prefix+raw+'\n');
+  assert.ok(enriched.startsWith(prefix));assert.match(enriched.slice(prefix.length),/howpublished/);
+});

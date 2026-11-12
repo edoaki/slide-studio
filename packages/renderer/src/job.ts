@@ -17,6 +17,8 @@ export interface ValidatedRenderJob {
   outputDir: string;
   timeoutMs: number;
   screenshots: boolean;
+  allSteps?: boolean;
+  pdf?: boolean;
 }
 
 function absolutePath(value: unknown, field: string): string {
@@ -63,7 +65,10 @@ export function parseRenderJob(value: unknown): ValidatedRenderJob {
     throw new JobValidationError("screenshots must be a boolean");
   }
 
+  for (const name of ["allSteps", "pdf"]) if (job[name] !== undefined && typeof job[name] !== "boolean") throw new JobValidationError(`${name} must be a boolean`);
   return {
+    ...(job.allSteps === undefined ? {} : { allSteps: job.allSteps as boolean }),
+    ...(job.pdf === undefined ? {} : { pdf: job.pdf as boolean }),
     schemaVersion: 1,
     inputHtml,
     outputDir,

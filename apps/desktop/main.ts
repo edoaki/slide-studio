@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, realpathSync, statSync, type Stats } from "node:fs";
-import { mkdtemp, mkdir, readFile, readdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, realpathSync, statSync, readFileSync, type Stats } from "node:fs";
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, lstat } from "node:fs/promises";
+import { tmpdir, homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import {
   app,
@@ -23,7 +23,11 @@ import type {
 import type { LegacyExportDocumentInput } from "../server/legacy.js";
 import { close_pandoc } from "../../packages/core/src/legacy-pandoc.js";
 import { render_text } from "../../packages/core/src/legacy-render.js";
+import { default_root } from "../../packages/core/src/legacy-workspace.js";
+import { argumentsOf, runCommand, throughBridge, earlyCommand } from "../cli/commands.js";
+import { prepareLauncher } from "../cli/launcher.js";
 import { atomicWriteFile } from "../../packages/renderer/src/output.js";
+import { atomicWriteFile as privateWrite } from "../../packages/core/src/atomic.js";
 import { STUDIO_RENDER_SCHEME } from "../../packages/renderer/src/protocol.js";
 import {
   startLegacyHost,
@@ -168,6 +172,8 @@ function resolveWorkspaceRoot(userData: string): { root: string; sample: boolean
     }
     return { root: requested, sample: false };
   }
+  const saved=readWorkspaceLocations().current;
+  if(saved && existsSync(saved) && statSync(saved).isDirectory()) return {root:saved,sample:false};
   const root = join(userData, "trial-workspace");
   mkdirSync(root, { recursive: true });
   return { root, sample: true };
@@ -279,8 +285,11 @@ function applySessionPolicy(target: Session): void {
     callback(false);
   });
   target.setPermissionCheckHandler(() => false);
-  target.on("will-download", (event) => {
-    event.preventDefault();
+  target.on("will-download", (event, item, contents) => {
+    // Only authenticated admin UI creates these local export blobs.
+    const trusted = mainWindow && contents === mainWindow.webContents && desktopHost
+      && item.getURL().startsWith(`blob:${desktopHost.adminOrigin}/`);
+    if (!trusted) event.preventDefault();
   });
   target.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, callback) => {
     callback({ cancel: !isLoopbackOrInternal(details.url) });
@@ -371,9 +380,9 @@ function installWindowPolicy(window: BrowserWindow): void {
   });
 }
 
-function createMainWindow(adminOrigin: string, token: string): void {
+function createMainWindow(adminOrigin: string, token: string, deck?: string): void {
   credentialToken = token;
-  bootstrapUrl = `${adminOrigin}/#token=${encodeURIComponent(token)}`;
+  bootstrapUrl = `${adminOrigin}${deck ? '/deck/' + encodeURIComponent(deck) : '/'}#token=${encodeURIComponent(token)}`;
   mainWindow = new BrowserWindow({
     show: !hiddenWindow,
     width: 1280,
@@ -540,6 +549,27 @@ function legacyDiagnostics(): LegacyDiagnosticItem[] {
   ];
 }
 
+async function inspectLegacy(html: string, options: { pdf: boolean; screenshots: boolean; allSteps: boolean }) {
+  return enqueuePdf(async () => {
+    const [{ parseRenderJob }, { renderDeck }, { JobDeadline }] = await Promise.all([
+      import('../../packages/renderer/src/job.js'), import('../../packages/renderer/src/render.js'), import('../../packages/renderer/src/deadline.js'),
+    ]);
+    const temporary = await mkdtemp(join(tmpdir(), 'slide-studio-inspect-'));
+    const deadline = new JobDeadline(180000, '描画が時間内に完了しませんでした');
+    activePdfDeadline = deadline;
+    try {
+      const inputHtml = join(temporary, 'input.html'), outputDir = join(temporary, 'output');
+      await writeOutput(inputHtml, html);
+      const result = await renderDeck(parseRenderJob({ schemaVersion: 1, inputHtml, outputDir, timeoutMs: 180000, ...options }), outputDir, deadline);
+      const screenshots = await Promise.all(result.steps.filter(s => s.screenshot).map(async s => ({ slide: s.slide, step: s.step, bytes: await readFile(join(outputDir, s.screenshot!)) })));
+      return { slides: result.slides, steps: result.steps, screenshots, ...(options.pdf ? { pdf: await readFile(join(outputDir, result.pdfFile)) } : {}) };
+    } finally {
+      if (activePdfDeadline === deadline) activePdfDeadline = undefined;
+      deadline.dispose(); await rm(temporary, { recursive: true, force: true, maxRetries: 5 });
+    }
+  });
+}
+
 async function writePdf(document: PreviewDocument, filePath: string): Promise<string> {
   const [{ parseRenderJob }, { renderDeck, RenderFailure }, { JobDeadline }] = await Promise.all([
     import("../../packages/renderer/src/job.js"),
@@ -588,6 +618,28 @@ async function writePdf(document: PreviewDocument, filePath: string): Promise<st
   }
 }
 
+function readWorkspaceLocations(): {current:string|null;recent:string[]} {
+  try {
+    const value=JSON.parse(readFileSync(join(app.getPath("userData"),"workspaces.json"),"utf8"));
+    const recent=Array.isArray(value.recent) ? value.recent.filter((p:unknown):p is string=>typeof p==="string"&&isAbsolute(p)).slice(0,12) : [];
+    return {current:typeof value.current==="string"&&isAbsolute(value.current)?value.current:null,recent};
+  } catch {return {current:null,recent:[]};}
+}
+async function chooseWorkspacePath(input:string,mode:"new"|"existing"):Promise<LegacyWorkspace> {
+  const selected=input==="~"?homedir():input.startsWith("~/")?join(homedir(),input.slice(2)):input;
+  if(!selected.trim()||!isAbsolute(selected))throw codedError("INVALID_INPUT","保管場所を絶対パスで指定してください");
+  const info=await lstat(selected).catch((error:NodeJS.ErrnoException)=>{if(error.code==='ENOENT')return null;throw error;});
+  if(mode==="new"){
+    if(info)throw codedError("INVALID_INPUT","同じ名前のフォルダがあります。既存フォルダを選ぶか、名前を変えてください");
+    await mkdir(dirname(selected),{recursive:true});await mkdir(selected,{mode:0o700});
+  } else {
+    if(!info || !(await stat(selected)).isDirectory())throw codedError("INVALID_INPUT","既存のフォルダを選んでください");
+    const names=await readdir(selected);
+    const directory=async(name:string)=>(await stat(join(selected,name)).catch(()=>null))?.isDirectory();
+    if(names.length && !(await directory('decks') && (await directory('topics') || await directory('figures'))))throw codedError("INVALID_INPUT","空のフォルダか、スライドの保管フォルダを選んでください");
+  }
+  return prepareWorkspace(selected);
+}
 async function selectWorkspace(): Promise<LegacyWorkspace | null> {
   const result = await showOpenDialog({
     title: MAIN_STRINGS.chooseWorkspace,
@@ -596,9 +648,10 @@ async function selectWorkspace(): Promise<LegacyWorkspace | null> {
   const selected = result.filePaths[0];
   if (result.canceled || selected === undefined || selected.length === 0) return null;
   if (shuttingDown) return null;
-  if (!isAbsolute(selected)) {
-    throw codedError("INVALID_INPUT", "selected workspace folder must be absolute");
-  }
+  return chooseWorkspacePath(selected,"existing");
+}
+async function prepareWorkspace(selected:string):Promise<LegacyWorkspace> {
+
   if (
     workspaceService !== undefined
     && canonicalPath(selected) === canonicalPath(workspaceService.root)
@@ -610,7 +663,7 @@ async function selectWorkspace(): Promise<LegacyWorkspace | null> {
     await next.close().catch((error: unknown) => {
       console.error("[desktop] cannot close a workspace opened during shutdown", error);
     });
-    return null;
+    throw codedError("INVALID_INPUT", "アプリを終了しています");
   }
   if (pendingWorkspaceService !== undefined) {
     await pendingWorkspaceService.close().catch((error: unknown) => {
@@ -636,6 +689,7 @@ async function legacyWorkspaceChanged(
   pendingWorkspaceService = undefined;
   const old = workspaceService;
   workspaceService = pending;
+  const recent=[...new Set([next.root,previous.root,...readWorkspaceLocations().recent])].slice(0,12);
   if (old !== undefined && old.workspace === previous && old !== pending) {
     try {
       await old.close();
@@ -643,10 +697,21 @@ async function legacyWorkspaceChanged(
       console.error("[desktop] cannot release the previous workspace lock", error);
     }
   }
+  await atomicWriteFile(join(app.getPath("userData"),"workspaces.json"),JSON.stringify({current:next.root,recent}));
+
 }
 
 async function start(): Promise<void> {
   try {
+    const cli = cliMode ? argumentsOf(process.argv.slice(process.argv.indexOf("--studio-cli") + 1)) : null;
+    if (cli && earlyCommand(cli)) { await shutdown(0); return; }
+    if (cli) {
+      const root = cli.values.root ?? default_root();
+      process.env.SLIDE_STUDIO_HOME = resolve(root.startsWith("~/") ? join(homedir(), root.slice(2)) : root);
+      const bridged = await throughBridge(process.env.SLIDE_STUDIO_HOME, cli);
+      if (bridged !== null) { await shutdown(bridged); return; }
+      if (["new", "import", "fig"].includes(cli.positionals[0] ?? "")) mkdirSync(process.env.SLIDE_STUDIO_HOME, {recursive: true});
+    }
     appPath = app.isPackaged ? app.getAppPath() : resolveSourceRoot(app.getAppPath());
     uiDirectory = join(appPath, "dist", "packages", "web");
     pdfTemporaryRoot = join(app.getPath("userData"), "tmp");
@@ -656,11 +721,16 @@ async function start(): Promise<void> {
     const requested = resolveWorkspaceRoot(userData);
     pandocPath = resolvePandocPath();
     assertPandocAvailable();
+    if (!cliMode) process.env.SLIDE_STUDIO_CLI_BIN = await prepareLauncher(join(userData, "bin"), process.execPath, app.isPackaged ? undefined : join(appPath, "dist/apps/desktop/main.js"));
 
     workspaceService = await openLegacyWorkspace(requested.root, {
       sample: requested.sample,
     });
     workspace = workspaceService.workspace;
+    if (cli && cli.positionals[0] && cli.positionals[0] !== "open") {
+      const code = await runCommand(workspaceService.workspace, cli, {pandocPath, inspect: inspectLegacy, diagnostics: async () => legacyDiagnostics()});
+      await shutdown(code); return;
+    }
     if (shuttingDown) {
       await workspaceService.close();
       workspaceService = undefined;
@@ -675,6 +745,8 @@ async function start(): Promise<void> {
       pandocPath,
       renderText: render_text,
       selectWorkspace,
+      openWorkspace:chooseWorkspacePath,
+      recentWorkspaces:()=>readWorkspaceLocations().recent,
       onWorkspaceChanged: legacyWorkspaceChanged,
       openExternal: openExternalUrl,
       openPath: async path => {
@@ -682,6 +754,9 @@ async function start(): Promise<void> {
         if (error) throw new Error(error);
       },
       exportDocument: exportLegacyDocument,
+      inspect: inspectLegacy,
+      aiStorage: join(app.getPath("userData"), "ai"),
+      adminPort: browserMode ? Number(argumentValue(process.argv, "port") ?? 4320) : undefined,
       diagnostics: legacyDiagnostics,
       onShutdown: async () => {
         // Accepted host operations have settled by now. Cancel any remaining
@@ -701,12 +776,25 @@ async function start(): Promise<void> {
     allowedOrigins.add(desktopHost.contentOrigin);
     adminOriginValue = desktopHost.adminOrigin;
 
+    if (browserMode) {
+      const deck = argumentValue(process.argv, "deck");
+      const url = `${desktopHost.adminOrigin}${deck ? '/deck/' + encodeURIComponent(deck) : '/'}#token=${encodeURIComponent(desktopHost.token)}`;
+      // Keep the credential out of terminal logs; the owner-only bootstrap is
+      // available when --no-browser is requested or the OS browser cannot open.
+      const bootstrap = join(app.getPath("userData"), "browser-connection.html");
+      await privateWrite(bootstrap, `<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><a href="${url}">Slide Studio を開く</a>`, 0o600);
+      process.stdout.write(`Slide Studio: ${desktopHost.adminOrigin}\n接続用ファイル: ${bootstrap}\n終了: Ctrl+C\n`);
+      if (!process.argv.includes("--no-browser")) await shell.openExternal(url);
+      return;
+    }
+
     installSessionPolicy();
-    createMainWindow(desktopHost.adminOrigin, desktopHost.token);
+    createMainWindow(desktopHost.adminOrigin, desktopHost.token, cli?.positionals[0] === "open" ? cli.positionals[1] : argumentValue(process.argv, "deck"));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[desktop] startup failed", error);
     try {
+      if (cliMode || browserMode) { await shutdown(1); return; }
       dialog.showErrorBox(MAIN_STRINGS.startupError, message);
     } catch {
       // The dialog module can be unavailable if Electron is still starting.
@@ -725,6 +813,8 @@ async function shutdown(exitCode = 0): Promise<void> {
     console.error("[desktop] cannot close the desktop host", error);
   }
   desktopHost = undefined;
+  if (browserMode) await rm(join(app.getPath("userData"), "browser-connection.html"), {force: true});
+  await close_pandoc();
   try {
     await pdfTail;
   } catch (error) {
@@ -757,9 +847,12 @@ async function shutdown(exitCode = 0): Promise<void> {
 
 // Everything below must be synchronous and must happen before app.whenReady().
 const userDataOverride = process.env.SLIDE_STUDIO_ELECTRON_HOME;
+const cliMode = process.argv.includes("--studio-cli");
+const browserMode = process.argv.includes("--studio-browser") || cliMode && (process.argv.includes("--browser") || process.argv.includes("--no-browser"));
+const cliTemporaryProfile = cliMode && !userDataOverride ? mkdtempSync(join(tmpdir(), "slide-studio-cli-")) : null;
 const profileDirectory = userDataOverride !== undefined && userDataOverride.length > 0
   ? (isAbsolute(userDataOverride) ? userDataOverride : resolve(process.cwd(), userDataOverride))
-  : join(app.getPath("appData"), app.isPackaged ? "Slide Studio" : "Slide Studio Dev");
+  : cliTemporaryProfile ?? join(app.getPath("appData"), app.isPackaged ? "Slide Studio" : "Slide Studio Dev");
 const logsDirectory = join(profileDirectory, "logs");
 const crashDumpsDirectory = join(profileDirectory, "crashDumps");
 const sessionDataDirectory = join(profileDirectory, "sessionData");
@@ -771,6 +864,7 @@ app.setPath("userData", profileDirectory);
 app.setPath("sessionData", sessionDataDirectory);
 app.setPath("logs", logsDirectory);
 app.setPath("crashDumps", crashDumpsDirectory);
+if (cliTemporaryProfile) app.once("quit", () => { try { rmSync(cliTemporaryProfile, {recursive: true, force: true}); } catch {} });
 app.enableSandbox();
 app.commandLine.appendSwitch("dns-prefetch-disable");
 protocol.registerSchemesAsPrivileged([{
@@ -809,10 +903,12 @@ if (!hasSingleInstanceLock) {
   });
 
   app.on("window-all-closed", () => {
+    if (cliMode || browserMode) return;
     void shutdown(0);
   });
 
   app.whenReady().then(async () => {
+    if (cliMode || browserMode) app.dock?.hide();
     hiddenWindow = process.argv.includes("--hidden");
     await start();
   }).catch((error: unknown) => {

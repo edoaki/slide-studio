@@ -1,3 +1,6 @@
+import { createFrameBlocks } from './frame-blocks.js';
+import { createFrameCover } from './frame-cover.js';
+import { DESIGN_VARS } from '../block-design.js';
 // Content half of the staged preview/presentation bridge.
 //
 // The host serves this file as bridge/frame-agent.classic.js and includes it as
@@ -19,6 +22,7 @@ import {
   validateSnapshot,
   validateThemeName,
 } from './protocol.js';
+import { createFrameText } from './frame-text.js';
 import { createFrameSelection } from './frame-selection.js';
 
 const MAX_SNAPSHOT_STAGES = 4096;
@@ -312,6 +316,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       stageAt,
       stageNumbers: cachedStageNumbers,
       sourceVersion: liveSourceVersion,
+      hasReferences: !!querySelector('.references-slide .csl-entry'),
     };
     return validateSnapshot(snapshot, identity) ? snapshot : null;
   }
@@ -447,6 +452,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     installLinkInterception();
   }
 
+  let textEditor = null, coverEditor = null, blockEditor = null;
   function markReady() {
     if (ready || destroyed) return;
     const target = currentDeck();
@@ -461,6 +467,9 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     removeWindowListener('deckready', markReady);
     installReadyListeners();
     if (!presenting) {
+      blockEditor = createFrameBlocks(win, doc, { getSourceVersion: () => liveSourceVersion, sendEvent });
+      coverEditor = createFrameCover(win, doc, { getSourceVersion: () => liveSourceVersion, sendEvent });
+      textEditor = createFrameText(win, doc, { getSourceVersion: () => liveSourceVersion, sendEvent });
       selection = createFrameSelection(win, doc, {
         getSourceVersion: () => liveSourceVersion,
         sendEvent,
@@ -523,6 +532,30 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       }
       case 'theme.swap':
         return swapTheme(params.name, params.version, params.sourceVersion);
+      case 'block.configure': return Promise.resolve(blockEditor.configure(params));
+      case 'block.dropAt': return Promise.resolve(blockEditor.dropAt(params));
+      case 'block.clear': blockEditor.clear(); return Promise.resolve(null);
+      case 'block.cancel': blockEditor.cancel(); return Promise.resolve(null);
+      case 'cover.inspect': return Promise.resolve(coverEditor.state());
+      case 'cover.configure': coverEditor.configure(params.enabled); return Promise.resolve(null);
+      case 'cover.select': coverEditor.select(params.selected); return Promise.resolve(null);
+      case 'edit.themeValues':
+        return Promise.resolve(Object.fromEntries(DESIGN_VARS.map(k => [k, getComputedStyle(doc.documentElement).getPropertyValue(k).trim()])));
+      case 'edit.themePreview':
+        for (const [k,v] of Object.entries(params.values)) {
+          if (v === null) doc.documentElement.style.removeProperty(k); else doc.documentElement.style.setProperty(k,v);
+          if (/^--block-(quote|bracket|fold)-line$/.test(k)) { const m = v?.match(/^([\d.]+px) \w+ (#[\da-f]{8})$/i), stem=k.replace(/-line$/, '');
+            for (const [suffix,value] of [['accent',m?.[2]],['width',m?.[1]]]) { if(value)doc.documentElement.style.setProperty(`${stem}-${suffix}`,value);else doc.documentElement.style.removeProperty(`${stem}-${suffix}`); }
+          }
+        }
+        return Promise.resolve(null);
+      case 'text.begin':
+        if (!textEditor || !selection || (!params.heading && !selection.hasKey(params.key))) throw errorWithCode('unknown-key', 'unknown editing key');
+        return Promise.resolve(textEditor.begin(params));
+      case 'text.command':
+        return textEditor.command(params);
+      case 'text.cellAt':
+        return Promise.resolve(textEditor.cellAt(params));
       case 'edit.configure': {
         if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
         // Only the frame's actual committed source revision is accepted.
@@ -549,6 +582,18 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
         selection.designing(params.active);
         return Promise.resolve({ active: params.active });
+      case 'edit.markStep':
+        querySelectorAll('.slide-studio-step-mark').forEach(el=>el.classList.remove('slide-studio-step-mark'));
+        if(params.step!==null)querySelector('.slide.active')?.querySelectorAll('[data-step],[data-highlight-step]').forEach(el=>{if(Number(el.dataset.step??el.dataset.highlightStep)===params.step&&!el.parentElement.closest('.slide-studio-step-mark'))el.classList.add('slide-studio-step-mark');});
+        return Promise.resolve(null);
+      case 'edit.issues':
+        querySelectorAll('.slide-studio-check-box').forEach(n => n.remove());
+        for (const r of params.rects) {
+          const n = doc.createElement('div'); n.className = 'slide-studio-check-box';
+          Object.assign(n.style, {position:'absolute',left:`${r.x-3}px`,top:`${r.y-3}px`,width:`${r.w+6}px`,height:`${r.h+6}px`,boxSizing:'border-box',border:`3px solid ${params.level === 'error' ? '#dc2626' : '#d97706'}`,borderRadius:'3px',pointerEvents:'none',zIndex:'99999'});
+          (querySelector('#stage') || doc.body).append(n);
+        }
+        return Promise.resolve(null);
       case 'edit.locks':
         if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
         selection.locks(params.figures, params.color);
@@ -653,7 +698,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         // the parent's cached backdrop without turning the ack into a snapshot.
         publish('deckchange', true);
         send(makeResponse(identity, message.id, true, result ?? null));
-      } else if (message.method.startsWith('edit.')) {
+      } else if ((message.method.startsWith('edit.') || message.method.startsWith('text.') || message.method.startsWith('cover.') || message.method.startsWith('block.'))) {
         // Edit acks are direct results (selection already published an
         // edit.layout event). They must not be replaced by a deck snapshot.
         send(makeResponse(identity, message.id, true, result ?? null));

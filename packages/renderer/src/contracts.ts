@@ -9,6 +9,8 @@ export interface RenderJob {
   timeoutMs?: number;
   /** Capture every PDF-selected step at 1280x720. Default true. */
   screenshots?: boolean;
+  allSteps?: boolean;
+  pdf?: boolean;
 }
 
 export interface RenderStep {

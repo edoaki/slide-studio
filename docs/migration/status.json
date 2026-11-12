@@ -1,7 +1,7 @@
 {
-  "date": "2026-11-12",
+  "date": "2026-11-13",
   "milestone": "Full legacy UI / behavior parity migration; simplified desktop slice rejected",
-  "status": "in_progress",
+  "status": "in_progress_original_ui_integrated",
   "baseline_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
   "python_code_commit": "186a68df8a8c6e20bf4ce495e70dd065f3c56eb8",
   "layout": {
@@ -159,11 +159,11 @@
     }
   ],
   "next_work": [
-    "Retain raw Python and Electron PDF pages; cross-merge to isolate print-compositor versus merger differences",
-    "Inspect ToUnicode space mappings and classify invisible/outlined SVG labels using high-resolution crops",
-    "Add focused text-layer fixture and an explicit policy for invisible text before declaring PDF parity",
-    "Finish API/SSE/iframe and AI CLI OS contracts; then continue M1 host/direct-edit/packaging work on Mac",
-    "Complete Windows and signing acceptance once environments/accounts are available"
+    "Complete the 377-case legacy UI test correspondence; integration coverage is not a claim that every old test passes.",
+    "Live authenticated inference for each provider and full OS capability classification.",
+    "Finish edge rendering goldens and PDF visual/text comparison.",
+    "Windows runtime and Intel Mac runtime verification are not performed; Windows is deferred by user.",
+    "Developer ID/notarization, Windows signing and public GitHub release are not configured."
   ],
   "source_commits": {
     "renderer": "b53890b",
@@ -174,12 +174,6 @@
   "checkout_layout": "Electron-only source tree. Legacy Python implementation and tests preserved in ../slide-studio-old and Git history; migration is not feature-complete.",
   "historical_evidence": "Python test results, manifests and old artifact paths are historical baseline evidence; source/test citations refer to the reference checkout or recorded Git commit.",
   "electron_only_checkout": "electron-only.json",
-  "current_scope": {
-    "reference": "legacy/python ca1f148; original uv-run application",
-    "required": "All legacy appearance, features and operations, including AI/history/direct editing/materials/bibliography/themes/presentation/CLI",
-    "simplified_ui": "Rejected by user; not a deliverable or parity evidence",
-    "packaging": "DMG and NSIS EXE generation proven for superseded slice; full parity build/install still required",
-    "source_install": "npm workflow under development; GitHub branch not yet published"
-  },
+  "current_scope": "Original UI and TypeScript/Electron host are connected across desktop, browser and CLI. Whole-workflow integration and installed-DMG verification are required; individual features do not constitute completion.",
   "full_parity_progress": "full-parity-progress.json"
 }

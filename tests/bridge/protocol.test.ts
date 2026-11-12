@@ -255,3 +255,19 @@ test("preview capability requires a matching absolute http(s) origin", () => {
   assert.throws(() => p.parsePreviewCapability({ ...capability, url: "file:///tmp/a.html" }));
   assert.throws(() => p.parsePreviewCapability({ ...capability, version: "" }));
 });
+
+test('direct editing boundary rejects unknown operations, invalid author layouts and oversized text',()=>{
+ const base={sourceVersion:'v1',sequence:1,trusted:true};
+ const event=(name:string,data:unknown)=>p.validateEvent(p.makeEvent(identity,name,data),identity);
+ assert.equal(event('block.intent',{...base,kind:'operation',key:'p0/0',name:'eval',value:'code'}),false);
+ assert.equal(event('block.intent',{...base,sequence:-1,kind:'layout'}),false);
+ assert.equal(event('block.intent',{...base,kind:'outside',key:'p0/0',phase:'drop',point:{x:100,y:700}}),true);
+ assert.equal(event('block.intent',{...base,kind:'outside',key:'p0/0',phase:'drop',point:{x:Infinity,y:700}}),false);
+ assert.equal(event('cover.intent',{...base,kind:'commit',state:{values:{file:'outside'}}}),false);
+ const state={values:{position:'bottom',size:35},formats:{size:{size:35,bold:false},affSize:{size:20,bold:false}},rect:{left:0,top:0,right:100,bottom:100,width:100,height:100},left:0,top:0};
+ assert.equal(event('cover.intent',{...base,kind:'commit',state}),true);
+ assert.equal(event('cover.intent',{...base,kind:'commit',state:{...state,values:{...state.values,size:Infinity}}}),false);
+ assert.equal(event('text.state',{...base,lease:'session',kind:'finished',html:'text',state:null}),true);
+ assert.equal(event('text.state',{...base,lease:'session',kind:'finished',html:'x'.repeat(1000001),state:null}),false);
+ assert.equal(event('text.state',{...base,lease:'session',kind:'finished',html:'text',state:{rect:{left:NaN}}}),false);
+});

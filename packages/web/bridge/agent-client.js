@@ -330,7 +330,7 @@ export class AgentClient {
         pending.reject(bridgeError(data.error.code, data.error.message));
         return;
       }
-      if (pending.method.startsWith('edit.')) {
+      if ((pending.method.startsWith('edit.') || pending.method.startsWith('text.') || pending.method.startsWith('cover.') || pending.method.startsWith('block.'))) {
         const layout = pending.method === 'edit.measure' ? parseEditLayout(data.result) : null;
         pending.resolve(layout || data.result);
         return;

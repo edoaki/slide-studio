@@ -193,6 +193,7 @@ export function mount(fig) {
       case 'first': api.setStep(0, false); break;
       case 'previous': api.setStep(api.step - 1, false); break;
       case 'next': api.setStep(api.step + 1, false); break;
+      case 'step': if (Number.isInteger(event.data.step) && event.data.step >= 0 && event.data.step < fig.steps.length) api.setStep(event.data.step, false); break;
     }
   };
   window.addEventListener('message', assetCommand);

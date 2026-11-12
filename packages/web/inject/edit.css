@@ -63,3 +63,27 @@ body { background: #fff; }
 .cover-authors { cursor:grab; }
 .cover-authors-selected { outline:2px solid #399dc2; outline-offset:3px; }
 .cover-authors-selected:active { cursor:grabbing; }
+
+/* Shared handle geometry; controls live inside the isolated preview frame. */
+.bh-layer, .bd-layer { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+/* つまみの地は白（スライドの地は常に白なので、暗い表示でも黒くしない） */
+.bh { position: absolute; pointer-events: auto; box-sizing: border-box; background: #fff; border: 1.5px solid var(--hc, var(--primary)); border-radius: 3px; box-shadow: 0 1px 3px rgba(30, 36, 60, .25); touch-action: none; }
+.bh.corner { cursor: nwse-resize; border-radius: 2px; }
+.bh.edge-x, .bh.pad-x { cursor: ew-resize; border-radius: var(--r-full); }
+.bh.edge-y, .bh.pad-y { cursor: ns-resize; border-radius: var(--r-full); }
+.bh:hover, .bh.on { background: var(--hc, var(--primary)); }
+/* 表の列の境目：線の上ならどこでも掴める。普段は上端の小さなつまみだけ見せ、合わせると線を出す */
+.bh.table-col, .bh.table-col:hover, .bh.table-col.on { background: transparent; border: 0; border-radius: 0; box-shadow: none; cursor: col-resize; }
+.bh.table-col::before { content: ''; position: absolute; left: 0; top: -14px; width: 8px; height: 14px; box-sizing: border-box; background: #fff; border: 1.5px solid var(--hc, var(--primary)); border-radius: var(--r-full); box-shadow: 0 1px 3px rgba(30, 36, 60, .25); }
+.bh.table-col:hover::before, .bh.table-col.on::before { background: var(--hc, var(--primary)); }
+.bh.table-col:hover::after, .bh.table-col.on::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px; background: var(--hc, var(--primary)); }
+/* つまみ・ブロックを動かしている間はツールバーを隠す（下の数値や置き場所を見せる） */
+[data-operating] > #blockTools { visibility: hidden; }
+.bh-band { position: absolute; background: color-mix(in srgb, var(--hc, var(--primary)) 20%, transparent); }
+.bh-band[data-value]::after { content: attr(data-value); position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 4px; background: var(--hc, var(--primary)); color: #fff; font: 600 10px/1.5 var(--font-mono); white-space: nowrap; }
+.bh-band[data-side="top"]::after { top: 0; transform: translate(-50%, calc(-100% - 7px)); }
+.bh-band[data-side="bottom"]::after { top: 100%; transform: translate(-50%, 7px); }
+.bh-band[data-side="left"]::after { left: 0; transform: translate(calc(-100% - 7px), -50%); }
+.bh-band[data-side="right"]::after { left: 100%; transform: translate(7px, -50%); }
+.bd-line { position: absolute; background: var(--primary); border-radius: 2px; box-shadow: 0 0 0 2px rgba(61, 134, 245, .25); }
+.bd-face { position: absolute; border: 2px dashed var(--primary); border-radius: 6px; background: var(--primary-soft); }

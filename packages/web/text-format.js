@@ -13,8 +13,8 @@ export const COLORS = [['accent', '--accent'], ['good', '--good'], ['warn', '--w
 export const COLOR_CLASSES = COLORS.map(([c]) => c);
 
 // win：今のスライドの iframe の window を返す関数
-export function makeTextFormat(win, changeAlign) {
-  const edit = () => win()?.slideStudioEdit;
+export function makeTextFormat(win, changeAlign, remote = null) {
+  const edit = () => remote ?? win()?.slideStudioEdit;
   const keep = e => { if (!e.target.closest('input')) e.preventDefault(); };
   const button = (icon, name, keys, fn, cls = '') => {
     const b = document.createElement('button');
@@ -58,7 +58,7 @@ export function makeTextFormat(win, changeAlign) {
     if (!open) return;
     // 色はスライドのテーマから取る（テーマを替えれば見本も替わる）
     const w = win(), cs = w && w.getComputedStyle(w.document.documentElement);
-    for (const b of swatches) b.style.setProperty('--c', cs?.getPropertyValue(b.dataset.var).trim() || 'transparent');
+    for (const b of swatches) b.style.setProperty('--c', remote?.colors()[b.dataset.var] || cs?.getPropertyValue(b.dataset.var).trim() || 'transparent');
   }
 
   const bold = button('bold', S.fmt.bold, '⌘ B', () => { edit()?.command('bold'); update(); });
@@ -74,8 +74,8 @@ export function makeTextFormat(win, changeAlign) {
   const linkBox = document.createElement('div'); linkBox.className = 'fmt-colorbox';
   const linkMenu = document.createElement('div'); linkMenu.className = 'fmt-menu fmt-link'; linkMenu.hidden = true;
   function closeLink() { linkMenu.hidden = true; linkMenu.replaceChildren(); }
-  function openLink() {
-    const state = edit()?.linkState(); if (!state) return;
+  async function openLink() {
+    const state = await edit()?.linkState(); if (!state) return;
     toggle(false);
     const input = linkInput({ ...state,
       done: (url, text) => { edit()?.setLink(url, text); closeLink(); update(); },
@@ -94,7 +94,7 @@ export function makeTextFormat(win, changeAlign) {
   // 選んでいる文字の今の書式を出す。force：大きさの欄に打ちかけていても今の値に戻す
   function update(force = false) {
     const st = edit()?.formatState?.(); if (!st) return;
-    const currentAlign = win()?.getComputedStyle(win().document.querySelector('.slide-studio-editing')).textAlign;
+    const currentAlign = remote?.align() ?? win()?.getComputedStyle(win().document.querySelector('.slide-studio-editing')).textAlign;
     align.setAlign(currentAlign);
     if (force || document.activeElement !== size) size.value = String(st.px);
     color.querySelector('.fmt-ink').style.background = st.ink;
@@ -108,7 +108,7 @@ export function makeTextFormat(win, changeAlign) {
   };
   addEventListener('pointerdown', away, true);
   return {
-    nodes, update,
+    nodes, update, openLink,
     // 表紙のタイトル・副題を直すときは、太字・斜体・リンクを出さない
     plain(on) { for (const n of styles) n.hidden = on; },
     // 表のセルの揃えは列で決まるので、セルを直している間は揃えを出さない

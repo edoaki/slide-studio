@@ -87,14 +87,15 @@ export function mountHome(root) {
     </main>
   </div>`;
   const $ = s => root.querySelector(s);
-  let data = null, alive = true;
+  let data = null, alive = true, loadSequence = 0;
   const actions = homeManage(root, load);
   const ai = homeAi($('.env-ai'));
 
 
   async function load() {
+    const sequence=++loadSequence;
     const [d, themes] = await Promise.all([api('/api/home'), api('/api/themes')]);
-    if (!alive) return;
+    if (!alive || sequence!==loadSequence) return;
     data = d;
     data.themeDetails = themes.themes;
     themeCards($('.theme-cards'), themes.themes, theme => newDeckDialog(data, { theme }), undefined, () => load());

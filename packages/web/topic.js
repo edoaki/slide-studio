@@ -94,9 +94,9 @@ export function mountTopic(root, shelf) {
         thumb.innerHTML = `<div class="topic-preview"><iframe ${item.kind === 'html' ? 'sandbox="allow-scripts"' : ''} tabindex="-1" aria-hidden="true" title="${esc(item.name)}" data-src="${esc(item.url)}"></iframe></div>${item.steps ? `<div class="meta">${S.topic.step(step + 1)}</div>` : ''}`;
         const frame = thumb.querySelector('iframe');
         if (item.kind === 'figure') frame.onload = () => {
-          const animation = frame.contentWindow?.animation;
-          animation?.setVisible(true);
-          animation?.setStep(step, false);
+          const origin = new URL(item.url, location.href).origin;
+          frame.contentWindow?.postMessage({channel: 'slide-studio-asset-preview', action: 'visible'}, origin);
+          frame.contentWindow?.postMessage({channel: 'slide-studio-asset-preview', action: 'step', step}, origin);
         };
         strip.append(thumb);
         const preview = thumb.querySelector('.topic-preview');
