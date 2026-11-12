@@ -5,7 +5,7 @@
 // 左の欄で［下書き］を見ている間は「下書きのチャット」（mode "memo"。設計書 §8.8）：タブ・会話を分け、対象を選ばず、
 // 書いて送るとすぐ1回の実行になる。AI は memo.md だけを直し、返事は普通の文章（検査も ✓／✗ も無い）。
 import { makeModelPicker, lookup, helpHtml, loginAi } from './ai-model.js';
-import { api, locationHeaders, esc, onEvent, toast as showToast } from './api.js';
+import { api, uploadFetch, esc, onEvent, toast as showToast } from './api.js';
 import { svg } from './icons.js';
 import { S } from './strings.js';
 import { tip } from './tip.js';
@@ -384,7 +384,7 @@ export function makeChat(ctx) {
     const image = (file.type || '').startsWith('image/') && (IMAGE.test(name) || !/\.\w+$/.test(name));
     const url = image ? `/api/deck/${encodeURIComponent(deck)}/assets?name=${encodeURIComponent(name)}`
       : `/api/deck/${encodeURIComponent(deck)}/materials?path=${encodeURIComponent(name || 'file')}`;
-    const r = await fetch(url, { method: 'POST', headers: { ...locationHeaders(), 'Content-Type': (image && file.type) || 'application/octet-stream' }, body: file });
+    const r = await uploadFetch(url, { method: 'POST', headers: { 'Content-Type': (image && file.type) || 'application/octet-stream' }, body: file });
     const out = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(`${name || T.attachUnnamed}：${out.error || r.status}`);
     return image ? { path: out.path, name: out.name, kind: 'image' } : { path: `materials/${out.path}`, name: out.path.split('/').pop(), kind: 'file' };

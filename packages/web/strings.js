@@ -70,6 +70,7 @@ export const S = {
   present: { title: '発表する', first: '最初から', current: '今のページから', error: '発表を始められませんでした。描画の状態を確認してください。' },
   pageTemplates: { title: 'ページのひな形', blank: '白紙', chapter: '章扉', references: '参考文献', appendix: 'Appendix', preview: { chapter: '章扉', references: 'Reference', appendix: 'Appendix' }, textImage: '文と図', imageBullets: '図と箇条書き', table: '表', comparison: '2つの比較' },
   appName: 'Slide Studio',
+  authLost: '認証が切れました。アプリを開き直してください。',
   checks: {
     duplicateAttribute: (key, value, line) => `${line}行目：${key} が重複しています。後の指定（${value}）は無視されます。属性を1つにまとめてください。`,
     openSource: '原稿の該当箇所へ',

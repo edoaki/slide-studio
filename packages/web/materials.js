@@ -7,7 +7,7 @@
 // - 新しいフォルダ・追加は選んでいるフォルダの中（ファイルならその隣）。新しいフォルダは名前をその場で打って作る
 // - Enter／F2 で名前の変更、Delete／⌫ で削除（.slide-studio/trash/ へ移す）、↑↓ で選択、←→ で閉じる・開く
 // - 行を持ってフォルダ（または空いている所）へ落とすと移す。パソコンのファイル・フォルダを落とすと、その場所に追加する
-import { api, locationHeaders, esc, onEvent, toast } from './api.js';
+import { api, uploadFetch, esc, onEvent, toast } from './api.js';
 import { svg } from './icons.js';
 import { S } from './strings.js';
 import { tip } from './tip.js';
@@ -232,8 +232,8 @@ export function makeMaterials(ctx) {
     let added = 0, reused = 0;
     for (const { file, path } of items) {
       try {
-        const r = await fetch(`/api/deck/${deck}/materials?path=${encodeURIComponent(join(dir, path))}`, {
-          method: 'POST', headers: { ...locationHeaders(), 'Content-Type': 'application/octet-stream' }, body: file,
+        const r = await uploadFetch(`/api/deck/${deck}/materials?path=${encodeURIComponent(join(dir, path))}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file,
         });
         const out = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(out.error || `${r.status}`);

@@ -5,7 +5,7 @@
 // 追加は末尾の点線のタイル・ドロップ・貼り付け（insert.js）。
 // 押すと拡大プレビュー。専用ボタンで削除の選択を始める（⇧ で範囲、⌘A ですべて）。Delete／⌫ か上の帯のごみ箱で消す
 // （.slide-studio/trash/ へ移し、取り消しで戻す）。
-import { api, locationHeaders, esc, onEvent, toast } from './api.js';
+import { api, uploadFetch, esc, onEvent, toast } from './api.js';
 import { svg } from './icons.js';
 import { S } from './strings.js';
 import { tip } from './tip.js';
@@ -239,8 +239,8 @@ export function makeAssets(ctx) {
 
   // ------------------------------------------------------------ 追加
   async function upload(file) {
-    const r = await fetch(`/api/deck/${deck}/assets?name=${encodeURIComponent(file.name || '')}`, {
-      method: 'POST', headers: { ...locationHeaders(), 'Content-Type': file.type || 'application/octet-stream' }, body: file,
+    const r = await uploadFetch(`/api/deck/${deck}/assets?name=${encodeURIComponent(file.name || '')}`, {
+      method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file,
     });
     const out = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(out.error || `${r.status}`);
