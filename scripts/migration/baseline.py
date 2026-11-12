@@ -58,6 +58,7 @@ DECK = "nco-intro"
 TOPIC = "nco"
 
 KIND = "batch_export_baseline"
+UNTRACKED_SCOPES = ("slide_studio/", "scripts/migration/", "tests/fixtures/")
 SCOPE = {
     "kind": KIND,
     "is_batch_export_baseline": True,
@@ -101,6 +102,7 @@ LIMITATIONS = [
     "pdf_text_sha256 hashes canonical extracted text (line endings and trailing spaces normalised), so it is comparable even when raw PDF hashes differ because of timestamps.",
     "The representative HTML/PDF is the run whose total_ms is closest to the median total.",
     "Temporary directories use the local filesystem; disk and OS cache conditions affect timings.",
+    "git.dirty covers tracked changes plus untracked files under slide_studio/, scripts/migration/, and tests/fixtures/; unrelated untracked files are excluded.",
     "If git.dirty is true, the recorded commit does not exactly reproduce the working tree.",
 ]
 
@@ -249,12 +251,38 @@ def _git(repo: Path, *args: str) -> str | None:
 
 
 def git_state(repo: Path) -> dict:
-    """Pin the commit. Tracked-file dirtiness is recorded because it affects reproduction."""
+    """Pin the commit and record tracked/untracked changes that affect the baseline."""
     commit = _git(repo, "rev-parse", "HEAD")
     if not commit:
         raise BaselineError("cannot determine the git commit; run from a git checkout")
-    status = _git(repo, "status", "--porcelain", "--untracked-files=no")
-    return {"commit": commit, "dirty": None if status is None else bool(status)}
+    tracked = _git(repo, "status", "--porcelain", "--untracked-files=no")
+    untracked = _untracked_scoped(repo)
+    if tracked is None or untracked is None:
+        dirty = None
+    else:
+        dirty = bool(tracked) or bool(untracked)
+    return {
+        "commit": commit,
+        "dirty": dirty,
+        "tracked_dirty": None if tracked is None else bool(tracked),
+        "untracked_scoped": untracked,
+        "untracked_scopes": list(UNTRACKED_SCOPES),
+    }
+
+
+def _untracked_scoped(repo: Path) -> list[str] | None:
+    """Untracked, non-ignored files under the baseline's relevant directories only."""
+    output = _git(
+        repo,
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "--",
+        *UNTRACKED_SCOPES,
+    )
+    if output is None:
+        return None
+    return sorted(line for line in output.splitlines() if line)
 
 
 def environment(browser: check.Browser, git: dict) -> dict:
@@ -375,12 +403,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         # Fail before doing expensive work, and again atomically at allocation time.
         check_output_available(output)
+        script_path = Path(__file__).resolve()
         git = git_state(REPO_ROOT)
+        fixture_snapshot = fixture_hashes(FIXTURE)
         fixture = {
             "path": _display_path(FIXTURE),
             "deck": DECK,
             "topic": TOPIC,
-            **fixture_hashes(FIXTURE),
+            **fixture_snapshot,
         }
 
         measurements: list[dict] = []
@@ -398,12 +428,16 @@ def main(argv: list[str] | None = None) -> int:
                 measurements.append(record)
                 output_paths.append((html, pdf))
 
+            if fixture_hashes(FIXTURE) != fixture_snapshot:
+                raise BaselineError("fixture hashes changed during the baseline run; refusing to write the manifest")
+
             index = representative_run_index(measurements)
             representative = measurements[index]
             html_source, pdf_source = output_paths[index]
 
             summary = summarize_measurements(measurements)
             text_hashes = sorted({m["pdf"]["text_sha256"] for m in measurements})
+            html_hashes = sorted({m["html"]["sha256"] for m in measurements})
             with output_directory(output) as out:
                 html_copy = out / html_source.name
                 pdf_copy = out / pdf_source.name
@@ -416,6 +450,10 @@ def main(argv: list[str] | None = None) -> int:
                     "generated_at": _now(),
                     "git_commit": git["commit"],
                     "git_dirty": git["dirty"],
+                    "script": {
+                        "path": _display_path(script_path),
+                        "sha256": sha256_file(script_path),
+                    },
                     "scope": SCOPE,
                     "environment": env,
                     "fixture": fixture,
@@ -427,6 +465,11 @@ def main(argv: list[str] | None = None) -> int:
                     },
                     "measurements": measurements,
                     "summary": summary,
+                    "html_hash_consistency": {
+                        "unique_sha256": html_hashes,
+                        "consistent": len(html_hashes) == 1,
+                        "runs": len(measurements),
+                    },
                     "pdf_text_present": {
                         "all_runs": all(m["pdf"]["text_present"] for m in measurements),
                         "runs_with_text": sum(m["pdf"]["text_present"] for m in measurements),

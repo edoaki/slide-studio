@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,37 @@ def _load_baseline():
 
 
 baseline = _load_baseline()
+
+
+def run_git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+def make_git_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    run_git(repo, "init", "-q")
+    run_git(repo, "config", "user.email", "baseline@example.invalid")
+    run_git(repo, "config", "user.name", "Baseline Test")
+    run_git(repo, "config", "commit.gpgsign", "false")
+    (repo / "tracked.txt").write_text("tracked\n")
+    run_git(repo, "add", "tracked.txt")
+    run_git(repo, "commit", "-q", "-m", "initial")
+    return repo
+
+
+def write_untracked(repo: Path, *relative_paths: str) -> None:
+    for relative in relative_paths:
+        path = repo / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"{relative}\n")
 
 
 def measurement(number: int, *, open_ms: float = 1.0, import_ms: float = 2.0,
@@ -117,6 +149,43 @@ def test_main_stops_before_starting_browser_when_output_exists(tmp_path, monkeyp
 
     assert baseline.main(["--output", str(out), "--runs", "1"]) == 1
     assert keep.read_text() == "caller content"
+
+
+# ---------------------------------------------------------------- git state
+
+
+def test_git_state_marks_scoped_untracked_files_dirty(tmp_path):
+    repo = make_git_repo(tmp_path)
+    write_untracked(
+        repo,
+        "slide_studio/new.py",
+        "scripts/migration/new.py",
+        "tests/fixtures/new.txt",
+        "tests/test_untracked.py",
+        "opencode.json",
+    )
+
+    state = baseline.git_state(repo)
+
+    assert state["tracked_dirty"] is False
+    assert state["dirty"] is True
+    assert state["untracked_scoped"] == [
+        "scripts/migration/new.py",
+        "slide_studio/new.py",
+        "tests/fixtures/new.txt",
+    ]
+    assert state["untracked_scopes"] == list(baseline.UNTRACKED_SCOPES)
+
+
+def test_git_state_ignores_unrelated_untracked_files(tmp_path):
+    repo = make_git_repo(tmp_path)
+    write_untracked(repo, "opencode.json", "tests/test_untracked.py")
+
+    state = baseline.git_state(repo)
+
+    assert state["tracked_dirty"] is False
+    assert state["dirty"] is False
+    assert state["untracked_scoped"] == []
 
 
 # ---------------------------------------------------------------- statistics
