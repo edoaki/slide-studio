@@ -153,6 +153,7 @@ async function launch(
   overrides: {
     featureHandlers?: LegacyFeatureHandler[];
     onShutdown?: () => void | Promise<void>;
+    openPath?: (path: string) => Promise<void>;
     watch?: boolean;
     keepAliveMs?: number;
     renderText?: LegacyRenderText;
@@ -174,6 +175,7 @@ async function launch(
     watch: overrides.watch ?? false,
     keepAliveMs: overrides.keepAliveMs,
     featureHandlers: overrides.featureHandlers,
+    openPath: overrides.openPath,
     selectWorkspace: overrides.selectWorkspace,
     maxBodyBytes: overrides.maxBodyBytes,
     maxSourceBodyBytes: overrides.maxSourceBodyBytes,
@@ -449,12 +451,12 @@ test("dispatches feature routes before the generic POST action and never fakes s
   assert.deepEqual(body.seen, { op: "list" });
   assert.deepEqual(calls, ["POST /api/deck/deck-1/assets"]);
 
-  const pending = await adminRequest(host, "/api/deck/deck-1/materials", {
+  const pending = await adminRequest(host, "/api/deck/deck-1/checks", {
     method: "GET",
   });
   assert.equal(pending.status, 501);
   const pendingBody = pending.json as { feature: string; code: string; pending: boolean };
-  assert.equal(pendingBody.feature, "materials");
+  assert.equal(pendingBody.feature, "checks");
   assert.equal(pendingBody.code, "NOT_IMPLEMENTED");
   assert.equal(pendingBody.pending, true);
 
@@ -988,4 +990,30 @@ test('theme switching resets positions while preserving author metadata and Unic
   assert.match(changed,/style="color:red"/);
   assert.match(changed,/title: 日本語🎤/);
   assert.equal(reset_cover_positions(changed),changed);
+});
+
+
+test('materials API uploads binary files, opens locally, moves, deletes and restores', async t => {
+  const opened:string[]=[];
+  const {host,workspace}=await launch(t,{openPath:async path=>{opened.push(path);}});
+  workspace.new_deck('talk','test');
+  const upload=await adminRequest(host,'/api/deck/talk/materials?path=data/a.csv',{method:'POST',body:'1,2\n',contentType:'application/octet-stream'});
+  assert.equal(upload.status,200);assert.deepEqual(upload.json,{path:'data/a.csv',reused:false});
+  const listing=await adminRequest(host,'/api/deck/talk/materials');
+  assert.equal(listing.status,200);assert.deepEqual((listing.json as {entries:{path:string}[]}).entries.map(e=>e.path),['data','data/a.csv']);
+  const preview=await adminRequest(host,'/api/deck/talk/materials/read?path=data/a.csv');
+  assert.equal(preview.status,200);assert.equal(preview.text,'1,2\n');
+  assert.match(String(preview.headers['content-type']),/application\/octet-stream/);
+  assert.equal((await adminRequest(host,'/api/deck/talk/materials/read?path=../slides.qmd')).status,400);
+  const op=(name:string,body:unknown)=>adminRequest(host,`/api/deck/talk/materials/${name}`,{method:'POST',json:body});
+  assert.equal((await op('open',{path:'data/a.csv'})).status,200);
+  assert.deepEqual(opened,[join(workspace.deck_dir('talk'),'materials/data/a.csv')]);
+  assert.equal((await op('mkdir',{path:'結果'})).status,200);
+  assert.equal((await op('move',{path:'data/a.csv',to:'結果/a.csv'})).status,200);
+  const deleted=await op('delete',{path:'結果'});assert.equal(deleted.status,200);
+  assert.equal((await op('restore',deleted.json)).status,200);
+  assert.equal(await readFile(join(workspace.deck_dir('talk'),'materials/結果/a.csv'),'utf8'),'1,2\n');
+  assert.equal((await op('move',{path:'結果',to:'../bad'})).status,400);
+  assert.equal((await op('chmod',{})).status,404);
+  assert.equal((await adminRequest(host,'/api/deck/missing/materials')).status,404);
 });

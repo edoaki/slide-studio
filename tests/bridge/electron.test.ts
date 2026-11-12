@@ -778,6 +778,11 @@ test("stage 2 selection stays trusted, keyed and revision-scoped across origins"
   const frame = page.frames().find(item => item.url().includes(`generation=${generation}`));
   if (!frame) throw new Error("selection content frame was not found");
 
+  await harnessCall(page, "editLocks", generation, ["test/figure"], "#ff8800");
+  assert.equal(await frame.locator('[data-slide-studio-fig="test/figure"]').evaluate(el => (el as HTMLElement).style.outlineWidth), "3px");
+  await harnessCall(page, "editLocks", generation, [], "#ff8800");
+  assert.equal(await frame.locator('[data-slide-studio-fig="test/figure"]').evaluate(el => (el as HTMLElement).style.outline), "");
+
   const keys = [
     "p1/0", "p1/0.0", "p1/0.0.0", "p1/0.0.1",
     "p1/0.1", "p1/0.1.0", "p1/0.1.1",

@@ -337,6 +337,10 @@ async function editDesigning(generation, active) {
   return entry.client.api.edit.designing(active);
 }
 
+async function editLocks(generation, figures, color) {
+  return entryFor(generation).client.editLocks(figures, color);
+}
+
 async function editMeasure(generation) {
   const entry = entryFor(generation);
   return entry.client.api.edit.measure();
@@ -401,6 +405,7 @@ window.__bridgeHarness = {
   editHover,
   editDesigning,
   editMeasure,
+  editLocks,
   editLayout,
   placeToolbar,
   failures,

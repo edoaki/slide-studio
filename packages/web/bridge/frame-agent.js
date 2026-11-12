@@ -549,6 +549,10 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
         selection.designing(params.active);
         return Promise.resolve({ active: params.active });
+      case 'edit.locks':
+        if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
+        selection.locks(params.figures, params.color);
+        return Promise.resolve(null);
       case 'edit.measure':
         if (!selection) throw errorWithCode('not-ready', 'selection is not ready');
         return Promise.resolve(selection.measure());

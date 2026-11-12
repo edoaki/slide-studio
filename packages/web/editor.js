@@ -113,10 +113,8 @@ export function mountEditor(root, deck) {
     root.querySelectorAll('#qblocks .chip[data-fig]').forEach(c => c.closest('.card')?.classList.toggle('ai-lock', figs.includes(c.dataset.fig)));
     root.querySelectorAll('#pagestrip button[data-index]').forEach(b => b.classList.toggle('ai-lock', pages.has(ctx.preview?.pageOfSlide(+b.dataset.index))));
     const color = getComputedStyle(document.documentElement).getPropertyValue('--locked').trim();
-    ctx.preview?.win?.document.querySelectorAll('[data-slide-studio-fig]').forEach(el => {
-      const on = figs.includes(el.dataset.slideStudioFig);
-      el.style.outline = on ? `3px solid ${color}` : ''; el.style.outlineOffset = on ? '2px' : '';
-    });
+    const client = ctx.preview?.client;
+    if (client) client.editLocks(figs, color).catch(() => {});
   }
   ctx.paintLock = paintLock;
   const statusEl = $('#status', root);

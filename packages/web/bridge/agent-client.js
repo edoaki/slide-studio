@@ -512,6 +512,10 @@ export class AgentClient {
     return this.request('edit.designing', { active: active === true });
   }
 
+  editLocks(figures, color) {
+    return this.request('edit.locks', { figures, color });
+  }
+
   editMeasure() {
     return this.request('edit.measure', {});
   }

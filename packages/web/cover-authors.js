@@ -22,7 +22,8 @@ export function makeCoverAuthors(host, { ctx, live, select, write }) {
   };
   const save = patch => { if (live()) write(setFront(ctx.text, 'cover-authors-layout', ` ${JSON.stringify({ ...values(), ...patch })}`)); };
   function place() {
-    const el = target(); if (!chosen || !el || !el.getBoundingClientRect().width) { bar.hidden = true; return; }
+    if (!chosen) { bar.hidden = true; return; }
+    const el = target(); if (!el || !el.getBoundingClientRect().width) { bar.hidden = true; return; }
     const r = el.getBoundingClientRect(), fr = ctx.preview.frame.getBoundingClientRect(), hr = host.getBoundingClientRect();
     bar.hidden = false;
     bar.style.left = `${Math.max(4, Math.min(fr.left - hr.left + r.left, hr.width - bar.offsetWidth - 4))}px`;

@@ -160,7 +160,7 @@
   "desktop_connect": {
     "commit": "6c985dc",
     "tests": 22,
-    "status": "original UI loads in actual Electron; themes connected; assets, materials, AI, checks and shots still report explicit 501"
+    "status": "original UI loads in Electron; theme and reference-material workflows connected; assets, AI, checks and shots still pending"
   },
   "theme_management": {
     "status": "management API connected; automatic theme thumbnail generation pending",
@@ -177,6 +177,29 @@
     "remaining": [
       "automatic theme thumbnails",
       "AI theme locks with AI integration"
+    ]
+  },
+  "validation_scope": {
+    "macOS": "active: source Electron and eventual installed DMG parity",
+    "Windows": "runtime validation deferred by explicit user instruction; do not block Mac/OSS work"
+  },
+  "materials": {
+    "status": "core and API integrated; actual original UI workflow passes in Electron",
+    "core_and_host_tests": 26,
+    "electron_workflow_tests": 1,
+    "bridge_regression_tests": 28,
+    "skipped": 0,
+    "verified": [
+      "upload with folder layout and collision-safe names",
+      "listing, rename, move, trash and restore",
+      "authenticated inert text preview; content-origin image/PDF URLs",
+      "native open adapter and bounded file scope",
+      "Electron folder creation, file chooser upload, CSV preview, rename, delete and undo",
+      "figure lock outlines use bridge instead of cross-origin DOM access"
+    ],
+    "remaining": [
+      "native folder/file opening manually verified outside test injection",
+      "large file performance and material attachments through AI integration"
     ]
   }
 }

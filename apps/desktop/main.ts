@@ -677,6 +677,10 @@ async function start(): Promise<void> {
       selectWorkspace,
       onWorkspaceChanged: legacyWorkspaceChanged,
       openExternal: openExternalUrl,
+      openPath: async path => {
+        const error = await shell.openPath(path);
+        if (error) throw new Error(error);
+      },
       exportDocument: exportLegacyDocument,
       diagnostics: legacyDiagnostics,
       onShutdown: async () => {

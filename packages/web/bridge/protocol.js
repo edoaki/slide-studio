@@ -17,7 +17,7 @@ export const KEY_ALLOWLIST = Object.freeze(['Escape', 'f']);
 // HTML, JavaScript, selectors, filesystem paths or an arbitrary remote URL.
 export const COMMAND_METHODS = Object.freeze([
   'go', 'move', 'jump', 'goStage', 'resize', 'setFilter', 'theme.swap', 'finish', 'pageWheel',
-  'edit.configure', 'edit.select', 'edit.hover', 'edit.designing', 'edit.measure',
+  'edit.configure', 'edit.select', 'edit.hover', 'edit.designing', 'edit.measure', 'edit.locks',
 ]);
 
 const MAX_SLIDES = 10000;
@@ -393,6 +393,10 @@ export function validateParams(method, params) {
       return validNullableKey(params.key);
     case 'edit.designing':
       return isBoolean(params.active);
+    case 'edit.locks':
+      return Array.isArray(params.figures) && params.figures.length <= 10000
+        && params.figures.every(key => isSafeString(key, { max: 4096 }))
+        && typeof params.color === 'string' && /^(?:#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s]+\))$/.test(params.color);
     case 'edit.measure':
       return Object.keys(params).length === 0;
     default:

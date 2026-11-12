@@ -175,6 +175,9 @@ test("selection commands validate source keys, layers and keymaps", () => {
   assert.equal(p.validateRequest({ ...request, params: { ...configure, keys: new Array(10001).fill("p") } }, identity), false);
   assert.throws(() => p.makeRequest(identity, 7, "edit.select", { key: "", frameKey: null }), /invalid bridge request/);
   assert.throws(() => p.makeRequest(identity, 8, "edit.measure", { extra: 1 }), /invalid bridge request/);
+  assert.equal(p.validateRequest(p.makeRequest(identity, 9, "edit.locks", {figures:["topic/figure"],color:"#ff8800"}),identity),true);
+  assert.throws(()=>p.makeRequest(identity,10,"edit.locks",{figures:[],color:"url(https://example.com)"}),/invalid bridge request/);
+  assert.throws(()=>p.makeRequest(identity,10,"edit.locks",{figures:new Array(10001).fill("x"),color:"#ffffff"}),/invalid bridge request/);
 });
 
 test("edit layouts are finite, bounded, uniquely keyed and revision checked", () => {

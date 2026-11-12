@@ -485,6 +485,14 @@ export function createFrameSelection(win, doc, {
     select,
     hover,
     designing,
+    locks(figures, color) {
+      const locked = new Set(figures);
+      for (const el of querySelectorAll('[data-slide-studio-fig]')) {
+        const on = locked.has(el.getAttribute('data-slide-studio-fig'));
+        el.style.outline = on ? `3px solid ${color}` : '';
+        el.style.outlineOffset = on ? '2px' : '';
+      }
+    },
     measure,
     schedule,
     get enabled() { return enabled; },

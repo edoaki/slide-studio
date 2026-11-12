@@ -65,6 +65,8 @@ import {
   set_front,
   type Workspace,
 } from "../../packages/core/src/legacy-workspace.js";
+import { handleMaterials } from "./legacy-materials.js";
+import { MAX_BYTES as MATERIALS_MAX_BYTES } from "../../packages/core/src/legacy-materials.js";
 import { LegacyThemes } from "./legacy-themes.js";
 import * as memo from "./legacy-memo.js";
 import * as history from "./legacy-history.js";
@@ -174,6 +176,7 @@ export interface LegacyHostOptions {
   onWorkspaceChanged?: LegacyWorkspaceChanged;
   /** Native OS browser opening. */
   openExternal?: LegacyOpenExternal;
+  openPath?: (path: string) => Promise<void>;
   /** Native save/export adapter, used by a later export feature route. */
   exportDocument?: LegacyExportDocument;
   /** Injected doctor/environment report for `/api/env`. */
@@ -307,7 +310,7 @@ export const LEGACY_WEB_FILES: readonly string[] = Object.freeze([
 ]);
 
 const PENDING_FEATURES: readonly string[] = Object.freeze([
-  "assets", "materials", "library", "bibliography", "bib", "theme-shots", "ai",
+  "assets", "library", "bibliography", "bib", "theme-shots", "ai",
   "chat", "checks", "shots", "math", "setup", "home-manage",
   "export", "download", "topic", "location",
   "inject", "hooks/locks", "edit-scope",
@@ -319,7 +322,7 @@ const IMPLEMENTED_FEATURES: readonly string[] = Object.freeze([
   "home", "env", "new-deck", "new-topic", "deck-read", "deck-source",
   "memo", "style", "structure", "events", "preview", "theme-preview",
   "open-external", "chunks", "warning-issues", "merge3",
-  "block-design-migrate", "themes",
+  "block-design-migrate", "themes", "materials",
 ]);
 
 const FEATURE_ROUTES: readonly FeatureRoute[] = Object.freeze([
@@ -332,6 +335,7 @@ const FEATURE_ROUTES: readonly FeatureRoute[] = Object.freeze([
   { name: "assets", methods: ["GET", "POST"], pattern: /^\/api\/deck\/[^/]+\/assets$/u, bodyLimit: DEFAULT_MAX_UPLOAD_BODY_BYTES },
   { name: "assets", methods: ["POST"], pattern: /^\/api\/deck\/[^/]+\/assets\/[^/]+$/u, bodyLimit: DEFAULT_MAX_UPLOAD_BODY_BYTES },
   { name: "materials", methods: ["GET", "POST"], pattern: /^\/api\/deck\/[^/]+\/materials$/u, bodyLimit: DEFAULT_MAX_UPLOAD_BODY_BYTES },
+  { name: "materials", methods: ["GET"], pattern: /^\/api\/deck\/[^/]+\/materials\/read$/u },
   { name: "materials", methods: ["POST"], pattern: /^\/api\/deck\/[^/]+\/materials\/[^/]+$/u, bodyLimit: DEFAULT_MAX_UPLOAD_BODY_BYTES },
   { name: "library", methods: ["GET", "POST"], pattern: /^\/api\/deck\/[^/]+\/library$/u, bodyLimit: DEFAULT_MAX_UPLOAD_BODY_BYTES },
   { name: "bibliography", methods: ["POST"], pattern: /^\/api\/topic\/[^/]+\/bib\/verify$/u },
@@ -1645,6 +1649,14 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       route: feature.name,
       ...extras,
     } as LegacyFeatureRequest & { route: string; deck?: string; op?: string };
+    const materialResult = await handleMaterials(workspace as Workspace, featureRequest, {
+      openPath: options.openPath,
+      changed: path => broadcast({ type: "files", paths: [path] }),
+    });
+    if (materialResult !== null) {
+      sendFeatureResponse(response, materialResult, contentOrigin);
+      return;
+    }
     const themeResult = await themes.handle(workspace as Workspace, featureRequest);
     if (themeResult !== null) {
       sendFeatureResponse(response, themeResult, contentOrigin);
@@ -2265,7 +2277,9 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
 
     const limit = method === "PUT" && /^\/api\/deck\/[^/]+\/source$/u.test(pathname)
       ? maxSourceBodyBytes
-      : feature?.bodyLimit ?? maxBodyBytes;
+      : /^\/api\/deck\/[^/]+\/materials$/u.test(pathname)
+        ? (options.maxUploadBodyBytes ?? MATERIALS_MAX_BYTES)
+        : feature?.bodyLimit !== undefined ? maxUploadBodyBytes : maxBodyBytes;
     const raw = mutation ? await readBody(request, limit) : Buffer.alloc(0);
     const body = raw.byteLength === 0
       ? (mediaType === "application/json" ? {} : undefined)

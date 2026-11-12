@@ -270,7 +270,7 @@ export function makeMaterials(ctx) {
     const key = `${e.path}@${e.modified}`;
     if (key === shownKey) return;
     shownKey = key;
-    const url = `/files/decks/${deck}/materials/${e.path.split('/').map(encodeURIComponent).join('/')}?v=${e.modified}`;
+    const url = e.url || `/files/decks/${deck}/materials/${e.path.split('/').map(encodeURIComponent).join('/')}?v=${e.modified}`;
     const head = document.createElement('div'); head.className = 'mt-pvh';
     head.innerHTML = `${svg('file')}<span class="nm"></span>`;
     head.querySelector('.nm').textContent = e.path;
@@ -278,13 +278,15 @@ export function makeMaterials(ctx) {
     const body = document.createElement('div'); body.className = 'mt-pvb';
     if (IMAGE.test(e.name)) body.append(Object.assign(document.createElement('img'), { src: url, alt: e.name }));
     else if (PDF.test(e.name)) body.append(Object.assign(document.createElement('iframe'), { src: url, title: e.name }));
-    else if (TEXT.test(e.name) && e.size <= TEXT_MAX) { body.classList.add('text'); showText(body, url, key); }
+    else if (TEXT.test(e.name) && e.size <= TEXT_MAX) { body.classList.add('text'); showText(body, `/api/deck/${deck}/materials/read?path=${encodeURIComponent(e.path)}`, key); }
     else { body.classList.add('none'); body.textContent = TEXT.test(e.name) ? M.tooBig : M.noPreview; }
     pv.replaceChildren(head, body);
   }
   async function showText(body, url, key) {
     try {
-      const buf = await (await fetch(url)).arrayBuffer();
+      const response = await uploadFetch(url);
+      if (!response.ok) throw new Error((await response.json()).error || String(response.status));
+      const buf = await response.arrayBuffer();
       // UTF-8 でなければ Shift_JIS（日本語の CSV に多い）として読む
       let text;
       try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch { text = new TextDecoder('shift_jis').decode(buf); }

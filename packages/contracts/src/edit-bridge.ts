@@ -45,6 +45,7 @@ export type SelectionCommand =
   | { method: "edit.select"; params: { key: string | null; frameKey: string | null } }
   | { method: "edit.hover"; params: { key: string | null } }
   | { method: "edit.designing"; params: { active: boolean } }
+  | { method: "edit.locks"; params: { figures: string[]; color: string } }
   | { method: "edit.measure"; params: Record<string, never> };
 export type SelectionIntent = {
   sourceVersion: string; sequence: number;
