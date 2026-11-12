@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -34,6 +35,7 @@ import {
 import { Workspace } from "../../packages/core/src/legacy-workspace.js";
 
 const BIB = '@article{one,\n title = {A {nested} title},\n slide-studio-status = {unverified}\n}\n';
+const IS_ROOT = (process as unknown as { getuid?: () => number }).getuid?.() === 0;
 
 function scratch(t: TestContext): string {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), "slide-studio-bib-")));
@@ -61,6 +63,27 @@ test("entries preserves comments, nesting, quotes and @string records", () => {
   assert.equal(records[4]![1], "trailing prose");
   assert.throws(() => entries("@article{broken, title={x}"), /BibTeX/u);
 });
+
+test("entries keeps a BOM before the first record, like Python's strip()", () => {
+  const records = entries("\uFEFF@article{one, title={T}}");
+  assert.deepEqual(records[0], [null, "\uFEFF"]);
+  assert.equal(records[1]![0], "one");
+  assert.equal(
+    mergeOffline("\uFEFF@article{one, title={T}}"),
+    "\uFEFF\n\n@article{one, title={T}}\n",
+  );
+});
+
+function mergeOffline(text: string): string {
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "slide-studio-bib-bom-")));
+  try {
+    const path = join(root, "reference.bib");
+    write(path, text);
+    return merge([path]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
 
 test("fields keeps commas inside braces and quotes and yields exact ranges", () => {
   const raw = '@article{one, title={A, B}, year="2020", note=macro, author={Doe, Jane}}';
@@ -207,6 +230,57 @@ test("update_path rewrites selected fields and preserves TeX and neighbours", as
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("update_path rewrites every duplicate occurrence of a field", async () => {
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "slide-studio-bib-duplicate-")));
+  try {
+    const path = join(root, "reference.bib");
+    const raw = "@article{d, note={a}, note={b}}";
+    write(path, raw);
+    await update_path(path, "d", { note: "c" }, raw);
+    const updated = readFileSync(path, "utf8");
+    assert.equal(updated.match(/note = \{c\}/gu)?.length, 2);
+
+    await update_path(path, "d", { note: "" }, updated);
+    assert.doesNotMatch(readFileSync(path, "utf8"), /note/iu);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("listing keeps hyphens in the entry type", () => {
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "slide-studio-bib-type-")));
+  try {
+    const path = join(root, "reference.bib");
+    write(path, "@my-type{k, title={T}}\n");
+    assert.equal(listing(path)[0]!.type, "my-type");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("plans ignores unreadable decks instead of failing every render", {
+  skip: process.platform === "win32" || IS_ROOT,
+}, async (t) => {
+  const root = scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("good", "test");
+  ws.new_deck("broken", "test");
+  const broken = ws.qmd("broken");
+  write(broken, "---\ntopic: test\n---\n## A\n");
+  chmodSync(broken, 0o000);
+  t.after(() => {
+    try {
+      chmodSync(broken, 0o600);
+    } catch {
+      // Already removed with the scratch root.
+    }
+  });
+  // `plans` and `require_ready` must not throw for the other deck.
+  assert.doesNotThrow(() => plans(ws));
+  await require_ready(ws, "good");
+  assert.equal([...plans(ws).keys()].length, 1);
 });
 
 test("plans, conflicts and migrate follow the topic-sharing migration", async (t) => {

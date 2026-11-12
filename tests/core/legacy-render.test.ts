@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import {
   chmod,
   mkdir,
@@ -169,6 +170,48 @@ test("warning_issues maps duplicate attributes and keeps plain Pandoc warnings",
     kind: "pandoc",
     message: "[WARNING] Duplicate identifier 'a' at line 6 column 1",
   });
+
+  // A group that starts in the front matter must not consume body groups.
+  const spanning = [
+    "---",
+    "title: T",
+    "affiliation: {King's College}",
+    "---",
+    "",
+    "## A {#a}",
+    "",
+    '本文 {data-x="1" data-x="2"} は a\' b\' c\' }',
+    "",
+  ].join("\n");
+  const spanningIssues = warning_issues({
+    doc: parse(spanning),
+    warnings: ['[WARNING] Ignoring duplicate attribute data-x="2".'],
+    slides: [{ index: 0, page: 0 }],
+  } as any);
+  assert.equal(spanningIssues.length, 1);
+  assert.equal(spanningIssues[0]!.kind, "duplicate-attribute");
+  assert.equal(spanningIssues[0]!.source_offset, spanning.indexOf('data-x="2"'));
+
+  // The legacy scanner does not mark an unclosed fence as code (source._Scan
+  // records it as unclosed instead), so its attributes remain candidates.
+  const unclosed = [
+    "---",
+    "title: T",
+    "---",
+    "",
+    "## A {#a}",
+    "",
+    "```",
+    '本文 {data-x="1" data-x="2"}',
+    "",
+  ].join("\n");
+  const unclosedIssues = warning_issues({
+    doc: parse(unclosed),
+    warnings: ['[WARNING] Ignoring duplicate attribute data-x="2".'],
+    slides: [{ index: 0, page: 0 }],
+  } as any);
+  assert.equal(unclosedIssues[0]!.kind, "duplicate-attribute");
+  assert.equal(unclosedIssues[0]!.source_offset, unclosed.indexOf('data-x="2"'));
 });
 
 test("render_text assembles the legacy shell, collections and page structure", {
@@ -312,8 +355,10 @@ references:
   assert.match(stdin, /references:/u);
   assert.match(stdin, /Alpha inline/u);
   assert.doesNotMatch(stdin, /\/etc\/passwd/u);
-  assert.doesNotMatch(stdin, /evil\.lua/u);
-  assert.doesNotMatch(stdin, /pandoc-defaults/u);
+  // `filters`/`defaults` are inert as document metadata; keeping them restores
+  // Python/Quarto parity. The CLI allowlist is what prevents filter execution.
+  assert.match(stdin, /evil\.lua/u);
+  assert.match(stdin, /pandoc-defaults/u);
 
   const args = (await readFile(argsPath, "utf8")).trim().split(/\r?\n/u);
   assert.equal(args.filter((argument) => argument === "--lua-filter").length, 1);
@@ -323,6 +368,13 @@ references:
   assert.equal(args.includes("--defaults"), false);
   assert.equal(args[0], "--sandbox");
   assert.equal(args[1], "--data-dir");
+  assert.ok(args.includes("--bibliography"));
+  const abbreviations = args.find((argument) => argument.startsWith("citation-abbreviations=/"));
+  assert.ok(abbreviations);
+  assert.equal(
+    readFileSync(abbreviations.slice("citation-abbreviations=".length), "utf8"),
+    "{\"default\":{}}\n",
+  );
 });
 
 test("front matter sanitization fails closed when resource keys cannot be inspected", {
@@ -346,6 +398,124 @@ bibliography: /etc/passwd
     render_text(ws, "deck", broken, { pandocPath: pandoc }),
     /安全確認/u,
   );
+});
+
+test("front matter sanitization keeps UTF-16 offsets and handles duplicate keys", {
+  skip: !POSIX,
+}, async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("deck", "test");
+  const stdinPath = join(root, "pandoc.stdin");
+  const pandoc = join(root, "logging-pandoc");
+  await writeExecutable(pandoc, [
+    "#!/bin/sh",
+    `cat > '${stdinPath}'`,
+    "cat <<'HTML'",
+    '<h2 id="a">A</h2>',
+    "HTML",
+  ].join("\n"));
+
+  const astral = `---
+title: "保持"
+csl: "${"😀".repeat(11)}"
+bibliography: /etc/passwd
+theme: default
+---
+## A {#a}
+
+本文。
+`;
+  await render_text(ws, "deck", astral, { pandocPath: pandoc });
+  const astralStdin = await readFile(stdinPath, "utf8");
+  assert.doesNotMatch(astralStdin, /\/etc\/passwd/u);
+  assert.match(astralStdin, /^title: "保持"$/mu);
+  assert.match(astralStdin, /^theme: default$/mu);
+  assert.doesNotMatch(astralStdin, /😀/u);
+
+  const duplicate = `---
+title: a
+title: b
+"bibliography": /etc/passwd
+filters: [x.lua]
+---
+## A {#a}
+
+本文。
+`;
+  const rendered = await render_text(ws, "deck", duplicate, { pandocPath: pandoc });
+  assert.equal(rendered.slides.length, 1);
+  const duplicateStdin = await readFile(stdinPath, "utf8");
+  assert.doesNotMatch(duplicateStdin, /\/etc\/passwd/u);
+  assert.match(duplicateStdin, /filters: \[x\.lua\]/u);
+});
+
+test("CRLF input renders as the same document and keeps ordinary metadata", {
+  skip: !POSIX,
+}, async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("deck", "test");
+  const stdinPath = join(root, "pandoc.stdin");
+  const pandoc = join(root, "logging-pandoc");
+  await writeExecutable(pandoc, [
+    "#!/bin/sh",
+    `cat > '${stdinPath}'`,
+    "cat <<'HTML'",
+    '<h2 id="a">A</h2>',
+    "HTML",
+  ].join("\n"));
+
+  const lf = `---
+title: "CRLF"
+filters: [x.lua]
+---
+## A {#a}
+
+本文。
+`;
+  const first = await render_text(ws, "deck", lf, { pandocPath: pandoc });
+  const crlf = lf.replaceAll("\n", "\r\n");
+  const second = await render_text(ws, "deck", crlf, { pandocPath: pandoc });
+  assert.equal(second.version, first.version);
+  assert.deepEqual(second.slides, first.slides);
+  assert.equal(second.html, first.html);
+  assert.match(await readFile(stdinPath, "utf8"), /filters: \[x\.lua\]/u);
+});
+
+test("text extraction skips ruby annotations like BeautifulSoup", {
+  skip: !POSIX,
+}, async (t) => {
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("deck", "test");
+  const pandoc = join(root, "ruby-pandoc");
+  await writeExecutable(
+    pandoc,
+    fakePandocScript([
+      '<h2 id="a"><ruby>漢字<rt>かんじ</rt></ruby></h2>',
+      '<p data-cites="alpha">引用</p>',
+      '<h2 id="toc" class="toc-slide">目次</h2>',
+      '<div id="refs"><div class="csl-entry" id="ref-alpha"><ruby>文献<rt>ぶんけん</rt></ruby></div></div>',
+    ].join("\n")),
+  );
+  const source = `---
+title: T
+---
+## <ruby>漢字<rt>かんじ</rt></ruby>
+
+引用 [@alpha]。
+
+## 目次 {#toc}
+
+::: {#toc}
+:::
+`;
+  const rendered = await render_text(ws, "deck", source, { pandocPath: pandoc });
+  assert.equal(rendered.slides[0]!.title, "漢字");
+  const $ = cheerio.load(rendered.html);
+  assert.equal($("#toc .toc-label").text(), "漢字");
+  assert.equal($("#a footer.citations p").first().text(), "文献");
 });
 
 test("render_text maps Pandoc failures through the wrapped-source origin map", {
@@ -386,8 +556,7 @@ test("run_pandoc isolates the environment, bounds output and cleans up on close"
   ].join("\n"));
 
   const temporaryDirectory = join(root, "pandoc-temp");
-  const injected = `$(touch ${join(root, "pwned")})`;
-  const result = await run_pandoc("hello", ["--from", "markdown", "--to", "html5", injected], {
+  const result = await run_pandoc("hello", ["--from", "markdown", "--to", "html5", "--wrap=none"], {
     pandocPath: pandoc,
     cwd: root,
     temporaryDirectory,
@@ -401,8 +570,35 @@ test("run_pandoc isolates the environment, bounds output and cleans up on close"
   assert.equal(args[0], "--sandbox");
   assert.equal(args[1], "--data-dir");
   assert.equal(args[2], join(temporaryDirectory, "data"));
-  assert.equal(args.includes(injected), true);
-  assert.equal(existsSync(join(root, "pwned")), false);
+  assert.equal(args.includes("--wrap=none"), true);
+
+  const forbiddenMarker = join(root, "forbidden-started");
+  const forbiddenPandoc = join(root, "forbidden-pandoc");
+  await writeExecutable(forbiddenPandoc, `#!/bin/sh\ncat >/dev/null\ntouch '${forbiddenMarker}'\n`);
+  for (const forbidden of [
+    ["--sandbox=false"],
+    ["--sand=false"],
+    ["--data-dir", join(root, "data")],
+    ["-d", join(root, "defaults.yaml")],
+    ["--defaults", join(root, "defaults.yaml")],
+    ["-F", join(root, "filter.lua")],
+    ["--filter", join(root, "filter.lua")],
+    ["-o", join(root, "out.html")],
+    ["--output", join(root, "out.html")],
+    ["--extract-media", join(root, "media")],
+    ["--log", join(root, "pandoc.log")],
+    [join(root, "input.md")],
+    ["--"],
+    ["--from"],
+    ["--lua-filter", "relative.lua"],
+  ]) {
+    await assert.rejects(
+      run_pandoc("", forbidden, { pandocPath: forbiddenPandoc, cwd: root }),
+      (error: any) => error.code === "INVALID_INPUT",
+      forbidden.join(" "),
+    );
+  }
+  assert.equal(existsSync(forbiddenMarker), false);
 
   const failing = join(root, "failing-pandoc");
   await writeExecutable(failing, "#!/bin/sh\ncat >/dev/null\nprintf 'line 1: boom\\n' >&2\nexit 1\n");
@@ -569,6 +765,58 @@ function headSignature(html: string): Record<string, unknown> {
 }
 
 const PANDOC = pandocPath();
+
+test("the render differential uses native Pandoc 3.9", () => {
+  assert.notEqual(PANDOC, null, "native Pandoc 3.9 is required for the render differential");
+  const version = execFileSync(PANDOC!, ["--version"], { encoding: "utf8" });
+  assert.match(version, /^pandoc 3\.9(?:[.\s]|$)/u);
+});
+
+test("native Pandoc ignores body bibliography metadata and keeps inline references", async (t) => {
+  assert.notEqual(PANDOC, null, "native Pandoc 3.9 is required for this regression");
+  const root = await scratch(t);
+  const ws = Workspace.open(root);
+  ws.new_deck("bib", "test");
+  const secret = join(root, "secret.json");
+  await writeFile(secret, JSON.stringify([
+    {
+      id: "leak",
+      type: "article-journal",
+      title: "LEAK-SECRET",
+    },
+  ]));
+
+  const leaking = `---
+title: T
+---
+
+---
+bibliography: ${secret}
+---
+
+## A {#a}
+
+[@leak]
+`;
+  const rendered = await render_text(ws, "bib", leaking, { pandocPath: PANDOC! });
+  assert.doesNotMatch(rendered.html, /LEAK-SECRET/u);
+  assert.ok(rendered.missing_cites.includes("leak"), rendered.missing_cites.join(", "));
+
+  const inline = `---
+title: T
+references:
+  - id: inline
+    type: article-journal
+    title: "Inline Entry"
+---
+## A {#a}
+
+[@inline]
+`;
+  const withInline = await render_text(ws, "bib", inline, { pandocPath: PANDOC! });
+  assert.match(withInline.html, /Inline Entry/u);
+  assert.deepEqual(withInline.missing_cites, []);
+});
 
 test("the committed render golden is present at the source root", () => {
   assert.equal(existsSync(GOLDEN_FILE), true, `missing ${GOLDEN_FILE}`);

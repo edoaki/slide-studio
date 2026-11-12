@@ -9,10 +9,10 @@
  * citation/footnote footer semantics.
  *
  * Front matter is left intact for metadata (title, author, theme, lang, cover
- * layout). The resource-selecting keys that Pandoc could otherwise honour
- * (`bibliography`, `csl`, `filters`, `resource-path`, `defaults`, include
- * hooks) are neutralised before conversion. Filters are *never* selected from
- * the source; this module only passes the packaged Lua filter.
+ * layout). Only the metadata keys that select bibliography files
+ * (`bibliography`, `csl`, `citation-abbreviations`) are neutralised before
+ * conversion. Filters are *never* selected from the source; this module only
+ * passes the packaged Lua filter.
  */
 
 import { createHash } from "node:crypto";
@@ -122,6 +122,31 @@ function cpSlice(value: string, start: number, end: number): string {
   return value.slice(cpToUtf16(value, start), cpToUtf16(value, end));
 }
 
+function compareCodePoints(left: string, right: string): number {
+  const a = Array.from(left);
+  const b = Array.from(right);
+  const length = Math.min(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    const x = a[index]!.codePointAt(0)!;
+    const y = b[index]!.codePointAt(0)!;
+    if (x !== y) return x - y;
+  }
+  return a.length - b.length;
+}
+
+/**
+ * Python's `str.splitlines()`: every ASCII/Unicode line boundary, without the
+ * empty element that `String.split()` leaves after a trailing boundary.
+ */
+function pySplitLines(value: string): string[] {
+  if (value === "") return [];
+  const parts = value.split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/u);
+  if (parts.length > 0 && /(?:\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029])$/u.test(value)) {
+    parts.pop();
+  }
+  return parts;
+}
+
 function _map_lines(message: string, origin: Array<number | null>): string {
   return message.replace(/line (\d+)/gu, (_match, digits: string) => {
     const number = Number.parseInt(digits, 10);
@@ -152,12 +177,22 @@ function isHeadingNode(node: any): boolean {
   return isTagNode(node) && (node.tagName === "h1" || node.tagName === "h2");
 }
 
+// BeautifulSoup 4.10+ excludes these elements from `get_text()`: ruby
+// annotations are presentation, and script/style/template contents are not
+// document text.
+const SKIP_TEXT_ELEMENTS = new Set(["rt", "rp", "script", "style", "template"]);
+
+function skipsText(node: any): boolean {
+  return SKIP_TEXT_ELEMENTS.has(String(node?.tagName ?? "").toLowerCase());
+}
+
 function collectText(node: any, output: string[]): void {
   if (node === null || typeof node !== "object") return;
   if (node.type === "text") {
     output.push(String(node.data ?? ""));
     return;
   }
+  if (skipsText(node)) return;
   for (const child of node.children ?? []) collectText(child, output);
 }
 
@@ -175,13 +210,14 @@ function bsGetText(node: any, separator = "", strip = false): string {
     if (value.type === "text") {
       const text = String(value.data ?? "");
       if (strip) {
-        const trimmed = text.trim();
-        if (trimmed.length) output.push(trimmed);
+        const stripped = pyStrip(text);
+        if (stripped.length) output.push(stripped);
       } else {
         output.push(text);
       }
       return;
     }
+    if (skipsText(value)) return;
     for (const child of value.children ?? []) visit(child);
   };
   visit(node);
@@ -250,25 +286,22 @@ function liftImageSteps($: CheerioAPI, root: any): void {
 
 // ---------------------------------------------------------------- metadata audit
 
-// Only metadata keys that can make Pandoc read a source-chosen local file (or
-// load a source-chosen filter). Inline `references` metadata is a legacy
-// feature and must be preserved.
+// Only metadata keys that make Pandoc read a source-chosen local file. Other
+// Quarto-style keys (`filters`, `defaults`, `metadata-file`, ...) have no
+// effect as document metadata, and inline `references` must be preserved.
 const UNSAFE_METADATA_KEYS = new Set([
   "bibliography",
   "citation-abbreviations",
   "csl",
-  "filter",
-  "filters",
-  "metadata-file",
-  "defaults",
-  "resource-path",
-  "include-before-body",
-  "include-after-body",
 ]);
+const UNSAFE_KEY = [...UNSAFE_METADATA_KEYS]
+  .map((key) => key.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"))
+  .join("|");
+// The fallback is deliberately tolerant: quoted keys, explicit (`?`) keys and
+// flow mappings must all be recognised when the YAML parser rejects the block.
 const UNSAFE_METADATA_PATTERN = new RegExp(
-  String.raw`^[ \t]*(?:${[...UNSAFE_METADATA_KEYS]
-    .map((key) => key.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"))
-    .join("|")})[ \t]*:`,
+  String.raw`(?:^|[{,])[ \t]*(?:\?[ \t]*)?(?:"(?:${UNSAFE_KEY})"|'(?:${UNSAFE_KEY})'|(?:${UNSAFE_KEY}))[ \t]*:`
+    + String.raw`|^[ \t]*\?[ \t]*(?:"(?:${UNSAFE_KEY})"|'(?:${UNSAFE_KEY})'|(?:${UNSAFE_KEY}))[ \t]*$`,
   "mu",
 );
 
@@ -279,8 +312,8 @@ function unsafeMetadataPresent(front: string): boolean {
 /**
  * Keep all ordinary YAML metadata (title, author, theme, lang, cover layout,
  * inline `references`), but blank the values that could make Pandoc read a
- * source-chosen file or run a source-chosen filter. Newlines are preserved so
- * wrapped-source line numbers and origin maps remain valid.
+ * source-chosen bibliography file. Newlines are preserved so wrapped-source
+ * line numbers and origin maps remain valid.
  *
  * This check is fail-closed: if the front matter cannot be inspected while an
  * unsafe key is present, rendering stops instead of passing it through.
@@ -299,7 +332,12 @@ function sanitizeFrontMatter(wrapped: string, doc: Doc): string {
   const contentStart = front.indexOf("\n") + 1;
   let sanitized = front;
   try {
-    const parsed = parseDocument(match[1] ?? "", { prettyErrors: false });
+    // Duplicate keys would otherwise make `yaml` report an error and skip the
+    // safety pass; keep every occurrence so all of them are blanked.
+    const parsed = parseDocument(match[1] ?? "", {
+      prettyErrors: false,
+      uniqueKeys: false,
+    });
     if (parsed.errors.length > 0 && unsafeMetadataPresent(front)) {
       throw new RenderError("front matter の安全確認ができません。front matter を確認してください。");
     }
@@ -309,6 +347,7 @@ function sanitizeFrontMatter(wrapped: string, doc: Doc): string {
       }
       return wrapped;
     }
+    const ranges: Array<{ name: string; start: number; end: number }> = [];
     const map = parsed.contents as any;
     for (const pair of map.items) {
       const name = String(pair?.key?.value ?? "");
@@ -322,14 +361,27 @@ function sanitizeFrontMatter(wrapped: string, doc: Doc): string {
       }
       const start = contentStart + Number(range[0]);
       const end = contentStart + Number(range[1]);
-      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) {
+      if (
+        !Number.isFinite(start)
+        || !Number.isFinite(end)
+        || start < 0
+        || end < start
+        || end > front.length
+      ) {
         throw new RenderError(
           `front matter の ${name} を安全に確認できません。front matter を確認してください。`,
         );
       }
+      ranges.push({ name, start, end });
+    }
+    // Work from the end so earlier UTF-16 offsets stay valid. Replacing per
+    // code unit (no `u` flag) also keeps the string length unchanged after an
+    // astral character.
+    ranges.sort((left, right) => right.end - left.end || right.start - left.start);
+    for (const { start, end } of ranges) {
       const value = sanitized.slice(start, end);
       sanitized = sanitized.slice(0, start)
-        + value.replace(/[^\r\n]/gu, " ")
+        + value.replace(/[^\r\n]/g, " ")
         + sanitized.slice(end);
     }
   } catch (error) {
@@ -378,6 +430,37 @@ async function citeprocBibliography(
   const path = join(ws.build_dir(deck), "citeproc.bib");
   mkdirSync(dirname(path), { recursive: true });
   await atomicWriteFile(path, shown, 0o666 & ~process.umask());
+  return path;
+}
+
+async function ensureBuildFile(ws: Workspace, deck: string, name: string, content: string): Promise<string> {
+  const path = join(ws.build_dir(deck), name);
+  mkdirSync(dirname(path), { recursive: true });
+  if (!existsSync(path)) {
+    await atomicWriteFile(path, content, 0o666 & ~process.umask());
+  }
+  return path;
+}
+
+/**
+ * Pandoc also accepts YAML metadata blocks in the document body. Command-line
+ * `--bibliography` and `-M citation-abbreviations` override all document
+ * metadata, so pass an empty file even when the deck has no topic bibliography.
+ */
+async function emptyBibliography(ws: Workspace, deck: string): Promise<string> {
+  return ensureBuildFile(ws, deck, "empty.bib", "");
+}
+
+async function emptyCitationAbbreviations(ws: Workspace, deck: string): Promise<string> {
+  // citeproc requires the top-level `default` object even when no abbreviations
+  // are defined; a bare `{}` fails with `key "default" not found`. Refresh an
+  // existing build file so workspaces rendered by older versions recover too.
+  const path = join(ws.build_dir(deck), "citation-abbreviations.empty.json");
+  const content = "{\"default\":{}}\n";
+  if (!existsSync(path) || readFileSync(path, "utf8") !== content) {
+    mkdirSync(dirname(path), { recursive: true });
+    await atomicWriteFile(path, content, 0o666 & ~process.umask());
+  }
   return path;
 }
 
@@ -759,7 +842,10 @@ export async function render_text(
 ): Promise<LegacyRendered> {
   const folder = ws.deck_dir(deck);
   const started = performance.now();
-  const doc = parse(text);
+  // Python reads `slides.qmd` with universal newlines. Normalising here makes
+  // the in-memory path behave the same, including for CRLF front matter.
+  const normalized = text.replace(/\r\n|\r/gu, "\n");
+  const doc = parse(normalized);
   const [wrapped, origin] = wrapped_source(doc, options.wrap ?? true);
   const safeWrapped = sanitizeFrontMatter(wrapped, doc);
 
@@ -778,9 +864,16 @@ export async function render_text(
     );
   }
   const bib = ws.bib(deck, doc.meta);
-  if (existsSync(bib)) {
-    extra.push("--bibliography", await citeprocBibliography(ws, deck, bib));
-  }
+  extra.push(
+    "--bibliography",
+    existsSync(bib)
+      ? await citeprocBibliography(ws, deck, bib)
+      : await emptyBibliography(ws, deck),
+  );
+  extra.push(
+    "-M",
+    `citation-abbreviations=${await emptyCitationAbbreviations(ws, deck)}`,
+  );
   await ensureFigurePages(ws, deck, doc);
   const parsed = performance.now();
 
@@ -790,10 +883,9 @@ export async function render_text(
   const missing = [...new Set(
     [...result.stderr.matchAll(/Citeproc: citation (\S+) not found/gu)]
       .map((match) => match[1]!),
-  )].sort();
-  const warnings = result.stderr
-    .split(/\r\n|\r|\n/u)
-    .filter((line) => line.trim() && !line.includes("Citeproc: citation"));
+  )].sort(compareCodePoints);
+  const warnings = pySplitLines(result.stderr)
+    .filter((line) => pyStrip(line).length > 0 && !line.includes("Citeproc: citation"));
 
   const rendered = assemble(ws, deck, doc, result.stdout, missing);
   rendered.warnings = warnings.map((warning) => _map_lines(warning, origin));
@@ -904,9 +996,8 @@ export function warning_issues(rendered: LegacyRendered): LegacyWarningIssue[] {
   if (rendered.warnings.length === 0) return [];
   const doc = rendered.doc;
   const lines = new WarningLines(doc.text);
-  let first = doc.front[1] < codePointLength(doc.text) ? lines.indexAt(doc.front[1]) : lines.length;
+  let first = lines.indexAt(doc.front[1]);
   if (first < 0) first = 0;
-  if (doc.front[1] && first < lines.length && lines.starts[first]! < doc.front[1]) first += 1;
   const inCode = codeMask(lines, first);
 
   interface Candidate {
@@ -920,9 +1011,30 @@ export function warning_issues(rendered: LegacyRendered): LegacyWarningIssue[] {
   const candidates: Candidate[] = [];
   const groups = /\{(?:[^{}"']|"(?:\\.|[^"\\])*"|'[^']*')*\}/gu;
   const frontUtf16 = cpToUtf16(doc.text, doc.front[1]);
-  for (const group of doc.text.matchAll(groups)) {
-    if (group.index === undefined || group.index < frontUtf16) continue;
-    const groupOffset = codePointLength(doc.text.slice(0, group.index));
+  // Advance a UTF-16/code-point cursor instead of slicing the whole document
+  // for every group and attribute; the old form was O(n²) on large decks.
+  let codePointCursor = 0;
+  let utf16Cursor = 0;
+  const codePointAt = (utf16Offset: number): number => {
+    while (utf16Cursor < utf16Offset) {
+      const code = doc.text.codePointAt(utf16Cursor);
+      if (code === undefined) break;
+      utf16Cursor += code > 0xffff ? 2 : 1;
+      codePointCursor += 1;
+    }
+    return codePointCursor;
+  };
+
+  // Start the scan at the body, as Python's `finditer(text, front_end)` does:
+  // a match that begins inside the front matter must not swallow body groups.
+  groups.lastIndex = frontUtf16;
+  let group: RegExpExecArray | null;
+  while ((group = groups.exec(doc.text)) !== null) {
+    if (group[0].length === 0) {
+      groups.lastIndex += 1;
+      continue;
+    }
+    const groupOffset = codePointAt(group.index);
     if (inCode[lines.indexAt(groupOffset)]) continue;
     const inner = group[0].slice(1, -1);
     const seen = new Set<string>();
@@ -932,12 +1044,12 @@ export function warning_issues(rendered: LegacyRendered): LegacyWarningIssue[] {
       const value = attr[4] ?? attr[5] ?? attr[6] ?? "";
       if (seen.has(key)) {
         const absolute = group.index + 1 + (attr.index ?? 0);
-        const offset = codePointLength(doc.text.slice(0, absolute));
+        const offset = codePointAt(absolute);
         candidates.push({
           key,
           value,
           offset,
-          utf16Offset: doc.text.slice(0, absolute).length,
+          utf16Offset: absolute,
           line: lines.indexAt(offset) + 1,
           page: doc.page_of(offset),
         });

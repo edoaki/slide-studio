@@ -18,6 +18,7 @@ import {
 } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { atomicWriteFile } from "./atomic.js";
+import { pyStrip } from "./legacy-cover.js";
 import { ValueError } from "./legacy-source.js";
 import type { Workspace } from "./legacy-workspace.js";
 import { StudioError } from "./legacy-workspace.js";
@@ -36,6 +37,7 @@ const DECIMAL = /^\p{Nd}+$/u;
 const FIELD_NAME = /^([\p{L}\p{N}_-]+)\s*=\s*/u;
 const ENTRY_HEAD = new RegExp(String.raw`@([\p{L}\p{N}_-]+)\s*([({])`, "gu");
 const ENTRY_KIND = new RegExp(String.raw`^@([\p{L}\p{N}_]+)`, "u");
+const LISTING_KIND = new RegExp(String.raw`^@([\p{L}\p{N}_-]+)`, "u");
 const STRING_MACRO = /^\s*([^=\s]+)\s*=/u;
 const ENTRY_KEY = /^\s*([^,\s]+)\s*,/u;
 const CONTROL_FIELD = /^[\p{L}\p{N}_-]+$/u;
@@ -111,8 +113,9 @@ export function entries(text: string): Array<[string | null, string]> {
 
   let match = nextEntry(position);
   while (match) {
-    if (text.slice(position, match.index).trim()) {
-      result.push([null, text.slice(position, match.index).trim()]);
+    const leading = pyStrip(text.slice(position, match.index));
+    if (leading) {
+      result.push([null, leading]);
     }
     const opening = match[2]!;
     let depth = 1;
@@ -145,7 +148,7 @@ export function entries(text: string): Array<[string | null, string]> {
     }
     if (depth !== 0) throw new ValueError("BibTeX");
 
-    const raw = text.slice(match.index, index).trim();
+    const raw = pyStrip(text.slice(match.index, index));
     const kind = match[1]!.toLowerCase();
     const body = text.slice(ENTRY_HEAD.lastIndex, index - 1);
     let key: string | null;
@@ -164,8 +167,9 @@ export function entries(text: string): Array<[string | null, string]> {
     position = index;
     match = nextEntry(position);
   }
-  if (text.slice(position).trim()) {
-    result.push([null, text.slice(position).trim()]);
+  const trailing = pyStrip(text.slice(position));
+  if (trailing) {
+    result.push([null, trailing]);
   }
   return result;
 }
@@ -211,7 +215,7 @@ export function* fields(
     }
     yield [
       match[1]!.toLowerCase(),
-      raw.slice(valueStart, index).trim(),
+      pyStrip(raw.slice(valueStart, index)),
       start,
       Math.min(index + 1, end),
     ];
@@ -278,6 +282,12 @@ export function plans(ws: Workspace): Map<string, string[]> {
       target = ws.bib(deck);
     } catch (error) {
       if (error instanceof StudioError || error instanceof ValueError) continue;
+      // Python catches OSError here: one unreadable deck must not break every
+      // other deck's render, conflict check or migration.
+      if (error !== null && typeof error === "object"
+        && typeof (error as { code?: unknown }).code === "string") {
+        continue;
+      }
       throw error;
     }
     if (dirname(target) === ws.state) continue;
@@ -434,8 +444,11 @@ export async function update_path(
     const ranges = [...fields(raw)];
     for (let index = ranges.length - 1; index >= 0; index -= 1) {
       const [name, , start, end] = ranges[index]!;
-      if (!remaining.has(name)) continue;
-      const value = remaining.get(name)!.trim();
+      // Python tests membership in the original `changes` map, so every
+      // duplicate occurrence is rewritten. `remaining` is bookkeeping for
+      // fields that still need to be appended.
+      if (!Object.prototype.hasOwnProperty.call(changes, name)) continue;
+      const value = pyStrip(changes[name]!);
       updated = updated.slice(0, start)
         + (value ? `${name} = {${value}},` : "")
         + updated.slice(end);
@@ -443,7 +456,7 @@ export async function update_path(
     }
     let added = "";
     for (const [name, value] of remaining) {
-      const trimmed = value.trim();
+      const trimmed = pyStrip(value);
       if (trimmed) added += `\n  ${name} = {${trimmed}},`;
     }
     if (added) {
@@ -455,7 +468,7 @@ export async function update_path(
     const found = new Map<string, string>();
     for (const [name, value] of fields(updated)) found.set(name, value);
     const expected = Object.entries(changes).every(([name, value]) => {
-      const trimmed = value.trim();
+      const trimmed = pyStrip(value);
       return found.get(name) === (trimmed ? `{${trimmed}}` : undefined);
     });
     if (parsed.length !== 1 || parsed[0]![0] !== key || !expected) {
@@ -480,7 +493,7 @@ export function clean(value: string): string {
     .replace(/---/gu, "—")
     .replace(/--/gu, "–")
     .replace(/~/gu, " ");
-  return result.replace(/[\t\n\v\f\r \x1c-\x1f\x85\p{Z}]+/gu, " ").trim();
+  return pyStrip(result.replace(/[\t\n\v\f\r \x1c-\x1f\x85\p{Z}]+/gu, " "));
 }
 
 /**
@@ -548,7 +561,7 @@ export function listing(path: string): LegacyBibliographyEntry[] {
     }
     output.push({
       key,
-      type: (ENTRY_KIND.exec(raw)?.[1] ?? "").toLowerCase(),
+      type: (LISTING_KIND.exec(raw)?.[1] ?? "").toLowerCase(),
       fields: values,
       authors: authors(found.author ?? ""),
       unverified: (values["slide-studio-status"] ?? "").toLowerCase() === "unverified",
@@ -581,14 +594,14 @@ export function authors(value: string): Array<{ name: string; family: string }> 
   people.push(text.slice(start));
 
   const output: Array<{ name: string; family: string }> = [];
-  for (const person of people.map((item) => item.trim())) {
+  for (const person of people.map((item) => pyStrip(item))) {
     if (!person) continue;
     const name = clean(person);
     let family: string;
     if (person.startsWith("{") && person.endsWith("}")) {
       family = name;
     } else if (name.includes(",")) {
-      family = name.split(",")[0]!.trim();
+      family = pyStrip(name.split(",")[0]!);
     } else {
       family = name.split(" ").slice(-1)[0]!;
     }

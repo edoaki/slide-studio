@@ -8,6 +8,8 @@
  *
  * Security properties:
  * - `--sandbox` is always prepended and cannot be removed by the caller.
+ * - Caller arguments are an exact allowlist; sandbox/data-dir overrides,
+ *   filters, defaults, outputs, positional inputs and `--` are rejected.
  * - Pandoc is spawned with `shell: false`; no command string is ever built.
  * - `PATH`, `HOME`, XDG and temporary variables are replaced with isolated
  *   values; the caller's environment is not inherited.
@@ -19,7 +21,7 @@ import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { delimiter, isAbsolute, join, resolve } from "node:path";
 import { CoreError } from "./errors.js";
 
 /** Legacy one-shot conversions use the same 60-second budget as Python. */
@@ -94,7 +96,9 @@ function killGroup(child: ChildProcess, signal: NodeJS.Signals): void {
 
 function childEnvironment(temporaryDirectory: string): NodeJS.ProcessEnv {
   // Only OS-essential values are passed through. LUA_PATH, DYLD_*, secrets and
-  // the launching terminal's locale must not change Pandoc's behaviour.
+  // the launching terminal's locale must not change Pandoc's behaviour. The
+  // packaged filter uses no require/dofile/loadfile, so there is no Lua search
+  // path to expose.
   const env: NodeJS.ProcessEnv = {
     PATH: "/usr/bin:/bin",
     LANG: "en_US.UTF-8",
@@ -152,11 +156,83 @@ function validateOptions(options: RunPandocOptions): number {
   return timeoutMs;
 }
 
+const FORMAT_VALUE = /^[A-Za-z0-9_+.-]+$/u;
+const METADATA_KEYS = new Set([
+  "citation-abbreviations",
+  "link-citations",
+  "suppress-bibliography",
+]);
+
+function invalidArgument(argument: string): never {
+  throw new CoreError("INVALID_INPUT", `Pandoc argument is not allowed: ${argument}`);
+}
+
+function requireValue(args: string[], index: number, flag: string): string {
+  const value = args[index];
+  if (value === undefined) {
+    throw new CoreError("INVALID_INPUT", `Pandoc argument ${flag} requires a value`);
+  }
+  return value;
+}
+
+/**
+ * The caller's argument list is an exact allowlist. Pandoc accepts abbreviations
+ * (`--sand=false`) and last-one-wins options, so validating only the prepended
+ * flags would let a caller disable the sandbox or add filters/defaults/outputs.
+ */
+function validateArguments(args: string[]): void {
+  let index = 0;
+  while (index < args.length) {
+    const argument = args[index]!;
+    if (argument === "--from" || argument === "--to") {
+      const value = requireValue(args, index + 1, argument);
+      if (value.startsWith("-") || !FORMAT_VALUE.test(value)) {
+        invalidArgument(`${argument} ${value}`);
+      }
+      index += 2;
+      continue;
+    }
+    if (argument === "--mathml" || argument === "--citeproc" || argument === "--wrap=none") {
+      index += 1;
+      continue;
+    }
+    if (argument === "-M") {
+      const assignment = requireValue(args, index + 1, argument);
+      const separator = assignment.indexOf("=");
+      const key = separator < 0 ? "" : assignment.slice(0, separator);
+      if (!METADATA_KEYS.has(key)) invalidArgument(`${argument} ${assignment}`);
+      if (key === "citation-abbreviations") {
+        const value = assignment.slice(separator + 1);
+        if (!isAbsolute(value)) invalidArgument(`${argument} ${assignment}`);
+      }
+      index += 2;
+      continue;
+    }
+    if (argument === "--lua-filter" || argument === "--csl" || argument === "--bibliography") {
+      const value = requireValue(args, index + 1, argument);
+      if (!isAbsolute(value)) invalidArgument(`${argument} ${value}`);
+      index += 2;
+      continue;
+    }
+    if (argument === "--resource-path") {
+      const value = requireValue(args, index + 1, argument);
+      const parts = value.split(delimiter);
+      if (parts.length === 0 || parts.some((part) => !isAbsolute(part))) {
+        invalidArgument(`${argument} ${value}`);
+      }
+      index += 2;
+      continue;
+    }
+    invalidArgument(argument);
+  }
+}
+
 /**
  * Run one Pandoc conversion with bounded output and isolated state.
  *
- * The fixed `--sandbox` flag is always the first argument. Callers own the
- * remaining arguments and must derive them exclusively from validated paths.
+ * The fixed `--sandbox` flag is always the first argument. The remaining
+ * arguments must match the allowlist above and derive paths from validated
+ * absolute locations.
  */
 export async function run_pandoc(
   input: string,
@@ -168,6 +244,7 @@ export async function run_pandoc(
     typeof argument !== "string" || argument.includes("\u0000"))) {
     throw new CoreError("INVALID_INPUT", "Pandoc arguments must be NUL-free strings");
   }
+  validateArguments(args);
 
   const ownsTemporary = options.temporaryDirectory === undefined;
   const temporaryDirectory = ownsTemporary
@@ -327,5 +404,7 @@ export async function close_pandoc(): Promise<void> {
   const running = [...ACTIVE];
   for (const active of running) active.cancel();
   await Promise.all(running.map((active) => active.exited));
-  ACTIVE.clear();
+  // Do not clear ACTIVE: a run may have started while we were waiting, and a
+  // second close must still be able to cancel it. `finish` removes completed
+  // runs individually.
 }

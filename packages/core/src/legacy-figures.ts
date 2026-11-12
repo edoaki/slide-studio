@@ -12,9 +12,11 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
 } from "node:fs";
@@ -35,7 +37,7 @@ import { StudioError, TEMPLATES, check_name, runtime_rel } from "./legacy-worksp
 
 /** Static `import … from './x.mjs'`, `import './x.mjs'` and `export … from`. */
 export const IMPORT_SPEC =
-  /^([ \t]*(?:import[ \t]*|(?:import|export)\b[^;'"()=]*?\bfrom[ \t]*))(['"])([^'"\n]+)\2/gmu;
+  /^(\uFEFF?[ \t]*(?:import[ \t]*|(?:import|export)\b[^;'"()=]*?\bfrom[ \t]*))(['"])([^'"\n]+)\2/gmu;
 export const DYNAMIC = /\bimport\s*\(|\bfetch\s*\(/u;
 export const SKIP = new Set(["index.html", "main.mjs", ".DS_Store"]);
 
@@ -65,6 +67,17 @@ function modeFor(path: string): number {
 async function writeAtomic(path: string, data: string | Uint8Array): Promise<void> {
   mkdirSync(dirname(path), { recursive: true });
   await atomicWriteFile(path, data, modeFor(path));
+}
+
+/** Escape a value for the single-quoted JS string literals in the template. */
+function jsString(value: string): string {
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll("'", "\\'")
+    .replaceAll("\r", "\\r")
+    .replaceAll("\n", "\\n")
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029");
 }
 
 function copyFilePreserve(source: string, destination: string): void {
@@ -172,8 +185,8 @@ export async function new_figure(
   mkdirSync(destination, { recursive: true });
   const template = join(TEMPLATES, "figure");
   const figure = readFileSync(join(template, "figure.mjs"), "utf8")
-    .split("{{NAME}}").join(name)
-    .split("{{TITLE}}").join(title || name);
+    .split("{{NAME}}").join(jsString(name))
+    .split("{{TITLE}}").join(jsString(title || name));
   await writeAtomic(join(destination, "figure.mjs"), figure);
   copyFilePreserve(join(template, "style.css"), join(destination, "style.css"));
   await write_index(destination, ws);
@@ -207,7 +220,9 @@ export class Copier {
     this.#siblings = new Map(
       [...siblings].map(([source, destination]) => [canonical(source), destination]),
     );
-    this.#allow = [canonical(ws.root), canonical(TEMPLATES)];
+    // Match the Python rule: workspace root plus an optional extra root. The
+    // packaged templates are not a source for figure imports.
+    this.#allow = [canonical(ws.root)];
     if (allow) this.#allow.push(canonical(allow));
   }
 
@@ -217,12 +232,14 @@ export class Copier {
 
   resolve(owner: string, spec: string): string {
     const candidate = resolve(dirname(owner), spec);
-    if (!existsSync(candidate)) {
-      throw new StudioError(`import 先がありません: ${spec}（${owner}）`);
-    }
+    // Python checks containment before existence, so an outside path never
+    // reveals (through a different error) whether it exists.
     const path = canonical(candidate);
     if (!this.#allow.some((root) => isInside(root, path))) {
       throw new StudioError(`置き場の外の部品は使えません: ${spec}（${owner}）`);
+    }
+    if (!existsSync(path)) {
+      throw new StudioError(`import 先がありません: ${spec}（${owner}）`);
     }
     return path;
   }
@@ -347,6 +364,14 @@ export class Copier {
   }
 }
 
+function validateFigureName(value: string): string {
+  const name = check_name(value, "図の名前");
+  if (name === "." || name === "..") {
+    throw new StudioError(`図の名前が正しくありません: ${value}`);
+  }
+  return name;
+}
+
 /** Copy a figure to a shelf or deck `figures/` folder. */
 export async function copy_figure(
   ws: Workspace,
@@ -362,20 +387,66 @@ export async function copy_figure(
   if (!isInside(canonical(ws.root), destinationBase)) {
     throw new StudioError("図の置き場は保管フォルダの中にしてください");
   }
-  let selected = name || basename(src_dir);
-  if (replace && existsSync(join(destinationBase, selected))) {
+  let selected = validateFigureName(name || basename(src_dir));
+  if (!replace) {
+    selected = validateFigureName(free_name(destinationBase, selected));
     const target = join(destinationBase, selected);
-    if (!isInside(destinationBase, target)) {
-      throw new StudioError("図の置き場は保管フォルダの中にしてください");
+    if (!isInside(destinationBase, resolve(target))) {
+      throw new StudioError(`図の名前が正しくありません: ${selected}`);
     }
-    rmSync(target, { recursive: true, force: true });
-  } else if (!replace) {
-    selected = free_name(destinationBase, selected);
+    return new Copier(ws, src_dir, destinationBase).copy(selected);
   }
-  if (!isInside(destinationBase, resolve(destinationBase, selected))) {
+
+  const target = join(destinationBase, selected);
+  if (!isInside(destinationBase, resolve(target))) {
     throw new StudioError(`図の名前が正しくありません: ${selected}`);
   }
-  return new Copier(ws, src_dir, destinationBase).copy(selected);
+
+  // Copy to a sibling staging folder first. The old figure is swapped in only
+  // after every import has resolved, so a failed replacement is non-destructive.
+  mkdirSync(destinationBase, { recursive: true });
+  const staging = mkdtempSync(join(destinationBase, `.${selected}-new-`));
+  let copied: string;
+  try {
+    copied = await new Copier(ws, src_dir, destinationBase).copy(basename(staging));
+  } catch (error) {
+    rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+
+  if (!existsSync(target)) {
+    try {
+      renameSync(copied, target);
+    } catch (error) {
+      rmSync(staging, { recursive: true, force: true });
+      throw error;
+    }
+    return target;
+  }
+
+  const backup = mkdtempSync(join(destinationBase, `.${selected}-old-`));
+  const previous = join(backup, selected);
+  try {
+    renameSync(target, previous);
+  } catch (error) {
+    rmSync(staging, { recursive: true, force: true });
+    rmSync(backup, { recursive: true, force: true });
+    throw error;
+  }
+  try {
+    renameSync(copied, target);
+  } catch (error) {
+    try {
+      renameSync(previous, target);
+    } catch {
+      // Keep the original error; the backup still contains the old figure.
+    }
+    rmSync(staging, { recursive: true, force: true });
+    rmSync(backup, { recursive: true, force: true });
+    throw error;
+  }
+  rmSync(backup, { recursive: true, force: true });
+  return target;
 }
 
 export const FIG_REF = /(\{\{<\s*fig\s+)("?)([^"\s>]+)\2/gu;
