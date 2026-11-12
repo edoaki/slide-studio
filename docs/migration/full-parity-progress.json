@@ -1,0 +1,47 @@
+{
+  "status": "partial_foundation_validated_full_migration_in_progress",
+  "reference": "ca1f148dced6d207dab3f69474bc848560ff738c",
+  "source": {
+    "commit": "5d80176",
+    "tests": 23,
+    "result": "passed; includes differential comparison of 31 Python reference cases",
+    "validation": "npm run build; node --test dist/tests/core/legacy-source.test.js",
+    "review": "# Review: legacy-source.ts / legacy-cover.ts vs source.py / cover.py\n\nI reviewed this by reading only; nothing was executed. Each blocker includes a minimal input you can add to the golden suite.\n\n## Blockers\n\n### 1. `\\s` / `\\S` in every regex differ from Python's `\\s`\n\nJS `\\s` includes U+FEFF but excludes U+001C–U+001F and U+0085. Python's `\\s` follows `str.isspace()`, which is the reverse on exactly those characters. You already handled this in `pyStrip` (`PY_WS`), but the regexes still use JS `\\s`.\n\nThe affected patterns are `FOOTNOTE_DEF`, `LINK_DEF`, `ATTR_TOKEN`, `PURE_MATH` (and the `fullMath` built from it), `TABLE_RULE`, `CELL_PART` (`(?!\\s)`, `(?<!\\s)`), `CODE_EXEC`, `SINGLE_LINE_MATH`, `TRAILING_MATH_BREAK`, `FIG_LINE`, `SHORTCODE`, the `/^\\s*\\$\\$/u` in `blocks()`, the token regex in `fig_args`, and the strip regex in `image_options`.\n\nRepro (chunk boundaries and keys change):\n```\n## A\n\n\\uFEFF$$\na\n\nb\n$$\n```\n- **Python:** `^\\s*\\$\\$` does not match `\\uFEFF$$`, so the page has 2 chunks (`p0/0`, `p0/1`).\n- **TS:** the line matches, the math block runs to the final `$$`, so there is 1 chunk. `emitText` then also injects `\\begin{gathered}`.\n- With `\\x85$$` the difference goes the other way.\n\nFix:\n- Export `PY_WS` from legacy-cover.ts.\n- Define `const S = `[${PY_WS}]``, `const NS = `[^${PY_WS}]``.\n- Substitute `S` and `NS` everywhere above.\n- Inside negated classes, inline the set: `[^\\s}]` becomes `[^${PY_WS}}]`, and `[^\\]\\s]` becomes `[^\\]${PY_WS}]`.\n- Leave `(?![\\s\\S])` as is.\n\n### 2. `classify`: an empty `.columns` div becomes `columns`, but Python makes it `opaque`\n\nIn Python, `cols = []` is falsy, so `if cols:` fails and the kind is `opaque`. In TS, `validColumns` stays `true` when there are zero blocks.\n\nRepro: `## A\\n\\n::: {.columns}\\n:::\\n`. In TS, `emitChunk` takes the container path and emits an extra blank line between open and close, so the wrapped source and the `origin` array both differ.\n\nFix: `if (validColumns && columns.length > 0)`.\n\n### 3. A `__proto__` key is silently dropped in `parse_attrs` and `fig_args`\n\n`attrs.kv[key] = value` and `out[key] = …` run on ordinary objects. Assigning a string to `__proto__` is a no-op there.\n\nRepro: `::: {__proto__=x}\\ntext\\n:::`.\n- **Python:** `kv = {\"__proto__\": \"x\"}`, which is not a subset of `BOX_KEYS`, so the div is `opaque`.\n- **TS:** `kv = {}`, so the div becomes `box` with editable children.\n\nFix: use `Object.create(null)` for the `Attrs.kv` default, for `parse_attrs`'s `new Attrs()`, and for `fig_args`'s `out`. Alternatively, assign with `Object.defineProperty(obj, key, {value, enumerable: true, writable: true, configurable: true})`.\n\n### 4. `frontMatter`: the `yaml` package's YAML 1.2 defaults differ from PyYAML `safe_load` (YAML 1.1)\n\nThese are concrete differences in `meta`. Rewriting is unaffected because it uses only `doc.text`.\n\n| Input | PyYAML | `yaml.parse` default |\n|---|---|---|\n| Duplicate key | last value wins | throws, so `meta = {}` and `meta_error` is set (whole front matter lost) |\n| `toc: yes` / `on` / `off` / `no` | bool | string |\n| `<<: *base` | merged | literal `<<` key |\n| `010` | 8 | 10 |\n| `1e3` | string | 1000 |\n| `1:30` | 90 | string |\n| `!expr x` (Quarto) | ConstructorError, so `meta_error` | warning; value kept |\n| More than 100 alias uses | OK | \"Excessive alias count\" error |\n| `date: 2024-11-12` | `datetime.date` | string |\n\nFix (assuming `yaml` v2):\n```ts\nconst document = parseDocument(source, { version: \"1.1\", uniqueKeys: false });\nif (document.errors.length || document.warnings.some((w) => w.code === \"TAG_RESOLVE_FAILED\")) → meta_error\nconst loaded = document.toJS({ maxAliasCount: -1 });\n```\n- `version: \"1.1\"` turns on merge keys, booleans, octal, sexagesimal and timestamps.\n- With 1.1, timestamps come back as `Date`. `pyStr(Date)` currently returns the JS local-time string, so either map it to Python's `str(date)` / `str(datetime)` form or keep the source text through a custom `timestamp` tag.\n- Decide this based on how your Python harness serializes dates (`default=str`?).\n\n### 5. `decimalDigitValue` is wrong for adjacent Nd runs (`locate`)\n\nU+1D7CE–U+1D7FF holds five consecutive 0–9 runs. For `p𝟘/0`, walking back from U+1D7D8 reaches U+1D7CE, giving 10 instead of 0. Python's `int(\"𝟘\") == 0`, so TS locates page 10 instead of page 0.\n\nFix: `return (code - start) % 10;`\n\n## Uncovered edge cases (not blockers, or behavior to pin down with fixtures)\n\n- **`meta_error` text:** `String(error)` (`YAMLParseError: …`) differs from PyYAML's message. Golden tests only match when there is no error.\n- **PyYAML-specific scalar handling:** PyYAML treats U+0085, U+2028 and U+2029 as line breaks inside scalars. It also rejects non-printable characters such as a mid-document U+FEFF. `yaml` does neither.\n- **Non-string mapping keys:** for keys like `1:`, `true:`, `null:`, JS stringifies them. Python keeps int/bool/None keys; `json.dumps` turns them into `\"1\"`, `\"true\"`, `\"null\"`. Check what the JS side produces for `null`.\n- **Integer-like key order:** in `kv` and `meta` (`{b=1 2=x}`), JS objects move integer-like keys first. Deep-equal golden comparisons won't catch this; it matters only if order is serialized back.\n- **`pyStr` / `pyRepr` fidelity:** these differences show up in `authors()` and `html_block`:\n  - Floats: `1.0` gives `\"1\"`, but Python gives `\"1.0\"`. `1e16` and `1e-05` also format differently, and `12.0px` becomes `12px`.\n  - Ints above 2^53 lose precision.\n  - `repr` quoting: Python uses `\"it's\"` when the string contains `'` and no `\"`. It also escapes `\\n` and non-printables.\n- **`authors()` with a non-iterable `affiliations`:** for `affiliations: 5` or `true`, Python raises `TypeError` (from `Doc.to_json`), while TS returns `[]`.\n- **`fullMatch` helper:** it checks \"match at index 0 with full length\" instead of anchoring. That is fine for the current `TABLE_RULE`, but it is not true fullmatch semantics in general. Build `^(?:src)(?![\\s\\S])` the way `emitText` does.\n- **Unicode database version:** Python's `unicodedata` and V8's ICU can differ on newly assigned characters (`\\p{L}`, `\\p{Nd}`, `\\p{Z}`). Pin both versions in CI if parity on new characters matters.\n- **Performance (not correctness):** `Chunk.to_json`, `sliceText` and `rewrite` build a new `_Lines` for every chunk or edit, which is quadratic on large documents.\n\nSuggested golden fixtures to add: the inputs from blockers 1–3, a front matter with duplicate keys, `yes`, `<<`, `010` and `!expr`, and the key `p𝟘/0`.",
+    "resolved": [
+      "Python whitespace set including FEFF distinction",
+      "empty columns treated as opaque",
+      "own __proto__ dictionary keys",
+      "YAML 1.1 booleans, octal, sexagesimal, duplicate keys, merge keys, unknown tags and dates",
+      "Unicode decimal digit runs"
+    ],
+    "remaining": [
+      "Python float string representation loses lexical .0 in JavaScript values; track before full parity completion",
+      "YAML aliases deliberately limited to 1000 for bounded work; tests cover ordinary >100 aliases and rejection of expansion bombs"
+    ]
+  },
+  "workspace": {
+    "status": "repair_in_progress",
+    "review": "Data-preservation issues found; not yet approved for use on real user data"
+  },
+  "web": {
+    "status": "original UI restored in isolated implementation worktree; not yet integrated",
+    "base_commit": "1329d4a",
+    "pure_bridge_tests": {
+      "passed": 6,
+      "scope": "protocol validation only"
+    },
+    "real_electron_bridge_tests": "implementation_in_progress",
+    "direct_edit_bridge": "pending"
+  },
+  "reference_tests": {
+    "original_ui_test_functions": 377,
+    "coverage_index": "legacy-ui-test-index.json",
+    "note": "Index counts test functions, not executed or parametrized cases"
+  },
+  "delivery": {
+    "status": "not_ready",
+    "installed_dmg": "superseded reduced UI build; not a parity deliverable",
+    "windows_exe": "superseded reduced UI cross-build; runtime untested",
+    "github_clean_clone": "pending"
+  }
+}

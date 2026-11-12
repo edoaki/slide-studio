@@ -180,5 +180,6 @@
     "simplified_ui": "Rejected by user; not a deliverable or parity evidence",
     "packaging": "DMG and NSIS EXE generation proven for superseded slice; full parity build/install still required",
     "source_install": "npm workflow under development; GitHub branch not yet published"
-  }
+  },
+  "full_parity_progress": "full-parity-progress.json"
 }
