@@ -4,21 +4,24 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.34.6",
+  "packageManager": "npm@11.16.0",
   "engines": {
     "node": ">=24.18.0 <25"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build:renderer": "node scripts/build-renderer.mjs --clean && tsc && node scripts/build-renderer.mjs",
-    "test:renderer": "pnpm build:renderer && node --test dist/tests/renderer/*.test.js",
-    "render:spike": "pnpm build:renderer && node scripts/migration/render-spike.mjs",
-    "build": "pnpm build:renderer",
-    "dev:desktop": "pnpm build && node scripts/dev-desktop.mjs",
+    "build:renderer": "npm run build",
+    "test:renderer": "npm run build && node --test dist/tests/renderer/*.test.js",
+    "render:spike": "npm run build && node scripts/migration/render-spike.mjs",
+    "build": "node scripts/build-renderer.mjs --clean && tsc && node scripts/build-renderer.mjs",
+    "dev:desktop": "npm start",
     "setup:pandoc": "node scripts/setup-pandoc.mjs",
-    "test": "pnpm build && node --test dist/tests/renderer/*.test.js dist/tests/core/*.test.js dist/tests/desktop/*.test.js",
-    "test:desktop": "pnpm build && node --test dist/tests/desktop/*.test.js",
-    "test:desktop:e2e": "pnpm build && node --test dist/tests/e2e/*.test.js"
+    "test": "npm run build && node --test dist/tests/renderer/*.test.js dist/tests/core/*.test.js dist/tests/desktop/*.test.js",
+    "test:desktop": "npm run build && node --test dist/tests/desktop/*.test.js",
+    "test:desktop:e2e": "npm run build && node --test dist/tests/e2e/*.test.js",
+    "start": "npm run build && node scripts/dev-desktop.mjs",
+    "dist:mac": "npm run build && node scripts/package-desktop.mjs --mac",
+    "dist:win": "npm run build && node scripts/package-desktop.mjs --win"
   },
   "dependencies": {
     "cheerio": "1.2.0",
@@ -28,12 +31,15 @@
   "devDependencies": {
     "@types/node": "24.19.2",
     "electron": "45.3.1",
+    "electron-builder": "26.18.0",
     "playwright-core": "1.65.0",
     "typescript": "7.0.2"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron"
-    ]
+  "main": "dist/apps/desktop/main.js",
+  "description": "Local slide editor and Electron desktop application",
+  "author": "Slide Studio contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edoaki/slide-studio.git"
   }
 }

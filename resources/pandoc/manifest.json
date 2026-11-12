@@ -9,6 +9,10 @@
     "darwin-x64": {
       "url": "https://github.com/jgm/pandoc/releases/download/3.9/pandoc-3.9-x86_64-macOS.zip",
       "sha256": "f1dfb5a433976b131818c2e69db70bb46874604367e8923412a5c2fa673f2526"
+    },
+    "win32-x64": {
+      "url": "https://github.com/jgm/pandoc/releases/download/3.9/pandoc-3.9-windows-x86_64.zip",
+      "sha256": "edccdaa95b5a33b3320187f0e291d58a232e21318a8081750bd31f847e598d18"
     }
   }
 }
