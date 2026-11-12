@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script
+  data-studio-admin-origin="__ADMIN_ORIGIN__"
+  data-studio-deck="deck-test"
+  data-studio-version="v1"
+  data-studio-generation="__GENERATION__"
+  src="__CONTENT_ORIGIN__/bridge/frame-agent.classic.js"></script>
+<link id="slide-studio-theme" rel="stylesheet" href="/theme/base.css">
+<style>
+  html, body { margin: 0; padding: 0; }
+  #stage { width: 1280px; height: 720px; position: relative; }
+  #stage > .slide { display: none; width: 1280px; height: 720px; box-sizing: border-box; }
+  .slide { background-color: rgb(250, 251, 252); }
+  #stage > .slide.active { display: block; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <section class="slide" id="slide-1" data-page="0" data-group="intro"><h1>First</h1></section>
+  <section class="slide section-slide" id="slide-2" data-page="1" data-group="body"><h2>Second</h2></section>
+  <section class="slide" id="slide-3" data-page="2" data-section-start="true"><h2>Third</h2></section>
+</div>
+<script>
+(() => {
+  'use strict';
+  const authoredHash = location.hash;
+  const authoredHref = location.href;
+  const params = new URLSearchParams(location.search);
+  const adminOrigin = __ADMIN_ORIGIN_JSON__;
+  const generation = __GENERATION_JSON__;
+  const slides = Array.from(document.querySelectorAll('#stage > .slide'));
+  const maxSteps = [2, 1, 0];
+  const pdfSteps = [[0, 1, 2], [0, 1], [0]];
+  let index = 0;
+  let step = 0;
+  let filter = null;
+
+  const post = message => parent.postMessage({ fixtureGeneration: generation, ...message }, adminOrigin);
+  const maxStep = at => maxSteps[Number.isInteger(at) ? at : index] ?? 0;
+
+  function render() {
+    slides.forEach((slide, at) => slide.classList.toggle('active', at === index));
+    document.documentElement.dataset.slideAt = `${index}/${step}`;
+  }
+
+  function dispatchDeckChange() {
+    dispatchEvent(new CustomEvent('deckchange', {
+      detail: { index, step, maxStep: maxStep(index) },
+    }));
+  }
+
+  function go(nextIndex, nextStep = 0) {
+    // Deterministic pending navigation for the reload-invalidation test.
+    if (nextIndex === 999) return new Promise(() => {});
+    index = Math.max(0, Math.min(slides.length - 1, Number.isInteger(nextIndex) ? nextIndex : 0));
+    step = Math.max(0, Math.min(maxStep(index), Number.isInteger(nextStep) ? nextStep : 0));
+    render();
+    dispatchDeckChange();
+    return Promise.resolve().then(() => {
+      post({ type: 'fixture-go', index, step });
+      return { index, step };
+    });
+  }
+
+  function move(delta) {
+    const next = step + delta;
+    if (next > maxStep(index)) return go(index + 1, 0);
+    if (next < 0) return go(index - 1, maxStep(index - 1));
+    return go(index, next);
+  }
+
+  const initial = /^#(\d+)\/(\d+)/.exec(authoredHash);
+  if (initial) {
+    index = Math.max(0, Math.min(slides.length - 1, Number(initial[1]) - 1));
+    step = Math.max(0, Math.min(maxStep(index), Number(initial[2]) || 0));
+  }
+
+  window.deck = {
+    get index() { return index; },
+    get step() { return step; },
+    go,
+    move,
+    jump(delta) { return go(index + Math.sign(delta), 0); },
+    goStage(stage) { return go(index, stage); },
+    resize() { post({ type: 'fixture-resize' }); return Promise.resolve(true); },
+    setFilter(indices) {
+      filter = Array.isArray(indices) ? indices.slice() : null;
+      post({ type: 'fixture-filter', filter });
+      dispatchDeckChange();
+      return Promise.resolve(filter);
+    },
+    maxStep(at) { return maxStep(at); },
+    pdfMarks(at) { return (pdfSteps[Number.isInteger(at) ? at : index] || []).slice(); },
+    stageAt() { return step; },
+    stageNumber(stage) { return (Number.isInteger(stage) ? stage : 0) + 1; },
+    pageWheel(event) {
+      post({ type: 'fixture-wheel', deltaX: event.deltaX, deltaY: event.deltaY });
+      return true;
+    },
+  };
+
+  render();
+  const deferReady = params.get('deferReady') === '1';
+  if (deferReady) window.deckReady = false;
+  else {
+    window.deckReady = true;
+    dispatchEvent(new Event('deckready'));
+  }
+
+  let adminDom = 'allowed';
+  try {
+    void parent.document.title;
+  } catch (error) {
+    adminDom = `denied:${error?.name || 'Error'}`;
+  }
+  const nodeAccess = (typeof require === 'undefined' && typeof process === 'undefined') ? 'none' : 'exposed';
+  const themeHref = () => document.querySelector('#slide-studio-theme')?.href || '';
+
+  post({
+    type: 'fixture-loaded',
+    authoredHash,
+    authoredHref,
+    adminDom,
+    nodeAccess,
+    themeHref: themeHref(),
+  });
+
+  const duplicateNonce = params.get('duplicateNonce');
+  if (duplicateNonce) {
+    const channel = new MessageChannel();
+    parent.postMessage({
+      protocol: 'slide-studio-edit/1',
+      type: 'hello',
+      nonce: duplicateNonce,
+    }, adminOrigin, [channel.port2]);
+    post({ type: 'fixture-duplicate-posted', nonce: duplicateNonce });
+  }
+
+  addEventListener('message', event => {
+    if (event.origin !== adminOrigin) return;
+    const data = event.data;
+    if (!data || data.fixtureGeneration !== generation) return;
+    if (data.type === 'fixture-ready') {
+      window.deckReady = true;
+      dispatchEvent(new Event('deckready'));
+      post({ type: 'fixture-ready-set' });
+      return;
+    }
+    if (data.type === 'fixture-key') {
+      const dispatched = window.dispatchEvent(new KeyboardEvent(data.eventType || 'keydown', {
+        key: data.key || 'Escape',
+        code: data.code || '',
+        bubbles: true,
+        cancelable: true,
+      }));
+      post({ type: 'fixture-key-dispatched', key: data.key || 'Escape', canceled: !dispatched });
+      return;
+    }
+    if (data.type === 'fixture-link-prepare') {
+      const prepared = document.getElementById('bridge-external-link') || document.createElement('a');
+      prepared.id = 'bridge-external-link';
+      prepared.href = data.href;
+      prepared.textContent = 'external link';
+      if (!prepared.isConnected) document.body.append(prepared);
+      post({ type: 'fixture-link-prepared', href: data.href });
+      return;
+    }
+    if (data.type === 'fixture-link') {
+      const anchor = document.createElement('a');
+      anchor.href = data.href;
+      anchor.target = '_blank';
+      anchor.textContent = 'external';
+      document.body.append(anchor);
+      const dispatched = anchor.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      anchor.remove();
+      post({ type: 'fixture-link-clicked', href: data.href, canceled: !dispatched });
+      return;
+    }
+    if (data.type === 'fixture-state') {
+      post({
+        type: 'fixture-state',
+        label: data.label || '',
+        authoredHash,
+        authoredHref,
+        adminDom,
+        nodeAccess,
+        themeHref: themeHref(),
+        themeCount: document.querySelectorAll('#slide-studio-theme').length,
+        studioVersion: window.__slideStudioVersion,
+        noHash: window.__slideStudioNoHash === true,
+        filter,
+        index,
+        step,
+      });
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,9 +1,18 @@
 import { installExternalLinks } from './external-links.js';
 // 発表（設計書 §10.8）。読み込んだ HTML は終了まで差し替えない。
-import { toast } from './api.js';
+import { api, toast } from './api.js';
 import { svg } from './icons.js';
 import { S } from './strings.js';
 import { tip } from './tip.js';
+import {
+  AgentClient,
+  capabilityUrl,
+  createGeneration,
+  createNonce,
+  registerFrameClient,
+  requestPreviewCapability,
+  unregisterFrameClient,
+} from './bridge/agent-client.js';
 
 export function makePresent(ctx) {
   const host = document.createElement('span'); host.className = 'present-tools';
@@ -35,12 +44,15 @@ export function makePresent(ctx) {
   function finish(sync = true) {
     const s = session; if (!s) return;
     session = null;
-    const deck = s.frame.contentWindow?.deck;
-    if (sync && alive && deck) {
-      const id = deck.slides[deck.index]?.id;
+    const snapshot = s.client?.snapshot;
+    if (sync && alive && snapshot) {
+      const id = snapshot.slides[snapshot.index]?.id;
       const index = ctx.preview.slides.findIndex(slide => slide.id === id);
-      ctx.preview.go(index >= 0 ? index : deck.index, deck.step);
+      Promise.resolve(ctx.preview.go(index >= 0 ? index : snapshot.index, snapshot.step)).catch(() => {});
     }
+    for (const off of s.unsub || []) off();
+    s.client?.destroy();
+    unregisterFrameClient(s.frame, s.client);
     s.abort.abort(); s.box.remove(); ctx.root.inert = s.wasInert;
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (alive) trigger?.focus();
@@ -62,52 +74,80 @@ export function makePresent(ctx) {
   };
   addEventListener('keydown', keys, true); addEventListener('keyup', keys, true);
 
+  // Keys and the #fullscreen button are intercepted by the content agent and
+  // forwarded as validated events. Nested same-origin figure frames are wired
+  // there too, so the parent never reaches into the presentation document.
+  const bridgeKeys = data => {
+    if (!session || (data?.type !== 'keydown' && data?.type !== 'keyup')) return;
+    if (data.key === 'Escape') { finish(); return; }
+    const mods = data.mods || {};
+    if (data.key === 'f' && !mods.meta && !mods.ctrl && !mods.alt) {
+      if (data.type === 'keydown' && !data.repeat) toggleFullscreen();
+    }
+  };
+
   async function start(mode, button) {
     if (busy || session) return;
     trigger = button; busy = true; buttons.forEach(b => { b.disabled = true; });
+    let started = null;
     try {
       if (!await ctx.flush()) throw new Error(S.saveFirst);
       if (!alive) return;
       const index = mode === 'first' ? 0 : ctx.preview.index;
       const step = 0;
-      const url = new URL(`/files/decks/${encodeURIComponent(ctx.deck)}/__slide-studio_preview__.html?edit=0`, location.href);
-      const response = await fetch(url, { cache: 'no-store' });
-      if (!response.ok) throw new Error(S.present.error);
-      const html = await response.text();
+      const generation = createGeneration();
+      const nonce = createNonce();
+      const capability = await requestPreviewCapability(api, {
+        deck: ctx.deck,
+        // ctx.version is the freshest committed revision after flush(); the
+        // preview may still be showing the previous frame until its reload.
+        version: ctx.version ?? ctx.preview.version ?? '',
+        mode: 'present',
+        generation,
+      });
       if (!alive) return;
       const box = document.createElement('div'); box.className = 'present-screen';
       box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', S.present.title);
       const frame = document.createElement('iframe'); frame.title = S.present.title; frame.allowFullscreen = true;
-      const s = { box, frame, fullscreen: false, abort: new AbortController(), wasInert: ctx.root.inert };
-      session = s; ctx.root.inert = true;
-      // srcdoc に元の配信先を渡し、相対参照をそのまま解決する。編集用コードは含めない。
-      frame.srcdoc = html.replace(/<head>/i, `<head><base href="${url.href}"><script>window.__slideStudioNoHash=true;</script>`);
-      box.append(frame); document.body.append(box);
-      await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error(S.present.error)), 30000);
-        s.abort.signal.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
-        frame.addEventListener('load', () => {
-          const w = frame.contentWindow;
-          const ready = () => { clearTimeout(timer); resolve(); };
-          if (w.deckReady) ready(); else w.addEventListener('deckready', ready, { once: true });
-        }, { once: true });
+      const client = new AgentClient({
+        frame,
+        deck: ctx.deck,
+        version: capability.version,
+        generation,
+        adminOrigin: location.origin,
+        contentOrigin: capability.origin,
+        nonce,
       });
+      const s = started = {
+        box, frame, client, fullscreen: false, connected: false,
+        abort: new AbortController(), wasInert: ctx.root.inert, unsub: [],
+      };
+      session = s; ctx.root.inert = true;
+      s.unsub.push(client.on('key', bridgeKeys));
+      s.unsub.push(client.on('failure', () => {
+        if (session === s && s.connected) finish();
+      }));
+      installExternalLinks(client);
+      s.abort.signal.addEventListener('abort', () => client.destroy(), { once: true });
+      client.start();
+      registerFrameClient(frame, client);
+      frame.src = capabilityUrl(capability.url, { index, step, nonce, mode: 'present', generation });
+      box.append(frame); document.body.append(box);
+      await client.ready;
       if (session !== s || !alive) return;
-      const w = frame.contentWindow;
-      installExternalLinks(w.document);
-      await w.deck.go(index, step);
+      s.connected = true;
+      await client.api.go(index, step);
       if (session !== s || !alive) return;
-      w.addEventListener('keydown', keys, { capture: true, signal: s.abort.signal });
-      // 図へフォーカスを移しても Esc・全画面の操作を受け取る。
-      for (const f of w.document.querySelectorAll('iframe')) {
-        try { f.contentWindow.addEventListener('keydown', keys, { capture: true, signal: s.abort.signal }); } catch { /* 外部の図 */ }
-      }
-      const fs = w.document.querySelector('#fullscreen');
-      if (fs) fs.onclick = toggleFullscreen;
       if (document.fullscreenElement) s.fullscreen = true;
       else await toggleFullscreen();
-      if (session === s) frame.contentWindow.focus();
-    } catch (e) { finish(false); if (alive) toast(e.message); }
+      if (session === s) frame.focus();
+    } catch (e) {
+      // A normal Esc/fullscreen exit destroys the client while ready is still
+      // pending; that is not an error to report.
+      const cancelled = !!started && session !== started;
+      finish(false);
+      if (alive && !cancelled) toast(e?.message === S.saveFirst ? S.saveFirst : S.present.error);
+    }
     finally { busy = false; buttons.forEach(b => { b.disabled = false; }); }
   }
   return {

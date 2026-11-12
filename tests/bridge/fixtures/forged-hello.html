@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Forged bridge hello</title></head>
+<body>
+<script>
+(() => {
+  'use strict';
+  const params = new URLSearchParams(location.search);
+  const adminOrigin = __ADMIN_ORIGIN_JSON__;
+  const nonce = params.get('nonce') || '';
+  const generation = params.get('generation') || '';
+  const channel = new MessageChannel();
+  parent.postMessage({
+    protocol: 'slide-studio-edit/1',
+    type: 'hello',
+    nonce,
+  }, adminOrigin, [channel.port2]);
+  parent.postMessage({
+    type: 'forged-hello-posted',
+    fixtureGeneration: generation,
+    nonce,
+    origin: location.origin,
+  }, adminOrigin);
+})();
+</script>
+</body>
+</html>

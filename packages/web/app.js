@@ -1,4 +1,5 @@
 import { installExternalLinks } from './external-links.js';
+import { forwardWheel } from './bridge/agent-client.js';
 // 画面の切り替え：/ はホーム、/deck/<名前> は発表の編集画面。
 import { mountTopic } from './topic.js';
 import { mountHome } from './home.js';
@@ -23,7 +24,7 @@ addEventListener('popstate', () => { if (!window.__slideStudioFigureRoute?.()) r
 // iframe の外でも横スワイプは表示中のスライドへ渡す。
 addEventListener('wheel', e => {
   const frame = document.querySelector('.present-screen iframe') || document.querySelector('#slideBox iframe:not(.loading)');
-  frame?.contentWindow?.deck?.pageWheel(e);
+  if (frame) forwardWheel(frame, e);
 }, { passive: false, capture: true });
 installExternalLinks(document);
 document.addEventListener('click', e => {
