@@ -1,0 +1,6 @@
+{
+  "reference_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
+  "cases": 14,
+  "generation": "Bundled themes and a saved heading color edit generated with original theme_edit; direct read_vars, refresh_heading_options, preserve_title_header, drop_cover_layout, with_current_palette outputs",
+  "comparison": "Exact text and values"
+}

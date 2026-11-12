@@ -20,8 +20,16 @@
     ]
   },
   "workspace": {
-    "status": "repair_in_progress",
-    "review": "Data-preservation issues found; not yet approved for use on real user data"
+    "status": "repairs_integrated_followup_review_pending",
+    "commit": "e1bdd65",
+    "tests": 22,
+    "result": "passed; includes 14 exact theme helper golden cases",
+    "data_safety": "Temporary workspace tests cover migration backups, symlink escapes, copy rollback and bibliography retention. Not yet tested with real user data.",
+    "known_pending": [
+      "Portable compiler provisioning",
+      "Node/Electron agent guidance generation",
+      "Full theme API functions beyond workspace migration helpers"
+    ]
   },
   "web": {
     "status": "original UI restored in isolated implementation worktree; not yet integrated",
@@ -43,5 +51,9 @@
     "installed_dmg": "superseded reduced UI build; not a parity deliverable",
     "windows_exe": "superseded reduced UI cross-build; runtime untested",
     "github_clean_clone": "pending"
+  },
+  "integrated_foundation_tests": {
+    "passed": 45,
+    "skipped": 0
   }
 }

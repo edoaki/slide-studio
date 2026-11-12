@@ -8,6 +8,9 @@ export interface SlideSnapshot {
 export interface FrameSnapshot extends FrameIdentity {
   index: number; step: number; maxStep: number; slides: SlideSnapshot[];
   background: string; scale: number;
+  /** Committed source revision represented after a successful theme-only swap.
+   * The transport identity/version remains the immutable bootstrap revision. */
+  sourceVersion?: string;
 }
 export type NavigationCommand =
   | { method: "go"; params: { index: number; step: number } }
@@ -16,7 +19,7 @@ export type NavigationCommand =
   | { method: "goStage"; params: { stage: number } }
   | { method: "resize"; params: Record<string, never> }
   | { method: "setFilter"; params: { indices: number[] | null } }
-  | { method: "theme.swap"; params: { name: string; version: string } }
+  | { method: "theme.swap"; params: { name: string; version: string; sourceVersion?: string } }
   | { method: "finish"; params: Record<string, never> };
 export interface FrameHello {
   protocol: typeof EDIT_BRIDGE_PROTOCOL; type: "hello"; nonce: string;
