@@ -3,5 +3,22 @@
   "pandoc": "3.9",
   "cases": 20,
   "generation": "Original render_text and warning_issues in a fresh temporary legacy Workspace; deck parity, topic test; fixtures/sync/*.qmd",
-  "comparison": "Compare semantic DOM plus slides, warnings, missing_cites, cited, unsupported; timing intentionally excluded. Byte-identical HTML is not claimed across different HTML serializers."
+  "comparison": "Compare semantic DOM plus slides, warnings, missing_cites, cited, unsupported; timing intentionally excluded. Byte-identical HTML is not claimed across different HTML serializers.",
+  "edge_cases": {
+    "file": "edge-golden.json",
+    "cases": 7,
+    "reference_reverified": "Original Python baseline ca1f148dced6d207dab3f69474bc848560ff738c regenerated all seven outputs exactly in temporary workspaces on 2026-11-13.",
+    "passed": [
+      "ruby",
+      "raw-table",
+      "cover-authors",
+      "topic-image",
+      "figure-title",
+      "bibliography"
+    ],
+    "normalization": "Only whitespace-only nodes inside empty cover-author placeholders are normalized.",
+    "pending": [
+      "raw-tags: malformed raw HTML is repaired differently by parse5 and BeautifulSoup html.parser; test remains TODO and is not counted as passing."
+    ]
+  }
 }

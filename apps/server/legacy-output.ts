@@ -91,7 +91,7 @@ export class LegacyOutput{
   const old=this.scheduled.get(key);if(old)clearTimeout(old);
   this.scheduled.set(key,setTimeout(()=>{this.scheduled.delete(key);if(this.stopped)return;
    if(this.background.has(key)){this.schedule(ws,deck,400);return;}
-   const saved=this.saved(ws,deck);if(!saved.stale)return;
+   const saved=this.saved(ws,deck);if(!saved.stale){this.options.broadcast({type:'checks',deck,result:saved.result,busy:false,stale:false});return;}
    this.options.broadcast({type:'checks',deck,result:saved.result,busy:true,stale:true});
    const task=this.check(ws,deck).catch(error=>{this.options.broadcast({type:'checks',deck,result:saved.result,busy:false,stale:true,error:error instanceof Error?error.message:String(error)});}).finally(()=>this.background.delete(key));this.background.set(key,task);
   },delay));
@@ -112,7 +112,7 @@ export class LegacyOutput{
   }).finally(()=>{this.active--;});this.tail=run.catch(()=>{});return run;
  }
  handle(ws:Workspace,req:LegacyFeatureRequest):Promise<LegacyFeatureResponse|null>{if(!/^\/api\/deck\/[^/]+\/(?:build|check|checks|shots(?:\/priority)?|download\/(?:html|pdf))$/u.test(req.pathname))return Promise.resolve(null);this.active++;const run=this.tail.then(()=>this.run(ws,req)).finally(()=>{this.active--;});this.tail=run.catch(()=>{});return run;}
- private async inspect(ws:Workspace,deck:string,pdf:boolean,progress:(n:number)=>void,persist=true):Promise<Built>{const v=version(ws,deck),key=ws.root+'\0'+deck;const old=this.cache.get(key);if(persist&&old&&JSON.stringify(old.result.version)===JSON.stringify(v)&&(!pdf||old.inspection.pdf))return old;
+ private async inspect(ws:Workspace,deck:string,pdf:boolean,progress:(n:number)=>void,persist=true):Promise<Built>{const v=version(ws,deck),key=ws.root+'\0'+deck;const old=this.cache.get(key);if(persist&&old&&JSON.stringify(old.result.version)===JSON.stringify(v)&&(!pdf||old.inspection.pdf)){this.options.broadcast({type:'checks',deck,result:old.result,busy:false,stale:false});return old;}
  if(!this.options.inspect)throw Error('描画サービスが接続されていません');progress(5);const source=readFileSync(ws.qmd(deck),'utf8'),r=await render_text(ws,deck,source,{pandocPath:this.options.pandocPath,wrap:false});const issues=static_issues(ws,deck,r);progress(15);const bundled=bundleHtml(r.html,ws.deck_dir(deck),ws.root);for(const w of bundled.warnings)issues.push({level:'error',kind:'resource',message:w.message});progress(25);
  const inspection=await this.options.inspect(bundled.html,{pdf,screenshots:true,allSteps:true});for(const step of inspection.steps)if(Array.isArray(step.layout))for(const found of step.layout)if(found&&typeof found==='object')issues.push({...found as Issue,slide:step.slide,step:step.step});progress(85);
  if(JSON.stringify(v)!==JSON.stringify(version(ws,deck)))throw Error('原稿や依存ファイルが変わっています。再試行してください');

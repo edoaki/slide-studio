@@ -10,6 +10,7 @@ import { PDFDocument } from 'pdf-lib';
 import { Workspace } from '../../packages/core/src/legacy-workspace.js';
 import { add } from '../../packages/core/src/legacy-assets.js';
 import { new_figure } from '../../packages/core/src/legacy-figures.js';
+import { execute } from '../../packages/ai/src/process.js';
 const require=createRequire(import.meta.url);
 test('original Electron editor renders shared figures, checks all steps and exports offline HTML and selected-step PDF', {timeout:120000}, async t=>{
  const temp=await mkdtemp(join(tmpdir(),'studio-workflow-'));const ws=Workspace.open(join(temp,'workspace'));ws.new_deck('talk','test');await new_figure(ws,'chart',ws.shelf_dir('test'));add(ws,'talk','plot.png',Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWZkAAAAASUVORK5CYII=','base64'));
@@ -100,5 +101,14 @@ test('original Electron editor renders shared figures, checks all steps and expo
   assert.deepEqual(downloaded,exported,`${ext} must also be saved by Electron's download handler`);
  }
  assert.deepEqual(errors,[]);
+ if(process.platform==='darwin'){
+  const launcher=join(temp,'profile/bin/slide-studio'),codex=process.env.SLIDE_STUDIO_SANDBOX_TEST_CODEX;
+  const cli=(args:string[])=>execute(codex||launcher,codex?['sandbox','-c','default_permissions="slide-studio"','-c','permissions.slide-studio.extends=":workspace"','--',launcher,...args]:args,{cwd:ws.root,env:{...env,SLIDE_STUDIO_HOME:ws.root,SLIDE_STUDIO_SANDBOX:'1'},timeoutMs:60000});
+  const checked=await cli(['check','talk','--json']);assert.equal(checked.code,0,checked.stderr);assert.equal(JSON.parse(checked.stdout).slides,3);
+  const audit=await cli(['audit','run','talk']);assert.equal(audit.code,1,audit.stderr);const report=JSON.parse(audit.stdout);assert.equal(report.status,'needs_review');assert.ok(report.states.length>=4);
+  const savedAudit=await cli(['audit','status','talk',report.audit_id]);assert.equal(JSON.parse(savedAudit.stdout).audit_id,report.audit_id);
+ }
+ await page.waitForFunction(()=>document.querySelector('#status')?.getAttribute('data-tone')==='ok');
+ assert.doesNotMatch(await page.locator('#status').innerText(),/検査が古い/);
  if(process.env.SLIDE_STUDIO_TEST_ARTIFACTS) await page.screenshot({path:join(process.env.SLIDE_STUDIO_TEST_ARTIFACTS,'original-editor-installed.png')});
 });

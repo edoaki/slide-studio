@@ -871,3 +871,24 @@ test("render_text matches the Python render golden", async (t) => {
     });
   }
 });
+
+
+test("render_text retains legacy raw HTML, cover, figure and bibliography edge cases", async (t) => {
+ const entries=JSON.parse(readFileSync(join(ROOT,"tests/fixtures/render-parity/edge-golden.json"),"utf8")) as (GoldenEntry & {files:Record<string,string>})[];
+ for(const entry of entries) await t.test(entry.name,{todo:entry.name==="raw-tags" ? "Malformed raw HTML adoption differs from the legacy html.parser; retain the differential until fixed" : false},async()=>{
+  const root=await scratch(t),ws=Workspace.open(root);ws.new_deck("parity","test");
+  for(const [path,content] of Object.entries(entry.files)){await mkdir(dirname(join(root,path)),{recursive:true});await writeFile(join(root,path),content);}
+  const rendered=await render_text(ws,"parity",entry.text,{pandocPath:PANDOC!});
+  assert.deepEqual(JSON.parse(JSON.stringify(rendered.slides)),entry.slides);
+  assert.deepEqual(rendered.warnings,entry.warnings);
+  assert.deepEqual(rendered.missing_cites,entry.missing_cites);
+  assert.deepEqual(rendered.cited,entry.cited);
+  assert.deepEqual(rendered.unsupported,entry.unsupported);
+  assert.deepEqual(JSON.parse(JSON.stringify(warning_issues(rendered))),entry.warning_issues);
+  assert.deepEqual(headSignature(rendered.html),headSignature(entry.html));
+  // BeautifulSoup collapses whitespace-only nodes. Ignore their count only in
+  // the empty author placeholder; visible author names/styles remain exact.
+  const signature=(html:string)=>{if(entry.name!=="cover-authors")return stageSignature(html);const $=cheerio.load(html);$(".cover-authors[data-slide-studio]").each((_,el)=>{for(const child of [...el.children])if(child.type==="text"&&/^\s*$/u.test(child.data))child.data="\n";});return stageSignature($.html());};
+  assert.equal(signature(rendered.html),signature(entry.html));
+ });
+});
