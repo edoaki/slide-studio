@@ -2,7 +2,7 @@ import type { Doc } from "../../core/src/legacy-source.js";
 import type { Workspace } from "../../core/src/legacy-workspace.js";
 export interface LegacySlide {
   index: number; page: number | null; id: string; title: string;
-  chapter: boolean; group?: string; sectionStart?: boolean;
+  level: 1 | 2; figures: string[];
 }
 export interface LegacyRendered {
   html: string; slides: LegacySlide[]; doc: Doc; version: string;
