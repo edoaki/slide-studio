@@ -36,6 +36,7 @@ for(const mode of ['memo','theme','slides'] as const)test(`original AI panel sen
  const file=mode==='theme'?join(ws.themes,'default.css'):mode==='slides'?ws.qmd('talk'):ws.memo('talk');const before=await readFile(file,'utf8');
  await page.locator('.chat-input').fill('動作確認の一文を追加してください');
  if(mode==='slides'){const frame=page.frameLocator('#slideBox > iframe:not(.loading)');await page.locator('#stage[data-blocks=ready]').waitFor();await frame.locator('.slide.active p').click();await page.keyboard.press('Alt+KeyS');await frame.locator('.slide-studio-editing').fill('AI送信前の新規入力。');}
+ await page.waitForFunction(()=>!!document.querySelector<HTMLButtonElement>('.chat-send')&&!document.querySelector<HTMLButtonElement>('.chat-send')!.disabled);
  const sent=page.waitForResponse(r=>r.url().endsWith('/send')&&r.request().method()==='POST');await page.locator('.chat-send').evaluate((e:HTMLButtonElement)=>e.click());
  const response=await sent;assert.equal(response.status(),200,await response.text());
  const round=await response.json();
