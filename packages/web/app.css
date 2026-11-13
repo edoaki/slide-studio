@@ -748,8 +748,9 @@ body.home-page { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition-duration: 0s !important; } }
 
 /* 原稿のブロック表示。ai-slide/mock/gui/index.html の .page / .box / .rail / .card / .qtb / .rpop を移植（#qblocks の中だけ）。 */
-/* 右の余白：macOS の重ね表示のスクロールバー（幅 16px）に、現在のページの枠（右へ 6px はみ出す）まで重ならない幅 */
-#qblocks { position: relative; padding: 8px 24px 120px 6px; min-height: 100%; }
+/* Keep page outlines clear of overlay scrollbars with equal space on both sides. */
+#qscroll { scrollbar-gutter: stable both-edges; }
+#qblocks { position: relative; padding: 8px 24px 120px; min-height: 100%; }
 #qblocks[hidden], #qhost[hidden] { display: none; }
 #qblocks .heading {
   position: relative; display: block; width: calc(100% - 24px); min-height: calc(1.35em + 4px); margin: 0 0 4px 24px; padding: 2px 36px 2px 4px;
@@ -855,7 +856,7 @@ body.home-page { overflow: hidden; }
 /* 今のページは番号だけでなく、ページ全体を薄く塗って縁取る */
 #qblocks .page.cur { isolation: isolate; }
 #qblocks .page.cur::before {
-  content: ""; position: absolute; inset: -4px -6px -8px -4px; z-index: -1; border-radius: var(--r-container); pointer-events: none;
+  content: ""; position: absolute; inset: -4px -4px -8px -4px; z-index: -1; border-radius: var(--r-container); pointer-events: none;
   background: color-mix(in srgb, var(--primary) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 #qblocks .page ~ .page.cur::before { top: 6px; }

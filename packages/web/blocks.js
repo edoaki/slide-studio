@@ -417,7 +417,7 @@ export function makeBlocks(ctx) {
     if (editing || !live() || !p || p.generated || !legacy) return;
     select(null);
     editing = true; ctx.preview.defer = true;
-    session = { heading: p, text: ctx.text, last: ctx.text, html: null, sent: null, timer: 0, running: null, failed: false };
+    session = { heading: p, headingPoint: point, text: ctx.text, last: ctx.text, html: null, sent: null, timer: 0, running: null, failed: false };
     addEventListener('pointerdown', outside, true);
     legacy.startHeading(point); draw();
   }
@@ -559,8 +559,19 @@ export function makeBlocks(ctx) {
     clearTimeout(s.timer);
     if (html !== null) { s.html = html; s.htmlCell = s.cell; }
     const ok = await sync(s);
+    if (!ok) {
+      // Finishing in the frame removes contenteditable before conversion is
+      // acknowledged. Reopen the same input rather than replace it with the
+      // last saved preview. Keep its history and source revision for retry.
+      addEventListener('pointerdown', outside, true);
+      await beginText(s.key ?? null, s.html ?? '', s.heading
+        ? { heading: true, point: s.headingPoint }
+        : { plain: !!s.cover, ...(s.cell ? { cell: s.cell } : {}) });
+      draw(); ctx.showStatus();
+      return false;
+    }
     endSession();
-    const v = ctx.preview.deferredVersion ?? (ok ? null : ctx.preview.version);
+    const v = ctx.preview.deferredVersion;
     ctx.preview.deferredVersion = null;
     if (v) ctx.preview.load(v);
     draw();

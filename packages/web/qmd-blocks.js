@@ -372,7 +372,7 @@ export function makeQmdBlocks(ctx) {
       ratioBtn.hidden = !ratio && !ratioTarget(s);
       qtb.style.top = `${Math.max(0, r.y - 27)}px`;
       rpop.classList.toggle('below', r.y - 27 - scroller.scrollTop < 70);
-      qtb.style.left = `${Math.max(0, r.x + r.w - qtb.offsetWidth + 2)}px`;
+      qtb.style.left = `${Math.max(0, Math.min(r.x + r.w - qtb.offsetWidth + 2, host.clientWidth - qtb.offsetWidth - 4))}px`;
     } else closeRatio();
   }
   function setHover(key) {
@@ -832,6 +832,8 @@ export function makeQmdBlocks(ctx) {
     if (!currentOnly && h.top >= sr.top && h.bottom <= sr.bottom) return;
     scroller.scrollTo({ top: scroller.scrollTop + top - 4, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
+  const layoutObserver = new ResizeObserver(() => { if (!dead) chrome(); });
+  layoutObserver.observe(pagesEl);
   ctx.qmdBlocks = {
     // スライドでカーソルを合わせているブロック（inject/edit.js から）
     hover(key) { if (key !== slideHover) { slideHover = key; chrome(); } },
@@ -896,6 +898,6 @@ export function makeQmdBlocks(ctx) {
       const i = ctx.preview.slideOfPage(goPage); goPage = null;
       if (i >= 0) ctx.preview.go(i, 0);
     },
-    destroy() { dead = true; closeTemplate?.(); document.removeEventListener('pointerdown', outside, true); },
+    destroy() { dead = true; layoutObserver.disconnect(); closeTemplate?.(); document.removeEventListener('pointerdown', outside, true); },
   };
 }

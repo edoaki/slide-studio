@@ -152,3 +152,27 @@ test('legacy directional block insertion ignores empty input and adds adjacent c
 test('desktop autosave retries a failed conversion of an existing paragraph',{timeout:60000},async t=>{
  const {ws,page,app}=await setup(t,DOC);let fail=true;await page.route('**/api/deck/talk/chunks',async route=>{if(fail&&route.request().method()==='POST'&&route.request().postDataJSON()?.action==='html')await route.fulfill({status:503,json:{error:'conversion unavailable'}});else await route.continue();});const frame=page.frameLocator('#slideBox > iframe:not(.loading)'),p=frame.locator('.slide.active p').filter({hasText:'最初の段落。'});await p.click();await p.click();await frame.locator('.slide-studio-editing').fill('変換の再試行');const window=await app.browserWindow(page);await window.evaluate(w=>{setTimeout(()=>w.close(),0);});await new Promise(r=>setTimeout(r,1000));assert.equal(page.isClosed(),false);assert.equal(await page.locator('#status').innerText(),'保存待ち');assert.ok(await page.evaluate(()=>!dispatchEvent(new Event('beforeunload',{cancelable:true}))));assert.doesNotMatch(await readFile(ws.qmd('talk'),'utf8'),/変換の再試行/);fail=false;const closed=page.waitForEvent('close');await window.evaluate(w=>{setTimeout(()=>w.close(),0);});await closed;assert.match(await readFile(ws.qmd('talk'),'utf8'),/変換の再試行/);
 });
+
+for(const area of ['source','memo','new-block'] as const)test(`navigation waits for automatic ${area} saving before returning home`,{timeout:60000},async t=>{
+ const {ws,page}=await setup(t,DOC);await page.route('**/api/deck/talk/**',async route=>{if(['PUT','POST'].includes(route.request().method()))await new Promise(r=>setTimeout(r,500));await route.continue();});
+ if(area==='source'){await rawMode(page);await typeAt(page,'最初の段落','移動前の原稿');}
+ else if(area==='memo'){await page.getByRole('tab',{name:'下書き',exact:true}).click();await page.locator('.memo-input').fill('移動前の下書き');}
+ else{const frame=page.frameLocator('#slideBox > iframe:not(.loading)');await frame.locator('.slide.active p').filter({hasText:'最初の段落。'}).click();await page.keyboard.press('Alt+KeyS');await frame.locator('.slide-studio-editing').fill('移動前の新規段落');}
+ await page.getByRole('link',{name:'ホーム',exact:true}).click();await page.waitForURL(url=>url.pathname==='/');await page.locator('.deck-card-wrap[data-deck=talk]').waitFor();assert.match(await readFile(area==='memo'?ws.memo('talk'):ws.qmd('talk'),'utf8'),area==='memo'?/移動前の下書き/:area==='source'?/移動前の原稿/:/移動前の新規段落/);
+});
+for(const failFirst of [false,true])test(`browser back and forward preserve automatic saves and history failFirst=${failFirst}`,{timeout:60000},async t=>{
+ const {ws,page,url}=await setup(t,DOC);await page.getByRole('link',{name:'ホーム',exact:true}).click();await page.locator('.deck-card-wrap[data-deck=talk] .card').click();await page.locator('#stage[data-blocks=ready]').waitFor();await rawMode(page);let fail=failFirst;
+ await page.route('**/api/deck/talk/source',async route=>{if(route.request().method()==='PUT'){await new Promise(r=>setTimeout(r,300));if(fail){await route.fulfill({status:503,json:{error:'save unavailable'}});return;}}await route.continue();});
+ await typeAt(page,'最初の段落','戻る前の入力');await page.evaluate(()=>history.back());
+ if(failFirst){await page.waitForTimeout(1100);assert.equal(new URL(page.url()).pathname,'/deck/talk');assert.match(await page.locator('.raw textarea').inputValue(),/戻る前の入力/);assert.doesNotMatch(await readFile(ws.qmd('talk'),'utf8'),/戻る前の入力/);fail=false;await page.evaluate(()=>history.back());}
+ await page.waitForURL(u=>u.pathname==='/');await page.locator('.deck-card-wrap[data-deck=talk]').waitFor();assert.match(await readFile(ws.qmd('talk'),'utf8'),/戻る前の入力/);await page.evaluate(()=>history.forward());await page.waitForURL(url);await page.locator('#stage[data-blocks=ready]').waitFor();assert.match(await page.locator('.raw textarea').inputValue(),/戻る前の入力/);
+});
+for(const area of ['paragraph','heading','cell'] as const)test(`direct ${area} editing retains input on failed Escape conversion and retries`,{timeout:60000},async t=>{
+ const source=area==='cell'?'## 表\n\n| A | B |\n|---|---|\n| 一 | 二 |\n':DOC;
+ const {ws,page}=await setup(t,source);let fail=true;
+ await page.route('**/api/deck/talk/chunks',async route=>{if(fail&&route.request().method()==='POST')await route.fulfill({status:503,json:{error:'conversion unavailable'}});else await route.continue();});
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');
+ if(area==='heading')await frame.locator('.slide.active h2').dblclick();
+ else{const target=area==='cell'?frame.locator('td').filter({hasText:'一'}):frame.locator('.slide.active p').filter({hasText:'最初の段落。'});await target.click();await target.click({position:{x:10,y:10}});}
+ const input=frame.locator('.slide-studio-editing');await input.fill('失敗しても残る入力');const failure=page.waitForResponse(r=>r.url().endsWith('/chunks')&&r.status()===503);await page.keyboard.press('Escape');await failure;await page.waitForFunction(()=>document.querySelector('#status')?.textContent==='保存待ち');await input.waitFor();assert.equal(await input.innerText(),'失敗しても残る入力');assert.doesNotMatch(await readFile(ws.qmd('talk'),'utf8'),/失敗しても残る入力/);fail=false;await page.keyboard.press('Escape');await saved(ws,'失敗しても残る入力');await page.waitForFunction(()=>!['保存待ち','保存中','変換中'].includes(document.querySelector('#status')?.textContent||''));assert.deepEqual((await readFile(ws.qmd('talk'),'utf8')).match(/失敗しても残る入力/g)?.length,1);
+});

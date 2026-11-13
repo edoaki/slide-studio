@@ -15,11 +15,25 @@ export function flushBeforeLeave() {
     .catch(() => false).finally(() => { leaving = null; });
   return leaving;
 }
+const entryKey = 'slideStudioEntry';
+let entry = Number.isSafeInteger(history.state?.[entryKey]) ? history.state[entryKey] : 0;
+let renderedUrl = location.pathname + location.search + location.hash;
+let navigating = null, restoringHistory = false, traversal = 0;
+history.replaceState({ ...history.state, [entryKey]: entry }, '', location.href);
 export function navigate(path, replace = false) {
-  if (replace) history.replaceState(null, '', path); else history.pushState(null, '', path);
-  route();
+  if (navigating) return navigating;
+  navigating = (async () => {
+    if (!await flushBeforeLeave()) return false;
+    traversal++;
+    if (!replace) entry++;
+    history[replace ? 'replaceState' : 'pushState']({ [entryKey]: entry }, '', path);
+    route();
+    return true;
+  })().finally(() => { navigating = null; });
+  return navigating;
 }
 function route() {
+  renderedUrl = location.pathname + location.search + location.hash;
   unmount?.();
   const root = document.getElementById('root');
   root.textContent = '';
@@ -27,7 +41,23 @@ function route() {
   const topic = location.pathname.match(/^\/topic\/([^/]+)$/);
   unmount = location.pathname === '/agents' ? mountAgents(root) : topic ? mountTopic(root, decodeURIComponent(topic[1])) : m ? mountEditor(root, decodeURIComponent(m[1])) : mountHome(root);
 }
-addEventListener('popstate', () => { if (!window.__slideStudioFigureRoute?.()) route(); });
+addEventListener('popstate', async event => {
+  if (restoringHistory) { restoringHistory = false; return; }
+  if (window.__slideStudioFigureRoute?.()) return;
+  const ticket = ++traversal, target = event.state?.[entryKey];
+  const saved = await flushBeforeLeave();
+  if (ticket !== traversal) return;
+  if (!saved) {
+    if (Number.isSafeInteger(target) && target !== entry) {
+      restoringHistory = true;
+      history.go(entry - target);
+    } else history.replaceState({ ...history.state, [entryKey]: entry }, '', renderedUrl);
+    return;
+  }
+  entry = Number.isSafeInteger(target) ? target : entry + 1;
+  history.replaceState({ ...history.state, [entryKey]: entry }, '', location.href);
+  route();
+});
 // iframe の外でも横スワイプは表示中のスライドへ渡す。
 addEventListener('wheel', e => {
   const frame = document.querySelector('.present-screen iframe') || document.querySelector('#slideBox iframe:not(.loading)');

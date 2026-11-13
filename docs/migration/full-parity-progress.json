@@ -765,5 +765,38 @@
       "Full feature and operation equivalence is still under review; the legacy test correspondence count is not a count of missing implementations.",
       "Developer ID/notarization, Windows signing and binary GitHub Releases are not provided."
     ]
+  },
+  "navigation_spacing_followup_2026_11_13": {
+    "status": "source_fixed_feature_checks_passed_visual_acceptance_pending",
+    "changes": [
+      "Navigation waits for source, memo, theme and active direct-edit saving before unmounting the editor. Browser back/forward restores the current history entry on save failure.",
+      "Failed paragraph, heading and table-cell conversion on Escape reopens the same input for editing and retry, retaining the original history and source revision.",
+      "QMD block view uses equal horizontal padding and symmetric current-page outlines; persistent scrollbars reserve space on both sides.",
+      "The selected-block toolbar follows editor resizing and stays inside the panel."
+    ],
+    "validation": {
+      "navigation_and_conversion": "Seven scenarios passed in navigation-feature.txt. The table-cell case saved correctly but its test waited for a clean layout check despite deliberately long cell text; narrowed the wait to save/render completion, then the case passed in navigation-cell-final.txt. No full-suite rerun.",
+      "layout": [
+        {
+          "width": 390,
+          "left": 20,
+          "right": 20,
+          "overflow": false
+        },
+        {
+          "width": 600,
+          "left": 20,
+          "right": 20,
+          "overflow": false
+        }
+      ],
+      "visual": "Viewed editor-spacing-390.png; equal outer margins and all toolbar buttons visible. User visual acceptance remains pending.",
+      "logs": [
+        "/tmp/slide-studio-desktop/navigation-feature.txt",
+        "/tmp/slide-studio-desktop/navigation-cell-final.txt",
+        "/tmp/slide-studio-desktop/editor-spacing.json"
+      ]
+    },
+    "remaining": "Full feature migration continues; this is not final overall acceptance."
   }
 }

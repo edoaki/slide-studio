@@ -230,8 +230,7 @@ export function mountEditor(root, deck) {
   };
   root.querySelector('a[data-nav]').onclick = async e => {
     e.preventDefault(); e.stopPropagation();
-    if (await ctx.flush()) navigate('/');
-    else toast(S.saveFirst);
+    await navigate('/');
   };
   const beforeUnload = e => {
     if (ctx.dirty || ctx.saving || ctx.styleSaving || ctx.conflict || ctx.blocks?.pending) { e.preventDefault(); e.returnValue = ''; }
