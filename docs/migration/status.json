@@ -124,6 +124,11 @@
       "source_commit": "efb1a565b893fe14842c2f12eb438b78bbb63b7d",
       "result": "AI/workspace tests 50 passed; regression 434 passed and 7 conditional skips before navigation-only frontend fix; final bridge 33 passed. Final source UI run 44/45 passed; the remaining alignment assertion was corrected to wait for async UI updates and passed its targeted rerun. No installer rebuild or reinstallation.",
       "details": "full-parity-progress.json#step_editing_followup_2026_11_13"
+    },
+    {
+      "name": "operation_review_followup_2026_11_13",
+      "result": "468 regression tests passed, 7 conditional skips; 34 Electron bridge tests passed; 85 UI scenarios passed across two final runs, including 8 desktop autosave cases and HTML/PDF export. Real Codex chat test passed in a scratch workspace. Remaining individual operation review continues.",
+      "details": "full-parity-progress.json#operation_review_followup_2026_11_13"
     }
   ],
   "signing": {
@@ -213,9 +218,9 @@
   ],
   "next_work": [
     "Finish remaining original UI correspondences with the heading-design AI-only exception. Real native clipboard paste is verified, including pixels, undo/redo and reload.",
-    "Continue individual UI mapping: 25 covered, 8 superseded by the heading-design decision, 344 pending. Do not rebuild or reinstall distribution artifacts until the full legacy operation review is complete.",
-    "Finish PDF visual/text acceptance; browser-mode differences diagnosed in pdf-diagnosis-2026-11-13.json.",
-    "Verify authenticated inference/recovery for every provider.",
+    "Continue individual UI mapping: 77 covered, 8 superseded by the heading-design decision, 292 pending. Do not rebuild or reinstall distribution artifacts until the full legacy operation review is complete.",
+    "PDF technical review completed with documented differences (pdf-review-2026-11-13.json); user visual acceptance remains pending.",
+    "Real Codex inference and restoration verified using existing authenticated Codex home. Installed-app login and other providers remain unverified.",
     "Windows runtime is deferred by user. Intel runtime, Developer ID/notarization, Windows signing and public GitHub source/release are not completed."
   ],
   "source_commits": {

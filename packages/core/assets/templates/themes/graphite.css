@@ -1,4 +1,4 @@
-/* graphite：チャコールの方眼、太い白文字、オレンジのアクセント。
+/* graphite：チャコールの淡いグラデーション、太い白文字、オレンジのアクセント。
    色の値は :root の変数だけに書き、ほかの色は変数から作る（テーマの色を直すと全体が付いてくる）。 */
 :root {
   --ink: #eeeeec;
@@ -21,9 +21,9 @@
 .reveal{font-family:var(--font-body);color:var(--ink);font-size:29px;line-height:1.3}
 #stage a{color:var(--link)}
 #stage h3{font-size:1em;font-weight:700;color:var(--header)}
-/* 方眼は背景だけに描き、本文や図の配置を変えない。 */
+/* 背景は左上から右下へ、淡く明暗を付ける。 */
 #stage{background:var(--ink)}
-#stage .slide{border-radius:0;background-color:var(--paper);background-image:linear-gradient(color-mix(in srgb,var(--rule) 58%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--rule) 58%,transparent) 1px,transparent 1px);background-size:40px 40px;background-position:0 0}
+#stage .slide{border-radius:0;background-color:var(--paper);background-image:linear-gradient(135deg,color-mix(in srgb,var(--paper) 86%,var(--rule)),var(--paper));background-size:100% 100%;background-repeat:no-repeat;background-position:0 0}
 
 /* 見出し：太い白字、全幅の罫線とオレンジの短い線 */
 #stage h2{position:relative;font-size:1.25em;line-height:1.3;font-weight:800;letter-spacing:.06em;color:var(--header);background:none;border:0;border-bottom:2px solid var(--header);margin-top:0;margin-bottom:14px;padding:16px calc(var(--content-inset) + var(--text-pad)) 9px}
@@ -52,8 +52,8 @@
 #stage .section-slide h1::before{content:none}
 #stage .section-slide h1::after{content:'';display:block;width:96px;height:2px;background:var(--header);margin:30px auto 0}
 
-/* 目次：明るい方眼、黒い文字と番号。 */
-#stage section.slide.toc-slide{background-color:var(--ink);background-image:linear-gradient(color-mix(in srgb,var(--rule) 12%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--rule) 12%,transparent) 1px,transparent 1px);background-size:40px 40px;color:var(--paper)}
+/* 目次：明るいグラデーション、黒い文字と番号。 */
+#stage section.slide.toc-slide{background-color:var(--ink);background-image:linear-gradient(135deg,var(--ink),color-mix(in srgb,var(--ink) 94%,var(--rule)));background-size:100% 100%;color:var(--paper)}
 #stage .toc-slide::before{content:'';position:absolute;left:0;top:0;bottom:0;width:40px;background:var(--paper);pointer-events:none}
 #stage section.toc-slide > h2{color:var(--paper);border-bottom-color:var(--paper)}
 #stage section.toc-slide > h2::before{content:none}

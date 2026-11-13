@@ -1,140 +1,174 @@
-/* 青系の既定テーマ（グラデーションの枠＋白い面）。骨格は runtime/base.css、発表固有の調整は styles/slides.css。 */
+/* 青緑のグラデーションと円に半透明の白を重ね、青緑の点線を使う共有テーマ。 */
 :root {
-  --ink: #233244;
-  --link: #2167a8;
-  --accent: #2167a8;
-  --header: #1d4a94;
-  --muted: #667483;
-  --warn: #c0392b;
-  --good: #27804f;
-  --mark: #fff0b8;
-  --mark-ink: #754500;
-  --mark-line: #e7b54b;
-  --paper: #ffffff;
-  --rule: #c4d8e8;
-  --header-ink: #ffffff;
-  --font-body: "Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-  --font-head: "Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --ink:#535654;
+  --accent:#224d91;
+  --header:#224d91;
+  --header-ink:#224d91;
+  --muted:#707a85;
+  --warn:#af5148;
+  --good:#398781;
+  --mark:#f5e8c9;
+  --mark-ink:#65512d;
+  --mark-line:#d6bc83;
+  --paper:#ffffff;
+  --rule:#ccd9e7;
+  --link:#224d91;
+  --frame:#5c88c2;
+  --teal:#47a9aa;
+  --canvas:#f3f4f7;
+  --font-body:"Hiragino Kaku Gothic ProN","Yu Gothic","Avenir Next",sans-serif;
+  --font-head:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --citation-ink:#707a85;
+  --reference-rule:#e2e8ef;
+  --heading-mode:plain;
+  --heading-rule-style:dotted;
+  --heading-rule-width:3px;
+  --heading-rule-inset:44px;
+  --header-fill:transparent;
 }
 :root{--theme-ink:var(--ink);--theme-muted:var(--muted);--theme-accent:var(--accent);--theme-header:var(--header);--theme-rule:var(--rule);--theme-paper:var(--paper);--theme-border:var(--rule)}
-:root{--citation-ink:#64788a}
-.reveal{font-family:var(--font-body);color:var(--ink);font-size:29px}
-.reveal-viewport{background:var(--paper)}
-.reveal h1,.reveal h2,.reveal h3{font-family:var(--font-head);color:var(--ink);font-weight:650;text-transform:none;letter-spacing:0;line-height:1.35}
-.reveal h2{font-size:1.35em;color:var(--header);background:none;border:0;margin-bottom:12px}
-.reveal h3{font-size:1em}
-.reveal strong{color:var(--accent)}
-.reveal a{color:var(--link)}
-.reveal .kicker{font-size:.55em;letter-spacing:.13em;color:var(--accent);margin-bottom:12px}
-.reveal .cover-title{font-family:var(--font-head);font-size:1.9em;line-height:1.5;margin-top:56px}
-.reveal .cover-sub{font-size:.9em;color:var(--muted);margin-top:30px}
-.reveal table{font-size:.85em;width:auto;max-width:100%;line-height:1.6}
-.reveal table td,.reveal table th{padding:16px 8px;border-bottom:1px solid #ced5dc}
-.reveal .slide-number{left:20px;right:auto;bottom:16px;background:none;color:var(--muted);font-size:14px}
-.reveal .progress{color:var(--accent)}
-.reveal .slide-number{width:auto!important;left:65px!important;right:auto!important;pointer-events:none}
-.reveal .slides section.slide::after{
-  content:"";position:absolute;left:0;right:0;bottom:-4px;
-  border-top:2px solid var(--rule);pointer-events:none;
+.reveal{font-family:var(--font-body);color:var(--ink);font-size:29px;line-height:1.3}
+.reveal-viewport{background:var(--canvas)}
+.reveal h1,.reveal h2,.reveal h3{font-family:var(--font-head);font-weight:700;text-transform:none;line-height:1.35;letter-spacing:.04em}
+.reveal strong,.reveal a{color:var(--accent)}
+
+#stage .slide::after{content:none;border:0}
+#stage .slide > h2{
+  margin:0 calc(-1 * var(--content-inset)) 18px;
+  padding:36px calc(var(--content-inset) + var(--text-pad)) 7px;
+  width:auto;max-width:none;border:0;border-radius:0;background:none;box-shadow:none;
+  color:var(--header-ink);font-size:1.35em;line-height:1.35;position:relative;
 }
-.reveal .cover-title{color:var(--header)}
-.reveal .cover .kicker{border-top:6px solid var(--header);padding-top:18px}
-.reveal table th{color:var(--header);background:#edf5fc}
-.reveal .slide-number{color:var(--header)}
-.reveal .slide-number a{color:inherit}
-@media print{
-  #stage .slide::before,#stage .slide::after,#stage .slide>h2::before,#stage .section-slide h1,.reveal .cover .kicker,.reveal table th{
-    -webkit-print-color-adjust:exact;print-color-adjust:exact;
-  }
+#stage .slide > h2::before{
+  content:none;
 }
-.reveal{font-size:29px;line-height:1.3}
-#stage h2{font-size:1.35em;line-height:1.35;margin-top:0}
+#stage .slide > h2::after{content:none}
+#stage h2,#stage h2 *{color:var(--header-ink)}
+#stage h3{
+  display:flex;align-items:center;gap:22px;font-size:1em;font-weight:700;
+  color:var(--teal);letter-spacing:.025em;
+}
+#stage h3::after{content:"";flex:1;min-width:28px;border-top:3px dotted var(--teal)}
+#stage .kicker{font-size:.55em;letter-spacing:.12em;color:var(--header)}
+
+/* 表紙と章扉は白地に大きな青い題名、下に点線。 */
 #stage .cover{padding-top:0}
-#stage table{font-size:.85em;margin:0;border-collapse:collapse}
-#stage .cover p{color:var(--header)}
-#stage .page-number{left:auto;right:calc(var(--frame) + 24px);bottom:0;height:var(--frame);display:flex;align-items:center;font-size:14px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.04em;color:#fff}
-#stage .cover .cover-title{margin-top:140px;font-size:80px;font-weight:650;line-height:1.55;letter-spacing:.015em}
-#stage .cover .cover-title::before{content:'';display:block;width:92px;height:5px;background:var(--frame-fill);margin-bottom:28px}
-#stage .cover p{color:var(--header)}
-#stage table{border-top:2px solid #4b86b4;border-bottom:1px solid #b8cedf}
-#stage table th{background:#e8f1f8;color:var(--header);font-weight:650}
-#stage table tbody tr:nth-child(even){background:#f7fafd}
-#stage table td{border-bottom:1px solid #dce6ee}
-#toolbar button{background:#fffffff0;border:1px solid #cad9e5;box-shadow:0 2px 10px #14395312;color:#174b78}
-#overview{background:#edf3f8}
-.thumb{border-top-color:#2167a8;box-shadow:0 3px 12px #174b7810}
-.thumb[aria-current=true]{background:#dcebf6}
-:root{--reference-rule:#e4edf4}
+/* 題名が中央なので、発表者も中央に置く。 */
+#stage .slide.cover{text-align:center}
+#stage .cover .cover-title{
+  margin-top:130px;font-family:var(--font-head);font-size:80px;font-weight:700;
+  line-height:1.55;letter-spacing:.04em;text-align:center;color:var(--header);
+}
+#stage .cover .cover-title::before{content:none}
+#stage .slide.cover .cover-title::after{
+  content:"";width:72%;height:0;bottom:8px;border-bottom:4px dotted var(--frame);
+}
+#stage .cover p,#stage .cover .cover-title p{color:var(--header)}
+#stage .cover-sub,#stage .cover-subtitle{color:var(--header);text-align:center}
+#stage .slide.cover div.cover-subtitle{margin-top:16px}
+#stage .cover .kicker{border:0}
+#stage .section-slide{
+  padding:245px 65px 0;color:var(--header);overflow:hidden;
+}
+#stage .section-slide h1{
+  width:100%;font-size:62px;font-weight:700;line-height:1.5;letter-spacing:.06em;
+  text-align:center;color:var(--header);
+}
+#stage .section-slide h1::before{content:none}
+#stage .section-slide h1::after{
+  content:"";display:block;width:64%;margin:28px auto 0;border-top:4px dotted var(--frame);
+}
+
+/* 目次の番号は青い丸に白抜きで置く。折り返しても丸は縮めない。 */
+#stage .toc-slide .toc-list li{align-items:center}
+#stage .toc-slide .toc-number{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 48px;
+  width:48px;height:48px;box-sizing:border-box;border-radius:50%;
+  background:var(--accent);color:#ffffff;font-size:22px;font-weight:700;
+  line-height:1;letter-spacing:0;font-variant-numeric:tabular-nums;
+}
+#stage .toc-slide .toc-label{min-width:0}
+
+#stage table{font-size:.72em;width:100%;line-height:1.6;margin:0;border-collapse:collapse;border-top:2px solid var(--frame);border-bottom:1px solid var(--rule)}
+#stage table th{background:#edf3fb;color:var(--header);font-weight:700}
+#stage table td,#stage table th{padding:16px 8px;border-bottom:1px solid var(--rule)}
+#stage table tbody tr:nth-child(even){background:#f8fafc}
+#stage .page-number{
+  left:auto;right:34px;bottom:28px;font-size:14px;line-height:1.2;
+  font-variant-numeric:tabular-nums;letter-spacing:.04em;color:var(--header);
+}
+#stage .citations{bottom:26px}
+#stage .slide > .footnote-small{bottom:30px}
+#stage .references-slide .csl-entry{border-bottom:1px dotted var(--rule)}
+#toolbar button{background:var(--paper);border:1px solid var(--rule);box-shadow:none;color:var(--header)}
+#overview{background:var(--canvas)}
+.thumb{border-top-color:var(--frame);box-shadow:none}
+.thumb[aria-current=true]{background:#edf3fb;outline:2px solid var(--frame)}
+@media print{#stage .slide,#stage .slide *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 
 /* block palette v4: 整理・結論・補足・引用・定義・メモ */
 :root {
-  --block-border:3.5px solid #7b848fff;
+  --block-border:3.5px solid #939593ff;
   --block-background:#ffffffff;
-  --block-plain-ink:#233244ff;
+  --block-plain-ink:#535654ff;
   --block-plain-radius:10px;
-  --block-plain-shadow:0.18;
-  --block-top-line:8px solid #2167a8ff;
-  --block-top-fill:#e0e8f0ff;
-  --block-top-ink:#233244ff;
+  --block-plain-shadow:0.08;
+  --block-top-line:8px solid #224d91ff;
+  --block-top-fill:#e3e9f2ff;
+  --block-top-ink:#535654ff;
   --block-top-radius:10px;
-  --block-top-shadow:0.18;
-  --block-left-line:10px solid #27804fff;
-  --block-left-fill:#daece2ff;
-  --block-left-ink:#233244ff;
+  --block-top-shadow:0.08;
+  --block-left-line:10px solid #398781ff;
+  --block-left-fill:#dceae9ff;
+  --block-left-ink:#535654ff;
   --block-left-radius:10px;
-  --block-left-shadow:0.18;
-  --block-quote-line:3.5px solid #667483ff;
+  --block-left-shadow:0.08;
+  --block-quote-line:3.5px solid #707a85ff;
   --block-quote-fill:#e5e8ebff;
-  --block-quote-ink:#233244ff;
+  --block-quote-ink:#535654ff;
   --block-quote-radius:10px;
-  --block-quote-shadow:0.18;
-  --block-quote-accent:#667483ff;
+  --block-quote-shadow:0.08;
+  --block-quote-accent:#707a85ff;
   --block-quote-width:3.5px;
-  --block-bracket-line:3.5px solid #3f3d85ff;
-  --block-bracket-fill:#e6e6efff;
-  --block-bracket-ink:#233244ff;
+  --block-bracket-line:3.5px solid #4a4082ff;
+  --block-bracket-fill:#e8e6efff;
+  --block-bracket-ink:#535654ff;
   --block-bracket-radius:0px;
-  --block-bracket-shadow:0.18;
-  --block-bracket-accent:#3f3d85ff;
+  --block-bracket-shadow:0.08;
+  --block-bracket-accent:#4a4082ff;
   --block-bracket-width:3.5px;
-  --block-fold-line:3.5px solid #ab7b17ff;
-  --block-fold-fill:#ede7d9ff;
-  --block-fold-ink:#233244ff;
+  --block-fold-line:3.5px solid #a07e35ff;
+  --block-fold-fill:#ebe6daff;
+  --block-fold-ink:#535654ff;
   --block-fold-radius:10px;
-  --block-fold-shadow:0.18;
-  --block-fold-accent:#ab7b17ff;
+  --block-fold-shadow:0.08;
+  --block-fold-accent:#a07e35ff;
   --block-fold-width:3.5px;
-  --block-unframed-radius:0px; --block-unframed-shadow:0.18;
+  --block-unframed-radius:0px; --block-unframed-shadow:0.08;
 }
 
-/* 表紙の既定位置（タイトルの上余白・発表者までの間隔） */
-#stage .slide.cover { --cover-title-top:140px; --cover-authors-gap:44px; }
-#stage .slide.cover .cover-title { margin-top:var(--cover-title-top); left:0; top:0; }
-#stage .slide.cover .cover-subtitle { left:0; top:0; }
-#stage .slide.cover .cover-authors { margin-top:var(--cover-authors-gap); left:0; top:0; }
-
-/* 枠：全面のグラデーションに、角丸の面を重ねる。面の色は各ページの背景の設定に従う。 */
-#stage .slide{--frame:26px;--frame-radius:30px;--frame-fill:linear-gradient(100deg,#3f8a9c,var(--header));--panel:var(--background-fill,var(--paper));--content-inset:52px;isolation:isolate}
+/* 枠：全面のグラデーションに角丸の面を重ねる。面の色は各ページの背景の設定に従う。 */
+#stage .slide{--band:26px;--band-radius:30px;--band-fill:linear-gradient(100deg,#3f8a9c,var(--header));--panel:var(--background-fill,var(--paper));--content-inset:52px;isolation:isolate;background:var(--paper)}
 #stage .slide.cover{--panel:var(--cover-fill,var(--paper))}
 #stage .slide.section-slide{--panel:var(--section-fill,var(--paper))}
-/* 上の帯の右端に、薄い順に並ぶ小さな四角 */
 #stage .slide::before{content:'';position:absolute;inset:0;z-index:-2;pointer-events:none;
-  background:linear-gradient(#ffffffd0 0 0) right calc(var(--frame) + 24px) top calc((var(--frame) - 10px) / 2)/10px 10px no-repeat,linear-gradient(#ffffff80 0 0) right calc(var(--frame) + 50px) top calc((var(--frame) - 10px) / 2)/10px 10px no-repeat,linear-gradient(#ffffff40 0 0) right calc(var(--frame) + 76px) top calc((var(--frame) - 10px) / 2)/10px 10px no-repeat,var(--frame-fill)}
-#stage section.slide::after{content:'';position:absolute;inset:var(--frame);bottom:var(--frame)!important;z-index:-1;border:0;border-radius:var(--frame-radius);pointer-events:none;background:var(--panel)}
-#stage h2{color:var(--header);background:none;border:0;box-shadow:none}
-#stage section.slide>h2{position:relative;margin:calc(var(--frame) + 8px) calc(var(--frame) - var(--content-inset)) 10px;padding:0 calc(var(--content-inset) - var(--frame) + var(--text-pad))}
-/* 見出しの左の二本の棒 */
-#stage section.slide>h2::before{content:'';position:absolute;left:10px;top:calc(.675em - 17px);width:18px;height:34px;
-  background:linear-gradient(#3f8a9c 0 0) 0 0/7px 100% no-repeat,linear-gradient(var(--header) 0 0) 11px 100%/7px 60% no-repeat}
-#stage .citations{right:var(--content-inset);bottom:calc(var(--frame) + 4px)}
-#stage .footnote-small{bottom:calc(var(--frame) + 8px)}
+  background:var(--band-fill)}
+#stage section.slide::after{content:'';position:absolute;inset:var(--band);bottom:var(--band)!important;z-index:-1;border:0;border-radius:var(--band-radius);pointer-events:none;background:var(--panel)}
+#stage section.slide>h2{position:relative;margin:calc(var(--band) + 8px) calc(var(--band) - var(--content-inset)) 10px;padding:0 calc(var(--content-inset) - var(--band) + var(--text-pad))}
+#stage section.slide>h2::before{content:none}
+#stage .page-number{left:auto;right:calc(var(--band) + 24px);bottom:0;height:var(--band);display:flex;align-items:center;line-height:1;color:#fff}
+#stage .citations{right:var(--content-inset);bottom:calc(var(--band) + 4px)}
 /* 章の扉：左の枠から伸びる色付きの長方形に、大きな番号と白い見出し */
 #stage .section-slide{padding:212px var(--content-inset) 0;color:var(--ink)}
-#stage .section-slide h1{position:relative;display:flex;align-items:center;gap:44px;min-height:296px;margin:0 96px 0 calc(var(--frame) - var(--content-inset));padding:40px 64px 40px calc(var(--content-inset) - var(--frame) + 36px);border-radius:0 20px 20px 0;background:var(--frame-fill);color:var(--header-ink);font-size:60px;font-weight:650;line-height:1.4;letter-spacing:.035em}
-#stage .section-slide h1::before{content:none}
-#stage .section-slide .chapter-number{position:static;flex:none;margin:0;padding:0 44px 0 0;border-right:2px solid #ffffff66;color:var(--header-ink);font-size:144px;font-weight:700;line-height:1;letter-spacing:.02em}
-/* 表紙と章の扉：帯の四角の代わりに、面の右下へ段になった長方形 */
-#stage .slide:is(.cover,.section-slide)::before{background:var(--frame-fill)}
-#stage section.slide:is(.cover,.section-slide)::after{background:linear-gradient(var(--header) 0 0) 100% 100%/58px 86px no-repeat,linear-gradient(#8fbcc8 0 0) 100% 100%/118px 56px no-repeat,linear-gradient(#d5e5ea 0 0) 100% 100%/178px 26px no-repeat,var(--panel)}
-/* 表紙の短い線はタイトルの左端にそろえる */
-#stage .slide.cover .cover-title::before{left:var(--cover-inset);right:auto;margin:0}
+#stage .section-slide h1{position:relative;display:flex;align-items:center;gap:44px;width:auto;min-height:296px;margin:0 96px 0 calc(var(--band) - var(--content-inset));padding:40px 64px 40px calc(var(--content-inset) - var(--band) + 36px);border-radius:0 20px 20px 0;background:var(--band-fill);color:#fff;font-size:60px;font-weight:700;line-height:1.4;letter-spacing:.035em;text-align:left}
+#stage .section-slide h1::after{content:none}
+#stage .section-slide .chapter-number{position:static;flex:none;margin:0;padding:0 44px 0 0;border-right:2px solid #ffffff66;color:#fff;font-size:144px;font-weight:700;line-height:1;letter-spacing:.02em}
+
+/* slide-studio block top-radius */
+:root { --block-top-radius: 10px; }
+
+/* slide-studio block left-radius */
+:root { --block-left-radius: 10px; }
+
+/* slide-studio block border */
+:root { --block-border: 3.5px double #939593ff; }

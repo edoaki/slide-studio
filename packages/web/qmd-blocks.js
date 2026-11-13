@@ -13,7 +13,7 @@ import { pureMath } from './insert.js';
 import { captureScroll, restoreScroll } from './scroll-anchor.js';
 import { choosePageTemplate, isPlaceholder } from './page-templates.js';
 import { tip } from './tip.js';
-import { figureSteps, stepLabel } from './step-badge.js';
+import { stepLabel } from './step-badge.js';
 import { makeCoverForm, ownsChunk } from './cover-form.js';
 
 const qLayer = d => d <= 1 ? 'var(--l1)' : d === 2 ? 'var(--l2)' : 'var(--l3)';
@@ -176,16 +176,9 @@ export function makeQmdBlocks(ctx) {
     return b;
   }
   function updateStepBadges() {
-    // Step-badge figure inspection is a later-stage direct-DOM site. Keep the
-    // original path for same-origin use but never let it break Stage 2 when
-    // the frame is cross-origin.
-    let w = null;
-    try { w = ctx.preview.win; } catch { w = null; }
     for (const b of pagesEl.querySelectorAll('.step-badge')) {
-      let elements = [];
-      try { elements = w?.slideStudioEdit?.elements(b.dataset.key) || []; } catch { elements = []; }
-      const k = b.dataset.figure ? Number(elements[0]?.closest('[data-step]')?.dataset.step || b.dataset.step) : +b.dataset.step;
-      const n = figureSteps(elements);
+      const k = +b.dataset.step;
+      const n = b.dataset.figure === '1' ? ctx.preview.api?.figureSteps?.(b.dataset.key) ?? 0 : 0;
       b.hidden = !k && !n;
       const i = ctx.preview.slideOfPage(+b.closest('.page').dataset.page);
       const first = ctx.preview.api?.stageNumber(k, i) ?? k + 1;

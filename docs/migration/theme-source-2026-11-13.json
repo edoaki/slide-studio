@@ -1,0 +1,20 @@
+{
+  "source": "/Users/aki/Slides/themes",
+  "source_resolution": "Legacy ~/.config/slide-studio/location.json points to /Users/aki/Slides. The legacy repository bundled templates did not reflect the user-maintained themes actually used by the old app.",
+  "user_request": "Use the themes used by the old app, including the undecorated level-two headings.",
+  "files": {
+    "terracotta.css": "b1426a8343d1bce38df702e3cf3cb3555fc50d74128bfbcf58ba1daa34fb2079",
+    "default.css": "d3e4de99eb358b80e53790a975d5dc0525674fcd36ed4da3061199251403a8aa",
+    "night.css": "ce6583fa785e5f2fe7de7fed58501698273d09df366eab29b8688864903f6c41",
+    "mist.css": "52eba39d2fbdcb5c95d3e832c06146aec03dadb44a8be9cda6c4e1e23cd2b464",
+    "solarized.css": "83f4ed642b33936f3330ab5d5f4511d6c3aefbeb3990a459cb51520deabcfba1",
+    "graphite.css": "f0c73e78e5bc7a3bd586b88b1319664bcb6e9af71d8fb56cbb57eb019562bae1"
+  },
+  "destinations": [
+    "packages/core/assets/templates/themes",
+    "packages/core/assets/themes"
+  ],
+  "verification": "Bundled default heading ::before and ::after content are none, heading color is rgb(34,77,145); direct text color editing, undo and redo remain covered. Existing customized workspaces retain their custom themes.",
+  "user_visual_acceptance": "pending",
+  "installed_artifacts_updated": false
+}

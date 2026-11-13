@@ -259,11 +259,13 @@ function move(dir) {
   return step > 0 ? go(index, step - 1, animate) : index > 0 ? go(index - 1) : Promise.resolve();
 }
 function jump(dir) { return go(index, dir > 0 ? Infinity : 0); }
-function resize() {
+let previewSize = null;
+function resize(size) {
+  if (size && Number.isFinite(size.width) && Number.isFinite(size.height) && size.width > 0 && size.height > 0) previewSize = size;
   if (document.body.classList.contains('export')) return;
   // iframe の innerWidth/Height は整数に丸められるため、端に白い隙間が出る。
   // GUI のプレビューは実際の枠の小数を含む寸法で合わせる。
-  const frame = window.__slideStudioFill ? window.frameElement?.getBoundingClientRect() : null;
+  const frame = window.__slideStudioFill ? previewSize ?? window.frameElement?.getBoundingClientRect() : null;
   const width = frame?.width ?? innerWidth, height = frame?.height ?? innerHeight;
   // 操作のボタンはカーソルを合わせたときだけ出すので、画面いっぱいに描く
   const scale = Math.min(width / 1280, height / 720);

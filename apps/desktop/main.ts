@@ -51,11 +51,6 @@ interface CodedError extends Error {
  * packages/web/strings.js; dialogs owned by Electron cannot import that module.
  */
 const MAIN_STRINGS = Object.freeze({
-  unsavedTitle: "未保存の変更",
-  unsavedMessage: "保存していない変更があります。",
-  unsavedDetail: "変更を破棄して閉じますか？",
-  close: "閉じる",
-  cancel: "キャンセル",
   exportHtml: "HTMLを書き出す",
   exportPdf: "PDFを書き出す（試験的）",
   chooseWorkspace: "保管フォルダを選ぶ",
@@ -304,6 +299,29 @@ function installSessionPolicy(): void {
 
 function installWindowPolicy(window: BrowserWindow): void {
   const contents = window.webContents;
+  let completingClose = false;
+  let preparingLeave: Promise<void> | null = null;
+  const leaveAfterSave = (action: () => void) => {
+    if (preparingLeave || contents.isDestroyed()) return;
+    preparingLeave = (async () => {
+      const current = contents.getURL();
+      // Authored content runs in a different origin. Never execute this
+      // trusted UI call in an authored frame or an external document.
+      if (mainNavigationAllowed(current) && new URL(current).pathname.startsWith('/deck/')) {
+        const saved: unknown = await contents.executeJavaScript(
+          "import('/web/app.js').then(module => module.flushBeforeLeave())", true,
+        );
+        if (saved !== true) return;
+      }
+      if (!contents.isDestroyed()) action();
+    })().catch(error => { console.error('[desktop] could not finish automatic save', error instanceof Error ? error.message : 'unknown error'); })
+      .finally(() => { preparingLeave = null; });
+  };
+  window.on('close', event => {
+    if (completingClose || shuttingDown) return;
+    event.preventDefault();
+    leaveAfterSave(() => { completingClose = true; window.close(); });
+  });
   contents.setWindowOpenHandler(({ url }) => {
     console.error(`[desktop] blocked window.open: ${redactCredential(url)}`);
     return { action: "deny" };
@@ -315,11 +333,8 @@ function installWindowPolicy(window: BrowserWindow): void {
     const key = input.key.toLowerCase();
     const reload = key === "f5" || ((input.control || input.meta) && key === "r");
     if (reload && !shuttingDown) {
-      // Reload goes through Chromium's unload path, so the legacy UI's
-      // beforeunload guard still asks about unsaved changes. The admin token
-      // lives in per-origin sessionStorage; the current path must be kept.
       event.preventDefault();
-      contents.reload();
+      leaveAfterSave(() => contents.reload());
     }
   });
   contents.on("will-navigate", (...args: unknown[]) => {
@@ -365,18 +380,11 @@ function installWindowPolicy(window: BrowserWindow): void {
     }, 250);
   });
 
-  contents.on("will-prevent-unload", (event) => {
-    const response = dialog.showMessageBoxSync(window, {
-      type: "warning",
-      buttons: [MAIN_STRINGS.close, MAIN_STRINGS.cancel],
-      defaultId: 1,
-      cancelId: 1,
-      title: MAIN_STRINGS.unsavedTitle,
-      message: MAIN_STRINGS.unsavedMessage,
-      detail: MAIN_STRINGS.unsavedDetail,
-    });
-    // Calling preventDefault() ignores beforeunload and lets the page unload.
-    if (response === 0) event.preventDefault();
+  contents.on("will-prevent-unload", () => {
+    // Cancel this unload. Programmatic reloads can bypass before-input-event;
+    // retry only after autosave succeeds, without a destructive-choice dialog.
+    completingClose = false;
+    setTimeout(() => leaveAfterSave(() => contents.reload()), 0);
   });
 }
 

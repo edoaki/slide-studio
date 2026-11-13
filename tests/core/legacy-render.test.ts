@@ -764,6 +764,17 @@ function headSignature(html: string): Record<string, unknown> {
   };
 }
 
+// The isolated preview supplies fractional dimensions through its validated
+// bridge. Keep every other byte of the original player comparison unchanged.
+function migratedHeadSignature(html: string): Record<string, unknown> {
+  const head = headSignature(html);
+  head.player = String(head.player).replace('function resize() {',
+    'let previewSize = null;\nfunction resize(size) {\n  if (size && Number.isFinite(size.width) && Number.isFinite(size.height) && size.width > 0 && size.height > 0) previewSize = size;')
+    .replace('const frame = window.__slideStudioFill ? window.frameElement?.getBoundingClientRect() : null;',
+      'const frame = window.__slideStudioFill ? previewSize ?? window.frameElement?.getBoundingClientRect() : null;');
+  return head;
+}
+
 const PANDOC = pandocPath();
 
 test("the render differential uses native Pandoc 3.9", () => {
@@ -866,7 +877,7 @@ test("render_text matches the Python render golden", async (t) => {
         entry.warning_issues,
         `${entry.name} warning_issues`,
       );
-      assert.deepEqual(headSignature(rendered.html), headSignature(entry.html), `${entry.name} head`);
+      assert.deepEqual(headSignature(rendered.html), migratedHeadSignature(entry.html), `${entry.name} head`);
       assert.equal(stageSignature(rendered.html), stageSignature(entry.html), `${entry.name} stage`);
     });
   }
@@ -885,7 +896,7 @@ test("render_text retains legacy raw HTML, cover, figure and bibliography edge c
   assert.deepEqual(rendered.cited,entry.cited);
   assert.deepEqual(rendered.unsupported,entry.unsupported);
   assert.deepEqual(JSON.parse(JSON.stringify(warning_issues(rendered))),entry.warning_issues);
-  assert.deepEqual(headSignature(rendered.html),headSignature(entry.html));
+  assert.deepEqual(headSignature(rendered.html),migratedHeadSignature(entry.html));
   // BeautifulSoup collapses whitespace-only nodes. Ignore their count only in
   // the empty author placeholder; visible author names/styles remain exact.
   const signature=(html:string)=>{if(entry.name!=="cover-authors")return stageSignature(html);const $=cheerio.load(html);$(".cover-authors[data-slide-studio]").each((_,el)=>{for(const child of [...el.children])if(child.type==="text"&&/^\s*$/u.test(child.data))child.data="\n";});return stageSignature($.html());};

@@ -572,8 +572,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_reorder_insert_and_columns",
@@ -583,8 +584,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_size_and_padding_round_trip",
@@ -594,8 +596,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_move_to_page_end_and_wrapper_moves_together",
@@ -605,8 +608,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_move_column_out_takes_contents",
@@ -616,8 +620,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_removing_column_keeps_remaining_frame_and_step",
@@ -627,8 +632,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_moving_column_out_keeps_both_frames",
@@ -638,8 +644,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_column_collapse_keeps_outer_frame_and_step",
@@ -649,8 +656,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_add_paragraph_beside_padding_wrapper",
@@ -660,8 +668,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_moves_only_when_order_changes",
@@ -671,8 +680,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_decoration_keeps_wrappers_and_other_attributes",
@@ -682,8 +692,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_align_follows_surrounding_alignment",
@@ -693,8 +704,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_design_roundtrip_preserves_content_and_layout",
@@ -704,8 +716,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_outer_spacing_preserves_other_options",
@@ -715,8 +728,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_designed_box_keeps_boundary_when_adding_and_moving",
@@ -726,8 +740,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_horizontal_split_and_design_have_one_column_structure",
@@ -737,8 +752,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_design_merges_existing_single_box_into_column",
@@ -748,8 +764,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_move_framed_box_into_empty_column_promotes_it",
@@ -759,8 +776,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_move_box_into_column_keeps_independent_styles",
@@ -770,8 +788,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_block_ops_js.py::test_design_after_adding_description_targets_column_and_can_be_removed",
@@ -781,8 +800,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-block-ops.test.ts",
+      "evidence": "Original JS operation scripts and original Python parser produced golden results after all original assertions passed; migrated parser and operations match all 27 cases across 20 original test functions."
     },
     {
       "id": "tests/e2e/test_blocks.py::test_double_click_text_accepts_keyboard_input",
@@ -1744,8 +1764,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_external_change_updates_slide",
@@ -1755,8 +1776,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_conflict_keeps_unsaved_input",
@@ -1766,8 +1788,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_save_conflict_409",
@@ -1777,8 +1800,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_conflict_copy",
@@ -1789,8 +1813,9 @@
         "clipboard"
       ],
       "parameterized": true,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_open_and_close_does_not_touch_file",
@@ -1800,8 +1825,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_pandoc_error_keeps_last_slides",
@@ -1811,8 +1837,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_undo_redo",
@@ -1822,8 +1849,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_history_buttons_keep_manuscript_scroll",
@@ -1845,8 +1873,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_preview_has_no_fractional_edge_gap",
@@ -1856,8 +1885,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_current_slide_stays_visible_when_editor_resizes",
@@ -1890,8 +1920,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_chat_width_drag_and_keep",
@@ -1901,8 +1932,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_zero_key_closes_left_panel",
@@ -1912,8 +1944,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_chat_open_on_entry_at_any_width",
@@ -1923,8 +1956,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts",
+      "evidence": "Original editor scenario ported to isolated Electron frames; all three clipboard outcomes included. Save status accepts completed background checks; slow-save fixture scopes delay to source PUT requests."
     },
     {
       "id": "tests/e2e/test_editor.py::test_ai_lock_marks_editing_panes_orange",
@@ -3476,8 +3510,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-step-ops.test.ts",
+      "evidence": "legacy step wrapper combines padding, alignment and incremental options and unwraps losslessly"
     },
     {
       "id": "tests/e2e/test_step.py::test_step_numbers_and_compaction",
@@ -3487,8 +3522,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-step-ops.test.ts",
+      "evidence": "legacy step numbering retains simultaneous figures lists and highlights"
     },
     {
       "id": "tests/e2e/test_step.py::test_step_choices_have_no_gap",
@@ -3498,8 +3534,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-step-ops.test.ts",
+      "evidence": "legacy step removal compacts gaps in highlights and images"
     },
     {
       "id": "tests/e2e/test_step.py::test_step_align_ui_and_undo",
@@ -3521,8 +3558,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "figure step menu updates the shortcode and preview without text decoration controls"
     },
     {
       "id": "tests/e2e/test_step.py::test_alignment_in_text_session",
@@ -3568,8 +3606,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "step badge preserves text input focus and selection while its shape and state update"
     },
     {
       "id": "tests/e2e/test_step.py::test_figure_badge_range_and_incremental",
@@ -3579,8 +3618,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "figure badge ranges follow internal steps and keep later incremental items pending"
     },
     {
       "id": "tests/e2e/test_step.py::test_badge_late_figure_load",
@@ -3590,8 +3630,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "late figure loading refreshes badge ranges through real player events"
     },
     {
       "id": "tests/e2e/test_step.py::test_initial_figure_and_reverse_display_order",
@@ -3601,8 +3642,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "initial figures and reversed source order retain display sequence and step choices"
     },
     {
       "id": "tests/e2e/test_step.py::test_simultaneous_figures_share_start_and_wait_for_longest",
@@ -3612,8 +3654,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "simultaneous figures share a start and wait for the longest animation"
     },
     {
       "id": "tests/e2e/test_step.py::test_pdf_step_checkbox_writes_heading",
@@ -3636,8 +3679,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "PDF marks survive source editing while the previous save and preview are pending"
     },
     {
       "id": "tests/e2e/test_step.py::test_container_step_preserves_children",
@@ -3648,8 +3692,9 @@
         "kind"
       ],
       "parameterized": true,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/core/legacy-step-ops.test.ts",
+      "evidence": "legacy box/column/columns step preserves children and compacts their sequence"
     },
     {
       "id": "tests/e2e/test_step.py::test_container_step_ui_and_undo",
@@ -3659,8 +3704,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "container step selection preserves its children and supports removal and undo"
     },
     {
       "id": "tests/e2e/test_table_edit.py::test_edit_cells_on_the_slide_and_move_between_them",
@@ -3670,8 +3716,8 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-table-parity.test.ts: legacy table cells support Tab multiline headings per-cell undo and preserve citation source"
     },
     {
       "id": "tests/e2e/test_table_edit.py::test_empty_cell_can_be_filled",
@@ -3693,8 +3739,8 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-table-parity.test.ts: legacy table font size bold reset and nested cell editing preserve the table source"
     },
     {
       "id": "tests/e2e/test_table_edit.py::test_column_widths_and_table_width_by_dragging",
@@ -3705,8 +3751,8 @@
         "nested"
       ],
       "parameterized": true,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-table-parity.test.ts: legacy table column and total width dragging survives reload nested=false / nested=true"
     },
     {
       "id": "tests/e2e/test_table_edit.py::test_table_without_header_row_edits_the_right_row",
@@ -3716,8 +3762,8 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-table-parity.test.ts: legacy table without a visible header edits the correct source row"
     },
     {
       "id": "tests/e2e/test_table_edit.py::test_first_click_selects_and_the_table_can_be_dragged_from_its_text",
@@ -3727,8 +3773,8 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-table-parity.test.ts: legacy table selection allows dragging from its text without entering text editing"
     },
     {
       "id": "tests/e2e/test_table_edit.py::test_fixed_columns_wrap_even_if_the_deck_css_forbids_it",
@@ -3738,8 +3784,8 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-table-parity.test.ts: legacy fixed-width table wraps even when deck CSS requests nowrap"
     },
     {
       "id": "tests/e2e/test_text_format.py::test_format_bar_colors_size_and_close",

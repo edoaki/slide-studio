@@ -142,7 +142,7 @@ export class Preview {
         this.slides = snapshot.slides;
         if (event === 'deckchange' || event === 'response') {
           this.backdrop();
-          if (changed) this._notifyChange({ index: snapshot.index, step: snapshot.step, maxStep: snapshot.maxStep });
+          if (changed || event === 'deckchange') this._notifyChange({ index: snapshot.index, step: snapshot.step, maxStep: snapshot.maxStep });
         }
       },
         onFailure: error => this._handleFailure(client, error),
@@ -162,6 +162,7 @@ export class Preview {
 
     try {
       await client.ready;
+      await client.api.resize();
       if (token !== this.loadSeq || this.pending !== f || this.destroyed) {
         client.destroy();
         unregisterFrameClient(f, client);

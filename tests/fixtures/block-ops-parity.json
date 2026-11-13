@@ -1,0 +1,904 @@
+{
+  "reference": "legacy/python ca1f148",
+  "scope": "Original test_block_ops_js.py scripts and original Python parser, with original Python assertions executed before recording.",
+  "cases": [
+    {
+      "legacy_test": "test_list_backspace_boundaries",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "\n      return ['- A\\n- B\\n- C', '* A\\n* B', '1. A\\n2. B', '  - A\\n  - B'].map(t => {\n        const first = op.backspaceList(t, t.indexOf('B'));\n        return [first.text, op.backspaceList(first.text, first.caret).text];\n      });\n    ",
+      "expected": [
+        [
+          "- A\\\n  B\n- C",
+          "- AB\n- C"
+        ],
+        [
+          "* A\\\n  B",
+          "* AB"
+        ],
+        [
+          "1. A\\\n   B",
+          "1. AB"
+        ],
+        [
+          "  - A\\\n    B",
+          "  - AB"
+        ]
+      ]
+    },
+    {
+      "legacy_test": "test_list_backspace_boundaries",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "\n      return ['- B', 'A\\n- B', '- A\\n  - B', '- A\\n- xB', '- A\\n  B', '- A\\\\\\\\\\n  B']\n        .map(t => op.backspaceList(t, t.indexOf('B')));\n    ",
+      "expected": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "legacy_test": "test_reorder_insert_and_columns",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "\n      let t = text, s = await st(t), r = op.reorder(t, s, 'p0/0', 'down'); t = r.text;\n      const first = op.keyAt(await st(t), r.at, r.end);\n      s = await st(t); r = op.reorder(t, s, first, 'down'); t = r.text;\n      const end = op.reorder(t, await st(t), op.keyAt(await st(t), r.at, r.end), 'down');\n      return { t, first, end };",
+      "expected": {
+        "t": "## A {#a}\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n一。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "first": "p0/1",
+        "end": null
+      }
+    },
+    {
+      "legacy_test": "test_reorder_insert_and_columns",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "const s = await st(text);\n      return [op.reorder(text, s, 'p0/1.0.0', 'up').text, op.reorder(text, s, 'p0/1.0.0', 'right').text];",
+      "expected": [
+        "## A {#a}\n\n一。\n\n左。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n:::\n::: {.column width=\"40%\"}\n左。\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n"
+      ]
+    },
+    {
+      "legacy_test": "test_reorder_insert_and_columns",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "const s = await st(text);\n      return [op.insertBlock(text, s, 'p0/1.1', 'after', '右。'), op.insertBlock(text, s, 'p1/1', 'after', '最後。'),\n              op.addColumn(text, s, 'p0/1.0.0', 'right', '中。'), op.addColumn(text, s, 'p0/0', 'left', '前。')];",
+      "expected": [
+        {
+          "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n右。\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+          "select": "p0/1.1.0"
+        },
+        {
+          "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n\n最後。\n",
+          "select": "p1/2"
+        },
+        {
+          "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"40%\"}\n左。\n:::\n::: {.column width=\"33%\"}\n中。\n:::\n::: {.column width=\"27%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+          "select": "p0/1.1.0"
+        },
+        {
+          "text": "## A {#a}\n\n:::: {.columns}\n::: {.column}\n前。\n:::\n::: {.column}\n一。\n:::\n::::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+          "select": "p0/0.0.0"
+        }
+      ]
+    },
+    {
+      "legacy_test": "test_size_and_padding_round_trip",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "let s = await st(text);\n      const img = op.setSize(text, s, 'p1/0', 320).text, fig = op.setSize(text, s, 'p1/1', 300).text;\n      const wrapped = op.setPad(text, s, 'p0/0', '8px 12px');\n      const s2 = await st(wrapped.text), key = op.keyAt(s2, wrapped.at, wrapped.end);\n      const changed = op.setPad(wrapped.text, s2, key, '4px');\n      const s3 = await st(changed.text), back = op.setPad(changed.text, s3, op.keyAt(s3, changed.at, changed.end), null);\n      return { img, fig, wrapped: wrapped.text, key, crumbs: s2.pages[0].chunks.map(c => op.isPadWrap(c)), changed: changed.text, back: back.text,\n               gutter: op.setPad(text, s, 'p0/1', '30px').text,\n               imgPad: op.setPad(text, s, 'p1/0', '4px').text, figPad: op.setPad(text, s, 'p1/1', '8px 0px').text,\n               clear: op.setSize(img, await st(img), 'p1/0', null).text };",
+      "expected": {
+        "img": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=\"320\"}\n\n{{< fig s/x >}}\n",
+        "fig": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x height=\"300\" >}}\n",
+        "wrapped": "## A {#a}\n\n::: {style=\"padding:8px 12px;text-box:trim-both text\"}\n一。\n:::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "key": "p0/0.0",
+        "crumbs": [
+          true,
+          false,
+          false
+        ],
+        "changed": "## A {#a}\n\n::: {style=\"padding:4px;text-box:trim-both text\"}\n一。\n:::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "back": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "gutter": "## A {#a}\n\n一。\n\n:::: {.columns style=\"--gutter:30px\"}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "imgPad": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200 style=\"padding:4px\"}\n\n{{< fig s/x >}}\n",
+        "figPad": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x pad=\"8 0\" >}}\n",
+        "clear": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg)\n\n{{< fig s/x >}}\n"
+      }
+    },
+    {
+      "legacy_test": "test_move_to_page_end_and_wrapper_moves_together",
+      "text": "## A {#a}\n\n::: {style=\"padding:4px\"}\n一。\n:::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "const s = await st(text);\n      const r = op.move(text, s, 'p0/0.0', { pageEnd: 1 });\n      return { r, key: op.keyAt(await st(r.text), r.at, r.end), del: op.remove(text, s, 'p0/0.0').text };",
+      "expected": {
+        "r": {
+          "text": "## A {#a}\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n\n::: {style=\"padding:4px\"}\n一。\n:::\n",
+          "at": 153,
+          "end": 185
+        },
+        "key": "p1/2.0",
+        "del": "## A {#a}\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n"
+      }
+    },
+    {
+      "legacy_test": "test_move_column_out_takes_contents",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n右。\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "const s = await st(text);\n      const after = op.move(text, s, 'p0/1.1', { key: 'p0/2', side: 'after' });\n      const before = op.move(text, s, 'p0/1.1', { key: 'p0/1', side: 'before' });\n      const page = op.move(text, s, 'p0/1.1', { pageEnd: 1 });\n      return { after, key: op.keyAt(await st(after.text), after.at, after.end), before: before.text, page: page.text,\n               swap: op.move(text, s, 'p0/1.1', { key: 'p0/1.0', side: 'before' }).text };",
+      "expected": {
+        "after": {
+          "text": "## A {#a}\n\n一。\n\n左。\n\n二。\n\n右。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+          "at": 23,
+          "end": 25
+        },
+        "key": "p0/3",
+        "before": "## A {#a}\n\n一。\n\n右。\n\n左。\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "page": "## A {#a}\n\n一。\n\n左。\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n\n右。\n",
+        "swap": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"40%\"}\n右。\n:::\n::: {.column width=\"60%\"}\n左。\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n"
+      }
+    },
+    {
+      "legacy_test": "test_removing_column_keeps_remaining_frame_and_step",
+      "text": "## A\n\n:::: {.columns}\n::: {.column width=\"40%\" style=\"--block-design:plain;padding:8px;--block-space:4px\" data-step=\"2\"}\n左。\n\n説明。\n:::\n::: {.column width=\"60%\" style=\"--block-design:top;text-align:center\"}\n右。\n:::\n::::\n",
+      "script": "\n      const results = [];\n      for (const key of ['p0/0.1', 'p0/0.0']) {\n        const r = op.remove(text, await st(text), key), s = await st(r.text), box = s.pages[0].chunks[0];\n        results.push({kind:box.kind, attrs:box.attrs, children:box.children.map(c => r.text.slice(c.start, c.end)), text:r.text});\n      }\n      return results;\n    ",
+      "expected": [
+        {
+          "kind": "box",
+          "attrs": {
+            "id": "",
+            "classes": [],
+            "kv": {
+              "style": "--block-design:plain;padding:8px;--block-space:4px",
+              "data-step": "2"
+            }
+          },
+          "children": [
+            "左。",
+            "説明。"
+          ],
+          "text": "## A\n\n::: {style=\"--block-design:plain;padding:8px;--block-space:4px\" data-step=\"2\"}\n左。\n\n説明。\n:::\n"
+        },
+        {
+          "kind": "box",
+          "attrs": {
+            "id": "",
+            "classes": [],
+            "kv": {
+              "style": "--block-design:top;text-align:center"
+            }
+          },
+          "children": [
+            "右。"
+          ],
+          "text": "## A\n\n::: {style=\"--block-design:top;text-align:center\"}\n右。\n:::\n"
+        }
+      ]
+    },
+    {
+      "legacy_test": "test_moving_column_out_keeps_both_frames",
+      "text": "## A\n\n:::: {.columns}\n::: {.column width=\"40%\" style=\"--block-design:plain;padding:8px\"}\n左。\n:::\n::: {.column width=\"60%\" style=\"--block-design:top\" data-step=\"2\"}\n右。\n\n説明。\n:::\n::::\n\n終わり。\n",
+      "script": "\n      const results = [];\n      for (const spec of [{key:'p0/0', side:'before'}, {key:'p0/1', side:'after'}]) {\n        const r = op.move(text, await st(text), 'p0/0.1', spec), s = await st(r.text);\n        const key = op.keyAt(s, r.at, r.end), moved = op.find(s, key)?.chunk;\n        results.push({key, kind:moved?.kind, attrs:moved?.attrs,\n          children:moved?.children.map(c => r.text.slice(c.start, c.end)), text:r.text});\n      }\n      return results;\n    ",
+      "expected": [
+        {
+          "key": "p0/0",
+          "kind": "box",
+          "attrs": {
+            "id": "",
+            "classes": [],
+            "kv": {
+              "style": "--block-design:top",
+              "data-step": "2"
+            }
+          },
+          "children": [
+            "右。",
+            "説明。"
+          ],
+          "text": "## A\n\n::: {style=\"--block-design:top\" data-step=\"2\"}\n右。\n\n説明。\n:::\n\n::: {style=\"--block-design:plain;padding:8px\"}\n左。\n:::\n\n終わり。\n"
+        },
+        {
+          "key": "p0/2",
+          "kind": "box",
+          "attrs": {
+            "id": "",
+            "classes": [],
+            "kv": {
+              "style": "--block-design:top",
+              "data-step": "2"
+            }
+          },
+          "children": [
+            "右。",
+            "説明。"
+          ],
+          "text": "## A\n\n::: {style=\"--block-design:plain;padding:8px\"}\n左。\n:::\n\n終わり。\n\n::: {style=\"--block-design:top\" data-step=\"2\"}\n右。\n\n説明。\n:::\n"
+        }
+      ]
+    },
+    {
+      "legacy_test": "test_column_collapse_keeps_outer_frame_and_step",
+      "text": "## A\n\n:::: {.columns style=\"--block-design:top;--block-space:12px\" data-step=\"1\"}\n::: {.column width=\"40%\" style=\"--block-design:plain;padding:8px\" data-step=\"2\"}\n左。\n:::\n::: {.column width=\"60%\"}\n右。\n:::\n::::\n\n終わり。\n",
+      "script": "\n      const results = [];\n      for (const r of [op.remove(text, await st(text), 'p0/0.1'),\n        op.move(text, await st(text), 'p0/0.1', {key:'p0/1', side:'after'})]) {\n        const s = await st(r.text), outer = s.pages[0].chunks[0], inner = outer.children[0];\n        results.push({outer:{kind:outer.kind, attrs:outer.attrs}, inner:{kind:inner.kind, attrs:inner.attrs}, text:r.text});\n      }\n      return results;\n    ",
+      "expected": [
+        {
+          "outer": {
+            "kind": "box",
+            "attrs": {
+              "id": "",
+              "classes": [],
+              "kv": {
+                "style": "--block-design:top;--block-space:12px",
+                "data-step": "1"
+              }
+            }
+          },
+          "inner": {
+            "kind": "box",
+            "attrs": {
+              "id": "",
+              "classes": [],
+              "kv": {
+                "style": "--block-design:plain;padding:8px",
+                "data-step": "2"
+              }
+            }
+          },
+          "text": "## A\n\n:::: {style=\"--block-design:top;--block-space:12px\" data-step=\"1\"}\n::: {style=\"--block-design:plain;padding:8px\" data-step=\"2\"}\n左。\n:::\n::::\n\n終わり。\n"
+        },
+        {
+          "outer": {
+            "kind": "box",
+            "attrs": {
+              "id": "",
+              "classes": [],
+              "kv": {
+                "style": "--block-design:top;--block-space:12px",
+                "data-step": "1"
+              }
+            }
+          },
+          "inner": {
+            "kind": "box",
+            "attrs": {
+              "id": "",
+              "classes": [],
+              "kv": {
+                "style": "--block-design:plain;padding:8px",
+                "data-step": "2"
+              }
+            }
+          },
+          "text": "## A\n\n:::: {style=\"--block-design:top;--block-space:12px\" data-step=\"1\"}\n::: {style=\"--block-design:plain;padding:8px\" data-step=\"2\"}\n左。\n:::\n::::\n\n終わり。\n\n右。\n"
+        }
+      ]
+    },
+    {
+      "legacy_test": "test_add_paragraph_beside_padding_wrapper",
+      "text": "## A\n\n::: {style=\"padding:8px\" data-step=\"2\"}\n本文。\n:::\n",
+      "script": "\n      const s = await st(text), results = [];\n      for (const side of ['before', 'after']) {\n        const r = op.insertBlock(text, s, 'p0/0.0', side, '追加。'), next = await st(r.text);\n        results.push({text:r.text, kinds:next.pages[0].chunks.map(c => c.kind)});\n      }\n      const p = op.pendingBelow(s, 'p0/0.0');\n      return {results, owner:p.owner, atEnd:p.pos === s.pages[0].chunks[0].end};\n    ",
+      "expected": {
+        "results": [
+          {
+            "text": "## A\n\n追加。\n\n::: {style=\"padding:8px\" data-step=\"2\"}\n本文。\n:::\n",
+            "kinds": [
+              "text",
+              "box"
+            ]
+          },
+          {
+            "text": "## A\n\n::: {style=\"padding:8px\" data-step=\"2\"}\n本文。\n:::\n\n追加。\n",
+            "kinds": [
+              "box",
+              "text"
+            ]
+          }
+        ],
+        "owner": null,
+        "atEnd": true
+      }
+    },
+    {
+      "legacy_test": "test_moves_only_when_order_changes",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "const s = await st(text);\n      return [op.moves(text, s, 'p0/0', { key: 'p0/1', side: 'before' }), op.moves(text, s, 'p0/0', { key: 'p0/0', side: 'after' }),\n              op.moves(text, s, 'p0/2', { key: 'p0/1', side: 'after' }), op.moves(text, s, 'p1/1', { pageEnd: 1 }),\n              op.moves(text, s, 'p0/1.0', { key: 'p0/1.1', side: 'before' }), op.moves(text, s, 'p0/1', { into: 'p0/1.1' }),\n              op.moves(text, s, 'p0/0', { key: 'p0/2', side: 'after' }), op.moves(text, s, 'p0/1.1', { key: 'p0/1.0', side: 'before' })];",
+      "expected": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
+    },
+    {
+      "legacy_test": "test_decoration_keeps_wrappers_and_other_attributes",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "\n      const values = { border: '3px dotted #11223380', 'background-color': '#aabbcc40' };\n      let r = op.setTextOptions(text, await st(text), 'p0/0', { padding: '8px', align: 'center', step: 2 });\n      let s = await st(r.text), key = op.keyAt(s, r.at, r.end);\n      r = op.setDecoration(r.text, s, key, values);\n      s = await st(r.text); key = r.select || op.keyAt(s, r.at, r.end);\n      const decorated = r.text, attrs = op.find(s, key).chunk.attrs;\n      const reset = op.setDecoration(r.text, s, key, { border: null, 'background-color': null }).text;\n      return { decorated, attrs, reset, image: op.setDecoration(text, await st(text), 'p1/0', values).text,\n        fig: op.setDecoration(text, await st(text), 'p1/1', values),\n        column: op.setDecoration(text, await st(text), 'p0/1.0', values).text };\n    ",
+      "expected": {
+        "decorated": "## A {#a}\n\n::: {style=\"padding:8px;text-align:center;border:3px dotted #11223380;background-color:#aabbcc40\" data-step=\"2\"}\n一。\n:::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "attrs": {
+          "id": "",
+          "classes": [],
+          "kv": {
+            "style": "padding:8px;text-align:center;border:3px dotted #11223380;background-color:#aabbcc40",
+            "data-step": "2"
+          }
+        },
+        "reset": "## A {#a}\n\n::: {data-step=\"2\" style=\"padding:8px;text-align:center\"}\n一。\n:::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "image": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200 style=\"border:3px dotted #11223380;background-color:#aabbcc40\"}\n\n{{< fig s/x >}}\n",
+        "fig": null,
+        "column": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\" style=\"border:3px dotted #11223380;background-color:#aabbcc40\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n"
+      }
+    },
+    {
+      "legacy_test": "test_align_follows_surrounding_alignment",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "\n      const s = await st(text), base = 'center';\n      const shown = op.textOptions(op.find(s, 'p0/0').chunk, base).align;\n      let r = op.setTextOptions(text, s, 'p0/0', { align: 'left', alignBase: base });\n      const left = r.text, s2 = await st(r.text), key = op.keyAt(s2, r.at, r.end);\n      r = op.setTextOptions(r.text, s2, key, { align: 'center', alignBase: base });\n      return { shown, left, back: r.text };\n    ",
+      "expected": {
+        "shown": "center",
+        "left": "## A {#a}\n\n::: {style=\"text-align:left\"}\n一。\n:::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "back": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n"
+      }
+    },
+    {
+      "legacy_test": "test_design_roundtrip_preserves_content_and_layout",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "\n      const { designValues, clearDecoration } = await import('/web/block-design.js');\n\n      const results = [];\n      for (const kind of ['plain', 'top', 'left', 'quote', 'bracket', 'fold']) for (const key of ['p0/0', 'p0/1', 'p0/1.0', 'p1/0']) {\n        const base = op.setSpace(text, await st(text), key, '16px').text;\n        let r = op.setDecoration(base, await st(base), key === 'p0/0' ? 'p0/0.0' : key, designValues(kind));\n        let s = await st(r.text), selected = r.select || op.keyAt(s, r.at, r.end);\n        const chunk = op.find(s, selected).chunk;\n        const decoration = op.decorationOf(r.text, chunk);\n        const wrappers = r.text.match(new RegExp(`--block-design:${kind}`, 'g'))?.length;\n        // 段階表示・揃えを変えても、装飾の囲みを二重に作らない。\n        if (chunk.kind === 'text') {\n          r = op.setTextOptions(r.text, s, selected, { step: 2, align: 'center' });\n          s = await st(r.text); selected = op.keyAt(s, r.at, r.end);\n          if (!op.isPadWrap(op.find(s, selected).chunk.parent)) throw new Error('wrapper lost');\n          r = op.setTextOptions(r.text, s, selected, { step: 0, align: 'left' });\n          s = await st(r.text); selected = op.keyAt(s, r.at, r.end);\n        }\n        const reset = op.setDecoration(r.text, s, selected, clearDecoration()).text;\n        results.push({ decoration, kind, wrappers, restored: reset === base });\n      }\n      return results;\n    ",
+      "expected": [
+        {
+          "decoration": {
+            "--block-design": "plain"
+          },
+          "kind": "plain",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "plain"
+          },
+          "kind": "plain",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "plain"
+          },
+          "kind": "plain",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "plain"
+          },
+          "kind": "plain",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "top"
+          },
+          "kind": "top",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "top"
+          },
+          "kind": "top",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "top"
+          },
+          "kind": "top",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "top"
+          },
+          "kind": "top",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "left"
+          },
+          "kind": "left",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "left"
+          },
+          "kind": "left",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "left"
+          },
+          "kind": "left",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "left"
+          },
+          "kind": "left",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "quote"
+          },
+          "kind": "quote",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "quote"
+          },
+          "kind": "quote",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "quote"
+          },
+          "kind": "quote",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "quote"
+          },
+          "kind": "quote",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "bracket"
+          },
+          "kind": "bracket",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "bracket"
+          },
+          "kind": "bracket",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "bracket"
+          },
+          "kind": "bracket",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "bracket"
+          },
+          "kind": "bracket",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "fold"
+          },
+          "kind": "fold",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "fold"
+          },
+          "kind": "fold",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "fold"
+          },
+          "kind": "fold",
+          "wrappers": 1,
+          "restored": true
+        },
+        {
+          "decoration": {
+            "--block-design": "fold"
+          },
+          "kind": "fold",
+          "wrappers": 1,
+          "restored": true
+        }
+      ]
+    },
+    {
+      "legacy_test": "test_outer_spacing_preserves_other_options",
+      "text": "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+      "script": "\n      let t = op.setPad(text, await st(text), 'p0/0', '8px').text;\n      t = op.setDecoration(t, await st(t), 'p0/0.0', {border:'2px solid red'}).text;\n      const spaced = op.setSpace(t, await st(t), 'p0/0', '0px 0px 42px 0px').text;\n      const s = await st(spaced);\n      const reset = op.setSpace(spaced, s, 'p0/0', null).text;\n      const media = [];\n      for (const key of ['p1/0', 'p1/1', 'p0/1', 'p0/1.0']) {\n        const v = op.setSpace(text, await st(text), key, '16px').text;\n        media.push([v, op.setSpace(v, await st(v), key, null).text]);\n      }\n      return {spaced, reset, t, hidden:op.isPadWrap(s.pages[0].chunks[0]), media};\n    ",
+      "expected": {
+        "spaced": "## A {#a}\n\n::: {style=\"padding:8px;text-box:trim-both text;border:2px solid red;--block-space:0px 0px 42px 0px\"}\n一。\n:::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "reset": "## A {#a}\n\n::: {style=\"padding:8px;text-box:trim-both text;border:2px solid red\"}\n一。\n:::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "t": "## A {#a}\n\n::: {style=\"padding:8px;text-box:trim-both text;border:2px solid red\"}\n一。\n:::\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+        "hidden": false,
+        "media": [
+          [
+            "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200 style=\"--block-space:16px\"}\n\n{{< fig s/x >}}\n",
+            "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n"
+          ],
+          [
+            "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x space=\"16\" >}}\n",
+            "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n"
+          ],
+          [
+            "## A {#a}\n\n一。\n\n:::: {.columns style=\"--block-space:16px\"}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+            "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n"
+          ],
+          [
+            "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\" style=\"--block-space:16px\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n",
+            "## A {#a}\n\n一。\n\n:::: {.columns}\n::: {.column width=\"60%\"}\n左。\n:::\n::: {.column width=\"40%\"}\n:::\n::::\n\n二。\n\n## B {#b}\n\n![画像](a.svg){width=200}\n\n{{< fig s/x >}}\n"
+          ]
+        ]
+      }
+    },
+    {
+      "legacy_test": "test_designed_box_keeps_boundary_when_adding_and_moving",
+      "text": "## A\n\n名前。\n\n説明。\n",
+      "script": "\n      const { designValues } = await import('/web/block-design.js');\n      const results = [];\n      for (const kind of ['plain', 'top', 'left', 'quote', 'bracket', 'fold']) {\n        const framed = op.setDecoration(text, await st(text), 'p0/0', designValues(kind));\n        const s = await st(framed.text), box = op.find(s, framed.select).chunk;\n        const added = op.insertBlock(framed.text, s, box.key, 'after', '説明。');\n        const moved = op.move(framed.text, s, 'p0/1', {key: box.children[0].key, side: 'after'});\n        const ms = await st(moved.text), parent = ms.pages[0].chunks[0];\n        const back = op.move(moved.text, ms, parent.children[1].key, {key: parent.key, side: 'after'});\n        const pending = op.pendingBelow(s, box.key);\n        const contentFirst = '## A\\n\\n::: {}\\n名前。\\n\\n説明。\\n:::\\n';\n        const designedLast = op.setDecoration(contentFirst, await st(contentFirst), 'p0/0', designValues(kind));\n        const shape = (t, b) => ({attrs: b.attrs, children: b.children.map(c => t.slice(c.start, c.end).trim())});\n        const addedBox = (await st(added.text)).pages[0].chunks[0];\n        const designedBox = (await st(designedLast.text)).pages[0].chunks[0];\n        results.push({kind, selected: box.kind, hidden: op.isPadWrap(box), owner: pending.owner,\n          sameOrder: JSON.stringify(shape(added.text, addedBox)) === JSON.stringify(shape(designedLast.text, designedBox)),\n          added: addedBox.children.map(c => c.kind),\n          moved: parent.children.map(c => c.kind), restored: back.text.replace(/\\n+/g, '\\n') === framed.text.replace(/\\n+/g, '\\n')});\n      }\n      return results;\n    ",
+      "expected": [
+        {
+          "kind": "plain",
+          "selected": "box",
+          "hidden": false,
+          "owner": "p0/0",
+          "sameOrder": true,
+          "added": [
+            "text",
+            "text"
+          ],
+          "moved": [
+            "text",
+            "text"
+          ],
+          "restored": true
+        },
+        {
+          "kind": "top",
+          "selected": "box",
+          "hidden": false,
+          "owner": "p0/0",
+          "sameOrder": true,
+          "added": [
+            "text",
+            "text"
+          ],
+          "moved": [
+            "text",
+            "text"
+          ],
+          "restored": true
+        },
+        {
+          "kind": "left",
+          "selected": "box",
+          "hidden": false,
+          "owner": "p0/0",
+          "sameOrder": true,
+          "added": [
+            "text",
+            "text"
+          ],
+          "moved": [
+            "text",
+            "text"
+          ],
+          "restored": true
+        },
+        {
+          "kind": "quote",
+          "selected": "box",
+          "hidden": false,
+          "owner": "p0/0",
+          "sameOrder": true,
+          "added": [
+            "text",
+            "text"
+          ],
+          "moved": [
+            "text",
+            "text"
+          ],
+          "restored": true
+        },
+        {
+          "kind": "bracket",
+          "selected": "box",
+          "hidden": false,
+          "owner": "p0/0",
+          "sameOrder": true,
+          "added": [
+            "text",
+            "text"
+          ],
+          "moved": [
+            "text",
+            "text"
+          ],
+          "restored": true
+        },
+        {
+          "kind": "fold",
+          "selected": "box",
+          "hidden": false,
+          "owner": "p0/0",
+          "sameOrder": true,
+          "added": [
+            "text",
+            "text"
+          ],
+          "moved": [
+            "text",
+            "text"
+          ],
+          "restored": true
+        }
+      ]
+    },
+    {
+      "legacy_test": "test_horizontal_split_and_design_have_one_column_structure",
+      "text": "## A\n\n名前。\n",
+      "script": "\n      const { designValues } = await import('/web/block-design.js');\n      const design = designValues('plain'), results = [];\n      for (const method of ['addRight', 'addColumn']) {\n        const split = async (t, key) => method === 'addRight'\n          ? op.addRight(t, await st(t), key) : op.addColumn(t, await st(t), key, 'right', '右。');\n        const framed = op.setDecoration(text, await st(text), 'p0/0', design);\n        const first = await split(framed.text, framed.select);\n        const splitFirst = await split(text, 'p0/0');\n        const second = op.setDecoration(splitFirst.text, await st(splitFirst.text), 'p0/0.0.0', design);\n        for (const r of [first, second]) {\n          let t = r.text, s = await st(t);\n          const added = op.insertBlock(t, s, 'p0/0.0', 'after', '説明。');\n          const col = (await st(added.text)).pages[0].chunks[0].children[0];\n          results.push({ attrs: col.attrs, kinds: col.children.map(c => c.kind),\n            body: col.children.map(c => added.text.slice(c.start, c.end).trim()) });\n        }\n      }\n      return results;\n    ",
+      "expected": [
+        {
+          "attrs": {
+            "id": "",
+            "classes": [
+              "column"
+            ],
+            "kv": {
+              "style": "--block-design:plain"
+            }
+          },
+          "kinds": [
+            "text",
+            "text"
+          ],
+          "body": [
+            "名前。",
+            "説明。"
+          ]
+        },
+        {
+          "attrs": {
+            "id": "",
+            "classes": [
+              "column"
+            ],
+            "kv": {
+              "style": "--block-design:plain"
+            }
+          },
+          "kinds": [
+            "text",
+            "text"
+          ],
+          "body": [
+            "名前。",
+            "説明。"
+          ]
+        },
+        {
+          "attrs": {
+            "id": "",
+            "classes": [
+              "column"
+            ],
+            "kv": {
+              "style": "--block-design:plain"
+            }
+          },
+          "kinds": [
+            "text",
+            "text"
+          ],
+          "body": [
+            "名前。",
+            "説明。"
+          ]
+        },
+        {
+          "attrs": {
+            "id": "",
+            "classes": [
+              "column"
+            ],
+            "kv": {
+              "style": "--block-design:plain"
+            }
+          },
+          "kinds": [
+            "text",
+            "text"
+          ],
+          "body": [
+            "名前。",
+            "説明。"
+          ]
+        }
+      ]
+    },
+    {
+      "legacy_test": "test_design_merges_existing_single_box_into_column",
+      "text": "## A\n\n:::: {.columns}\n::: {.column width=\"45%\"}\n::: {style=\"padding:12px;--block-design:plain\"}\n名前。\n\n説明。\n:::\n:::\n::: {.column width=\"55%\"}\n右。\n:::\n::::\n",
+      "script": "\n          const r = op.setDecoration(text, await st(text), 'p0/0.0', {'--block-design':'top'});\n          const col = (await st(r.text)).pages[0].chunks[0].children[0];\n          return {selected:r.select, attrs:col.attrs, kids:col.children.map(c => c.kind)};\n        ",
+      "expected": {
+        "selected": "p0/0.0",
+        "attrs": {
+          "id": "",
+          "classes": [
+            "column"
+          ],
+          "kv": {
+            "width": "45%",
+            "style": "padding:12px;--block-design:top"
+          }
+        },
+        "kids": [
+          "text",
+          "text"
+        ]
+      }
+    },
+    {
+      "legacy_test": "test_design_merges_existing_single_box_into_column",
+      "text": "## A\n\n:::: {.columns}\n::: {.column width=\"45%\"}\n::: {style=\"padding:12px;--block-design:plain\"}\n名前。\n\n説明。\n:::\n:::\n::: {.column width=\"55%\"}\n右。\n:::\n::::\n",
+      "script": "\n          const r = op.setDecoration(text, await st(text), 'p0/0.0.0', {'--block-design':'top'});\n          const col = (await st(r.text)).pages[0].chunks[0].children[0];\n          return {selected:r.select, attrs:col.attrs, kids:col.children.map(c => c.kind)};\n        ",
+      "expected": {
+        "selected": "p0/0.0",
+        "attrs": {
+          "id": "",
+          "classes": [
+            "column"
+          ],
+          "kv": {
+            "width": "45%",
+            "style": "padding:12px;--block-design:top"
+          }
+        },
+        "kids": [
+          "text",
+          "text"
+        ]
+      }
+    },
+    {
+      "legacy_test": "test_move_framed_box_into_empty_column_promotes_it",
+      "text": "## A\n\n::: {style=\"--block-design:plain;padding:12px\"}\n名前。\n\n説明。\n:::\n\n:::: {.columns}\n::: {.column width=\"40%\"}\n:::\n::: {.column width=\"60%\"}\n右。\n:::\n::::\n",
+      "script": "\n      const r = op.move(text, await st(text), 'p0/0', {into:'p0/1.0'});\n      const s = await st(r.text), col = s.pages[0].chunks[0].children[0];\n      return {style:col.attrs.kv, kinds:col.children.map(c => c.kind), text:r.text, selected:op.keyAt(s, r.at, r.end)};\n    ",
+      "expected": {
+        "style": {
+          "width": "40%",
+          "style": "--block-design:plain;padding:12px"
+        },
+        "kinds": [
+          "text",
+          "text"
+        ],
+        "text": "## A\n\n:::: {.columns}\n::: {.column width=\"40%\" style=\"--block-design:plain;padding:12px\"}\n名前。\n\n説明。\n:::\n::: {.column width=\"60%\"}\n右。\n:::\n::::\n",
+        "selected": "p0/0.0"
+      }
+    },
+    {
+      "legacy_test": "test_move_box_into_column_keeps_independent_styles",
+      "text": "## A\n\n::: {style=\"--block-design:plain\"}\n名前。\n:::\n\n:::: {.columns}\n::: {.column width=\"40%\" style=\"--block-design:plain\"}\n:::\n::: {.column width=\"60%\"}\n右。\n:::\n::::\n",
+      "script": "\n          const r = op.move(text, await st(text), 'p0/0', {into:'p0/1.0'});\n          const s = await st(r.text), col = s.pages[0].chunks[0].children[0], box = col.children[0];\n          return {column:col.attrs.kv, kind:box.kind, box:box.attrs?.kv,\n            contents:box.children.map(c => r.text.slice(c.start, c.end))};\n        ",
+      "expected": {
+        "column": {
+          "width": "40%",
+          "style": "--block-design:plain"
+        },
+        "kind": "box",
+        "box": {
+          "style": "--block-design:plain"
+        },
+        "contents": [
+          "名前。"
+        ]
+      }
+    },
+    {
+      "legacy_test": "test_move_box_into_column_keeps_independent_styles",
+      "text": "## A\n\n::: {style=\"--block-shadow:on\"}\n名前。\n:::\n\n:::: {.columns}\n::: {.column width=\"40%\" style=\"--block-design:plain\"}\n:::\n::: {.column width=\"60%\"}\n右。\n:::\n::::\n",
+      "script": "\n          const r = op.move(text, await st(text), 'p0/0', {into:'p0/1.0'});\n          const s = await st(r.text), col = s.pages[0].chunks[0].children[0], box = col.children[0];\n          return {column:col.attrs.kv, kind:box.kind, box:box.attrs?.kv,\n            contents:box.children.map(c => r.text.slice(c.start, c.end))};\n        ",
+      "expected": {
+        "column": {
+          "width": "40%",
+          "style": "--block-design:plain"
+        },
+        "kind": "box",
+        "box": {
+          "style": "--block-shadow:on"
+        },
+        "contents": [
+          "名前。"
+        ]
+      }
+    },
+    {
+      "legacy_test": "test_move_box_into_column_keeps_independent_styles",
+      "text": "## A\n\n::: {style=\"font-size:1.2em\"}\n名前。\n:::\n\n:::: {.columns}\n::: {.column width=\"40%\" style=\"font-size:1.2em\"}\n:::\n::: {.column width=\"60%\"}\n右。\n:::\n::::\n",
+      "script": "\n          const r = op.move(text, await st(text), 'p0/0', {into:'p0/1.0'});\n          const s = await st(r.text), col = s.pages[0].chunks[0].children[0], box = col.children[0];\n          return {column:col.attrs.kv, kind:box.kind, box:box.attrs?.kv,\n            contents:box.children.map(c => r.text.slice(c.start, c.end))};\n        ",
+      "expected": {
+        "column": {
+          "width": "40%",
+          "style": "font-size:1.2em"
+        },
+        "kind": "box",
+        "box": {
+          "style": "font-size:1.2em"
+        },
+        "contents": [
+          "名前。"
+        ]
+      }
+    },
+    {
+      "legacy_test": "test_move_box_into_column_keeps_independent_styles",
+      "text": "## A\n\n::: {style=\"opacity:0.5\"}\n名前。\n:::\n\n:::: {.columns}\n::: {.column width=\"40%\" style=\"opacity:0.5\"}\n:::\n::: {.column width=\"60%\"}\n右。\n:::\n::::\n",
+      "script": "\n          const r = op.move(text, await st(text), 'p0/0', {into:'p0/1.0'});\n          const s = await st(r.text), col = s.pages[0].chunks[0].children[0], box = col.children[0];\n          return {column:col.attrs.kv, kind:box.kind, box:box.attrs?.kv,\n            contents:box.children.map(c => r.text.slice(c.start, c.end))};\n        ",
+      "expected": {
+        "column": {
+          "width": "40%",
+          "style": "opacity:0.5"
+        },
+        "kind": "box",
+        "box": {
+          "style": "opacity:0.5"
+        },
+        "contents": [
+          "名前。"
+        ]
+      }
+    },
+    {
+      "legacy_test": "test_design_after_adding_description_targets_column_and_can_be_removed",
+      "text": "## A\n\n:::: {.columns}\n::: {.column width=\"50%\"}\n名前。\n\n説明。\n:::\n::: {.column width=\"50%\"}\n右。\n:::\n::::\n",
+      "script": "\n      const { designValues, clearDecoration } = await import('/web/block-design.js');\n      const r = op.setDecoration(text, await st(text), 'p0/0.0.0', designValues('plain'));\n      const s = await st(r.text), col = s.pages[0].chunks[0].children[0];\n      return {selected:r.select, kinds:col.children.map(c => c.kind),\n        design:op.decorationOf(r.text, col.children[1]),\n        restored:op.setDecoration(r.text, s, col.children[1].key, clearDecoration()).text};\n    ",
+      "expected": {
+        "selected": "p0/0.0",
+        "kinds": [
+          "text",
+          "text"
+        ],
+        "design": {
+          "--block-design": "plain"
+        },
+        "restored": "## A\n\n:::: {.columns}\n::: {.column width=\"50%\"}\n名前。\n\n説明。\n:::\n::: {.column width=\"50%\"}\n右。\n:::\n::::\n"
+      }
+    }
+  ]
+}

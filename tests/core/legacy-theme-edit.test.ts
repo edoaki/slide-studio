@@ -6,8 +6,9 @@ import { TEMPLATES } from '../../packages/core/src/legacy-workspace.js';
 import { set_vars, read_vars, restore } from '../../packages/core/src/legacy-theme-edit.js';
 import { sha256 } from '../../packages/core/src/source.js';
 const cases = JSON.parse(readFileSync('tests/fixtures/theme-parity/edit-golden.json','utf8')) as Array<{name:string;theme:string;values:Record<string,string>;sha256:string;again_sha256:string;vars:unknown;restored:boolean;error?:string}>;
+const originals = JSON.parse(readFileSync('tests/fixtures/theme-parity/golden.json','utf8')).cases as Array<{name:string;css:string}>;
 for (const row of cases) test(`original theme mutation: ${row.name}`, () => {
-  const css = readFileSync(join(TEMPLATES,'themes',`${row.theme}.css`),'utf8');
+  const css = originals.find(c=>c.name===`${row.theme}.css`)!.css;
   if (row.error) { assert.throws(()=>set_vars(css,row.values)); return; }
   const changed = set_vars(css,row.values);
   assert.equal(sha256(changed),row.sha256);

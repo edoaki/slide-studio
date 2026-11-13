@@ -4,19 +4,21 @@ import {mkdtemp,mkdir,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
-import {_electron} from 'playwright-core';
+import {_electron, type Page} from 'playwright-core';
+import {new_figure} from '../../packages/core/src/legacy-figures.js';
 import {Workspace} from '../../packages/core/src/legacy-workspace.js';
 const require=createRequire(import.meta.url);
-async function setup(t:TestContext,source:string,bib=''){
+async function setup(t:TestContext,source:string,bib='',prepare?:(ws:Workspace,page:Page)=>Promise<void>){
  const temp=await mkdtemp(join(tmpdir(),'studio-authoring-')),ws=Workspace.open(join(temp,'workspace'));ws.new_deck('talk','test');
  await writeFile(ws.qmd('talk'),`---\ntitle: 編集の確認\ntopic: test\ntheme: default\n---\n\n${source}`);
  if(bib)await writeFile(ws.bib('talk'),bib);
  const env:Record<string,string>=Object.fromEntries(Object.entries(process.env).filter((e):e is [string,string]=>e[1]!==undefined));delete env.ELECTRON_RUN_AS_NODE;env.SLIDE_STUDIO_ELECTRON_HOME=join(temp,'profile');
  const installed=process.env.SLIDE_STUDIO_TEST_APP,executablePath=installed?.endsWith('.app')?join(installed,'Contents/MacOS/Slide Studio'):installed||require('electron');
  const app=await _electron.launch({executablePath,args:[...(installed?[]:[join(process.cwd(),'dist/apps/desktop/main.js')]),'--root',ws.root],env});
- t.after(async()=>{try{await app.evaluate(async()=>{await (globalThis as any).__restoreParityClipboard?.();});}finally{await app.close();await rm(temp,{recursive:true,force:true});}});
+ t.after(async()=>{try{await app.evaluate(async()=>{await (globalThis as any).__restoreParityClipboard?.();});}finally{await app.evaluate(({BrowserWindow})=>{for(const window of BrowserWindow.getAllWindows())window.destroy();}).catch(()=>{});await app.close();await rm(temp,{recursive:true,force:true});}});
  const page=await app.firstWindow(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.waitForFunction(()=>!!sessionStorage.getItem('slide-studio:admin-token'));
+ if(prepare)await prepare(ws,page);
  const url=new URL('/deck/talk',page.url()).href;await page.goto(url);await page.locator('#stage[data-blocks=ready]').waitFor();
  return {ws,page,url,errors,app};
 }
@@ -39,7 +41,7 @@ for(const field of ['year','date'])test(`original bibliography edits ${field} in
 test('original table edits populated and empty cells, saves and reloads',{timeout:60000},async t=>{
  const {ws,page,errors}=await setup(t,'## 表 {#table}\n\n| 項目 | 説明 |\n|:---|:---|\n| 内容 | 長い説明 |\n|  | 二行目 |\n');
  const frame=page.frameLocator('#slideBox > iframe:not(.loading)');
- const cell=frame.locator('td').filter({hasText:'内容'}).first();await cell.click();await cell.click();
+ const cell=frame.locator('td').filter({hasText:'内容'}).first();await cell.click();const point=await cell.evaluate(el=>{const range=el.ownerDocument.createRange();range.selectNodeContents(el);const text=range.getClientRects()[0]!,box=el.getBoundingClientRect();return {x:text.left-box.left+3,y:text.top-box.top+text.height/2};});await cell.click({position:point});
  const editing=frame.locator('.slide-studio-editing');await editing.waitFor();await editing.fill('変更後');await editing.press('Escape');await saved(ws,'| 変更後 | 長い説明 |');
  await page.reload();await page.locator('#stage[data-blocks=ready]').waitFor();await frame.locator('td').filter({hasText:'変更後'}).waitFor();
  const empty=frame.locator('tbody tr').nth(1).locator('td').first();await empty.click();await empty.click();await editing.waitFor();await editing.fill('埋めた');await editing.press('Escape');await saved(ws,'| 埋めた | 二行目 |');
@@ -276,4 +278,75 @@ test('preview replacement waits for an in-flight step move and preserves its des
  await page.locator('#slideBox > iframe.loading').waitFor({state:'attached'});const pending=page.frameLocator('#slideBox > iframe.loading');await pending.locator('body').evaluate(async()=>{await (window as any).deckReady;});
  assert.equal(old.isDetached(),false);await old.evaluate(()=>(window as any).__releaseMove());
  await page.frameLocator('#slideBox > iframe:not(.loading)').locator('h2').filter({hasText:'更新後'}).waitFor();await page.waitForFunction(()=>document.querySelector('#stepCount')?.textContent==='2 / 3');assert.deepEqual(errors,[]);
+});
+
+async function figure(ws:Workspace,name:string,long=false){
+ await new_figure(ws,name,ws.shelf_dir('test'));
+ if(long){const path=join(ws.shelf_dir('test'),name,'figure.mjs');await writeFile(path,(await readFile(path,'utf8')).replace("steps: ['入力を表示', '処理を表示', '結果を表示']","steps: ['0', '1', '2', '3', '4', '5']"));}
+}
+async function badges(page:Page,labels:string[]){await page.waitForFunction(labels=>JSON.stringify([...document.querySelectorAll('#qblocks .page.cur .step-badge')].map(e=>e.textContent))===JSON.stringify(labels),labels);}
+async function stage(page:Page,step:number){const frame=await page.locator('#slideBox > iframe:not(.loading)').elementHandle().then(e=>e!.contentFrame());assert.ok(frame);await frame.evaluate(step=>(window as any).deck.go(0,step),step);return frame;}
+
+test('figure step menu updates the shortcode and preview without text decoration controls',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 図 {#fig}\n\n{{< fig test/demo >}}\n','',async ws=>{await figure(ws,'demo');});
+ await page.locator('#qblocks .page.cur .card').filter({hasText:'test/demo'}).click();const bar=page.locator('#blockTools');assert.equal(await bar.locator('.decoration-tool').count(),0);
+ await bar.getByRole('button',{name:'段階表示',exact:true}).click();await bar.getByRole('button',{name:'段 1（新しい段）',exact:true}).click();await saved(ws,'{{< fig test/demo step="1" >}}');
+ await page.frameLocator('#slideBox > iframe:not(.loading)').locator('.animation[data-step="1"]').waitFor();assert.deepEqual(errors,[]);
+});
+
+test('step badge preserves text input focus and selection while its shape and state update',{timeout:60000},async t=>{
+ const {page,errors}=await setup(t,'## 段階 {#step}\n\n::: {data-step="2"}\n最初。\n:::\n\n二番目の段落。\n\n## 最後 {#last}\n\n::: {data-step="3"}\n最後。\n:::\n');
+ await badges(page,['2']);const qb=page.locator('#qblocks .page.cur .step-badge');assert.equal(await qb.getAttribute('class'),'step-badge pending');
+ assert.deepEqual(await qb.evaluate(e=>{const s=getComputedStyle(e);return [s.backgroundColor,s.color,s.borderStyle,s.borderRadius];}),['rgb(255, 255, 255)','rgb(31, 99, 214)','dashed','999px']);
+ for(const theme of ['dark','light']){await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);assert.equal(await qb.evaluate(e=>getComputedStyle(e).color),'rgb(31, 99, 214)');assert.ok(await qb.evaluate(e=>Math.abs((e as HTMLElement).offsetWidth-(e as HTMLElement).offsetHeight)<=1));}
+ await qb.click();await page.locator('#blockTools .step-chips').waitFor();assert.equal(await page.locator('#qblocks .card.editing').count(),0);assert.equal(await page.frameLocator('#slideBox > iframe:not(.loading)').locator('.slide-studio-editing,.slide-studio-step-badge').count(),0);await page.keyboard.press('Escape');
+ await page.locator('#qblocks .page.cur .card').filter({hasText:'二番目の段落。'}).click();const input=page.locator('#qblocks .card.editing textarea');await input.evaluate(e=>{(window as any).__badgeInput=e;(e as HTMLTextAreaElement).setSelectionRange(2,2);});
+ await stage(page,1);await page.waitForFunction(()=>document.querySelector('#qblocks .page.cur .step-badge')?.className==='step-badge');
+ assert.ok(await input.evaluate(e=>e===(window as any).__badgeInput&&(e as HTMLTextAreaElement).selectionStart===2&&document.activeElement===e));
+ assert.deepEqual(await qb.evaluate(e=>[getComputedStyle(e).backgroundColor,getComputedStyle(e).color]),['rgb(31, 99, 214)','rgb(255, 255, 255)']);
+ await stage(page,0);await page.waitForFunction(()=>document.querySelector('#qblocks .page.cur .step-badge')?.className==='step-badge pending');assert.equal(await qb.getAttribute('data-tip'),'段階表示：段 2（まだ出ていない）・押すと段階表示を変える');assert.equal(await page.locator('#qblocks .page.dormant .step-badge.pending').count(),0);await page.keyboard.press('Escape');assert.deepEqual(errors,[]);
+});
+
+test('figure badge ranges follow internal steps and keep later incremental items pending',{timeout:60000},async t=>{
+ const {page,errors}=await setup(t,'## 図 {#fig}\n\n{{< fig test/box step="3" >}}\n\n::: {.incremental data-step="4"}\n- 次\n- 最後\n:::\n','',async ws=>{await figure(ws,'box',true);});
+ await badges(page,['2–7','8–9']);const qb=page.locator('#qblocks .page.cur .step-badge');assert.equal(await qb.nth(0).getAttribute('data-tip'),'段階表示：段 3（図の中で 5 回送る）（まだ出ていない）・押すと段階表示を変える');
+ const frame=await stage(page,5);await page.waitForFunction(()=>document.querySelector('#qblocks .page.cur .step-badge')?.className==='step-badge');assert.equal(await qb.nth(1).getAttribute('class'),'step-badge pending');
+ await qb.nth(0).click();await page.locator('#blockTools .step-chips').waitFor();assert.equal(await frame.locator('.animation.slide-studio-selected').count(),1);await qb.nth(1).click();assert.equal(await page.locator('#blockTools .step-tools input[type=checkbox]').isChecked(),true);
+ for(const [n,label] of [[null,'2'],[0,'2'],[5,'2–7']] as const){await frame.evaluate(n=>{const w=window as any;const f=document.querySelector('.slide.active iframe') as HTMLIFrameElement;(f.contentWindow as any).animation.steps=n;w.dispatchEvent(new CustomEvent('deckchange',{detail:{index:w.deck.index,step:w.deck.step,maxStep:w.deck.maxStep()}}));},n);await page.waitForFunction(label=>document.querySelector('#qblocks .page.cur .step-badge')?.textContent===label,label);}
+ assert.equal(await frame.locator('.slide-studio-step-badge').count(),0);assert.deepEqual(errors,[]);
+});
+
+test('late figure loading refreshes badge ranges through real player events',{timeout:60000},async t=>{
+ const held:import('playwright-core').Route[]=[];const {page,errors}=await setup(t,'## 最初 {#intro}\n\n本文。\n\n## 図 {#fig}\n\n{{< fig test/late step="3" >}}\n','',async(ws,page)=>{await figure(ws,'late');await page.route('**/late/figure.mjs*',route=>{held.push(route);});});
+ await page.frameLocator('#slideBox > iframe:not(.loading)').locator('body').evaluate(()=>{void (window as any).deck.go(1);});
+ await badges(page,['2']);for(let i=0;i<100&&!held.length;i++)await page.waitForTimeout(20);assert.ok(held.length);for(const route of held)await route.continue();await page.unroute('**/late/figure.mjs*');await badges(page,['2–4']);assert.deepEqual(errors,[]);
+});
+
+test('initial figures and reversed source order retain display sequence and step choices',{timeout:60000},async t=>{
+ const {page,errors}=await setup(t,'## 図 {#fig}\n\n::: {data-step="2"}\n上の文字。\n:::\n\n{{< fig test/first >}}\n\n::: {data-step="1"}\n下の文字。\n:::\n','',async ws=>{await figure(ws,'first');});
+ await badges(page,['5','1–3','4']);assert.equal(await page.locator('#stepCount').textContent(),'1 / 5');const qb=page.locator('#qblocks .page.cur .step-badge');await stage(page,3);await page.waitForFunction(()=>document.querySelectorAll('#qblocks .page.cur .step-badge')[2]?.className==='step-badge');assert.equal(await qb.nth(0).getAttribute('class'),'step-badge pending');await stage(page,4);await page.waitForFunction(()=>document.querySelector('#qblocks .page.cur .step-badge')?.className==='step-badge');await qb.nth(0).click();assert.deepEqual(await page.locator('#blockTools .step-chip').allTextContents(),['0 → ①','1 → ④','2 → ⑤']);assert.deepEqual(errors,[]);
+});
+
+test('simultaneous figures share a start and wait for the longest animation',{timeout:60000},async t=>{
+ const {page,errors}=await setup(t,'## 図 {#fig}\n\n{{< fig test/short step="1" >}}\n\n{{< fig test/long step="1" >}}\n\n::: {data-step="1"}\n同時。\n:::\n\n::: {data-step="2"}\n最後。\n:::\n','',async ws=>{await figure(ws,'short');await figure(ws,'long',true);});
+ await badges(page,['2–4','2–7','2','8']);const frame=await stage(page,0);await frame.evaluate(()=>{for(const f of document.querySelectorAll<HTMLIFrameElement>('.slide.active iframe')){const a=(f.contentWindow as any).animation,original=a.setStep.bind(a);a.setStep=(n:number,animate:boolean)=>{a.testStep=n;return original(n,animate);};}});
+ await stage(page,6);await page.waitForFunction(()=>document.querySelectorAll('#qblocks .page.cur .step-badge')[2]?.className==='step-badge');assert.equal(await page.locator('#qblocks .page.cur .step-badge').nth(3).getAttribute('class'),'step-badge pending');assert.deepEqual(await frame.evaluate(()=>[...document.querySelectorAll<HTMLIFrameElement>('.slide.active iframe')].map(f=>(f.contentWindow as any).animation.testStep)),[2,5]);await stage(page,7);await page.waitForFunction(()=>document.querySelectorAll('#qblocks .page.cur .step-badge')[3]?.className==='step-badge');assert.deepEqual(errors,[]);
+});
+
+test('container step selection preserves its children and supports removal and undo',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 囲み {#box}\n\n::: {.row}\n最初。\n\n囲みの本文。\n:::\n');const frame=page.frameLocator('#slideBox > iframe:not(.loading)'),bar=page.locator('#blockTools');
+ await frame.locator('p').filter({hasText:'最初。'}).click();await bar.getByRole('button',{name:'外側を選択',exact:true}).click();await bar.getByRole('button',{name:'段階表示',exact:true}).click();await bar.getByRole('button',{name:'段 1（新しい段）',exact:true}).click();await saved(ws,'.row data-step="1"');await frame.locator('.row[data-step="1"]').waitFor();await badges(page,['2']);await page.locator('#qblocks .page.cur .step-badge').click();await bar.getByRole('button',{name:'段 0（最初から）',exact:true}).click();await page.waitForFunction(()=>!(document.querySelector('.raw textarea') as HTMLTextAreaElement).value.includes('data-step='));await page.keyboard.press('Meta+z');await saved(ws,'.row data-step="1"');assert.deepEqual(errors,[]);
+});
+
+test('PDF marks survive source editing while the previous save and preview are pending',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 段階 {#steps}\n\n::: {data-step="1"}\n最初。\n:::\n\n::: {data-step="2"}\n次。\n:::\n');await page.getByRole('button',{name:'すべての記法を表示',exact:true}).click();
+ const pending:import('playwright-core').Route[]=[];let hold=true;await page.route('**/api/deck/talk/source',route=>{if(hold&&route.request().method()==='PUT')pending.push(route);else void route.continue();});
+ const box=page.locator('#pdfStep'),raw=page.locator('.raw textarea');const request=page.waitForRequest(r=>r.method()==='PUT'&&r.url().endsWith('/source'));await box.check();await request;assert.ok((await raw.inputValue()).includes('pdf="1"'));await raw.fill((await raw.inputValue()).replace('最初。','編集した段落。'));await raw.blur();await page.locator('#pagestrip button[data-index="0"]').click();await page.locator('#stepNext').click();await page.waitForFunction(()=>document.querySelector('#stepCount')?.textContent==='2 / 3');await box.check();assert.ok((await raw.inputValue()).includes('pdf="1 2"'));hold=false;for(const route of pending)await route.continue();await saved(ws,'## 段階 {#steps pdf="1 2"}');await saved(ws,'編集した段落。');await page.reload();await page.locator('#stage[data-blocks=ready]').waitFor();assert.deepEqual(await page.frameLocator('#slideBox > iframe:not(.loading)').locator('body').evaluate(()=>(window as any).deck.pdfSteps(0)),[0,1,2]);assert.deepEqual(errors,[]);
+});
+
+test('bundled default matches the theme used by the old app without heading ornaments',{timeout:60000},async t=>{
+ const {page,ws,errors}=await setup(t,'## 旧版の見出し {#theme}\n\n本文。\n');const frame=page.frameLocator('#slideBox > iframe:not(.loading)');
+ const heading=frame.locator('.slide.active > h2');assert.deepEqual(await heading.evaluate(e=>['::before','::after'].map(p=>getComputedStyle(e,p).content)),['none','none']);assert.equal(await heading.evaluate(e=>getComputedStyle(e).color),'rgb(34, 77, 145)');
+ const css=await readFile(join(ws.themes,'default.css'),'utf8');assert.ok(css.includes('--heading-mode:plain'));assert.ok(css.includes('--teal:#47a9aa'));
+ if(process.env.SLIDE_STUDIO_THEME_SCREENSHOT)await page.screenshot({path:process.env.SLIDE_STUDIO_THEME_SCREENSHOT});assert.deepEqual(errors,[]);
 });

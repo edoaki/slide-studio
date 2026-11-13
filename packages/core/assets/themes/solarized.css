@@ -1,12 +1,16 @@
-/* solarized：クリーム色の方眼紙と青緑。見出しは左上から下がるタブ、章扉は qmd と同じ # を付ける。
+/* solarized：クリーム色の方眼ノートと青緑。左に種類別の帯、見出しはマーカーと二重線、テープ飾りなし、表紙は紺とオレンジ、章扉は緑と薄紫。
    色の値は :root の変数だけに書き、ほかの色は変数から作る（テーマの色を直すと全体が付いてくる）。 */
 :root {
+  --cover-main: #304d73;
+  --cover-sub: #efb477;
+  --section-main: #526943;
+  --section-sub: #c7bed9;
   --ink: #3f555c;
   --link: #1f6fae;
   --accent: #006b83;
   --header: #0b4a57;
   --muted: #586e75;
-  --warn: #a93625;
+  --warn: #b33926;
   --good: #526900;
   --mark: #efe1a0;
   --mark-ink: #51420c;
@@ -22,34 +26,54 @@
 #stage a{color:var(--link)}
 #stage h3{font-size:1em;font-weight:650;color:var(--header)}
 
-/* ## 見出し：左上から下がる、角の丸いタブ */
-#stage h2{width:fit-content;max-width:calc(100% + var(--content-inset));font-size:1.2em;line-height:1.3;font-weight:650;color:var(--header);background:color-mix(in srgb,var(--accent) 11%,var(--paper));border:0;border-radius:0 0 18px 0;margin-top:0;margin-bottom:20px;padding:14px 40px 10px calc(var(--content-inset) + var(--text-pad))}
-
-/* 表紙・章扉：方眼紙 */
-#stage :is(.cover,.section-slide){background:
-  linear-gradient(color-mix(in srgb,var(--rule) 45%,transparent) 1px,transparent 1px) 0 0/40px 40px,
-  linear-gradient(90deg,color-mix(in srgb,var(--rule) 45%,transparent) 1px,transparent 1px) 0 0/40px 40px,
+/* 方眼の紙。左帯と右上の装飾色はスライドの種類で切り替える */
+#stage .slide{--page-decoration:var(--accent);--band-trim:var(--mark);background:
+  linear-gradient(color-mix(in srgb,var(--rule) 34%,transparent) 1px,transparent 1px) 0 0/40px 40px,
+  linear-gradient(90deg,color-mix(in srgb,var(--rule) 34%,transparent) 1px,transparent 1px) 0 0/40px 40px,
   var(--paper)}
+/* ノートの背表紙風：縫い目と縁取り。幅は表紙 > 章扉 > 本文 */
+#stage .slide.cover{--page-decoration:var(--cover-main);--band-trim:var(--cover-sub)}
+#stage .slide.section-slide{--page-decoration:var(--section-main);--band-trim:var(--section-sub)}
+#stage .slide::before{content:'';position:absolute;left:0;top:0;bottom:0;width:18px;pointer-events:none;border:0;background:
+  repeating-linear-gradient(to bottom,var(--band-trim) 0 5px,transparent 5px 11px) right 5px top/1px 100% no-repeat,
+  linear-gradient(to right,color-mix(in srgb,var(--page-decoration) 78%,var(--ink)),var(--page-decoration) 30%,var(--page-decoration) 78%,color-mix(in srgb,var(--page-decoration) 78%,var(--ink)));box-shadow:2px 0 0 color-mix(in srgb,var(--band-trim) 60%,var(--paper))}
+/* ## の本文スライドは縫い目のない単色の帯 */
+#stage .slide:not(.cover):not(.section-slide)::before{width:24px;background:var(--page-decoration)}
 
-/* 表紙：左端に青緑の柱、副題は等幅 */
+/* 本文の右上にもテープなどの装飾は置かない */
+#stage .slide::after{content:none}
+/* 表紙はテープや円などの装飾を置かない */
+#stage .slide.cover::before{width:40px}
+#stage .slide.cover::after{content:none}
+/* 章扉のメモ装飾は置かない */
+#stage .slide.section-slide::before{width:28px}
+#stage .slide.section-slide::after{content:none}
+
+/* ## 見出し：文字の下にマーカー、ページ幅に二重線 */
+#stage h2{position:relative;font-size:1.2em;line-height:1.3;font-weight:650;color:var(--header);background:none;border:0;margin-top:0;margin-bottom:10px;padding:22px 48px 12px calc(var(--content-inset) + var(--text-pad));text-decoration:underline var(--mark) .42em;text-underline-offset:-.14em;text-decoration-skip-ink:none}
+#stage h2::after{content:'';position:absolute;left:var(--content-inset);right:var(--content-inset);bottom:0;height:3px;border-top:2px solid var(--accent);border-bottom:1px solid var(--accent)}
+
+/* 表紙：紺の文字にオレンジの下線、副題は等幅 */
 #stage .cover{padding-top:0}
-#stage .cover::before{content:'';position:absolute;left:0;top:0;bottom:0;width:16px;background:var(--accent)}
-#stage .cover .cover-title{margin-top:150px;font-size:80px;font-weight:700;line-height:1.5;color:var(--header)}
-#stage .cover p{color:var(--accent);font-family:"Menlo",monospace;font-size:.72em}
+/* 帯から本文を離し、タイトルと副題の左端をそろえる */
+#stage .slide.cover{padding-left:calc(var(--content-inset) + 40px)}
+#stage .cover .cover-title{margin-top:150px;font-size:80px;font-weight:700;line-height:1.5;color:var(--cover-main);text-decoration:underline var(--cover-sub) .38em;text-underline-offset:-.12em;text-decoration-skip-ink:none}
+#stage .cover p{color:var(--cover-main);font-family:"Menlo",monospace;font-size:.72em}
 #stage .cover .cover-title p{color:inherit;font-family:inherit;font-size:inherit}
 
-/* # 章扉：qmd の書き方と同じ # を前に */
+/* # 章扉：# は少し傾けて貼った付箋、見出しにマーカー、下に二重線 */
 #stage .section-slide{padding:0 var(--content-inset);overflow:hidden}
-#stage .section-slide h1{margin-top:280px;padding-inline:var(--text-pad);font-size:74.4px;font-weight:700;line-height:1.4;color:var(--header)}
-#stage .section-slide h1::before{content:'#';display:inline;width:auto;height:auto;margin:0 .35em 0 0;background:none;font-family:"Menlo",monospace;font-weight:400;color:var(--accent)}
+#stage .section-slide h1{position:relative;margin-top:270px;padding:0 var(--text-pad) 26px;font-size:48px;font-weight:700;line-height:1.4;color:var(--section-main);text-decoration:underline var(--section-sub) .4em;text-underline-offset:-.12em;text-decoration-skip-ink:none}
+#stage .section-slide h1::before{content:'#';display:inline-block;width:1.25em;height:1.25em;margin:0 .4em 0 0;border-radius:4px 4px 16px 4px;background:var(--section-main);font-family:"Menlo",monospace;font-size:.8em;font-weight:700;line-height:1.25em;text-align:center;color:var(--paper);vertical-align:.04em;transform:rotate(-5deg);box-shadow:2px 3px 0 color-mix(in srgb,var(--header) 28%,transparent)}
+#stage .section-slide h1::after{content:'';position:absolute;left:var(--text-pad);right:0;bottom:0;height:4px;border-top:3px solid var(--section-main);border-bottom:1px solid var(--section-main)}
 
-/* 表：見出しの行をタブと同じ色、行は縞 */
-#stage table{font-size:.85em;width:auto;max-width:100%;line-height:1.6;margin:0;border-collapse:collapse}
-#stage table th{background:color-mix(in srgb,var(--accent) 11%,var(--paper));color:var(--header);font-weight:650;border-bottom:0}
-#stage table td{border-bottom:0}
-#stage table tbody tr:nth-child(even){background:color-mix(in srgb,var(--ink) 5%,var(--paper))}
+/* 表：見出しの下に二重線、行はノートの点線 */
+#stage table{font-size:.72em;width:100%;line-height:1.6;margin:0;border-collapse:collapse}
+#stage table th{background:none;color:var(--header);font-weight:650;border-bottom:3px double var(--accent)}
+#stage table td{border-bottom:1px dashed color-mix(in srgb,var(--rule) 70%,var(--muted))}
 
-#stage .page-number{left:auto;right:10px;bottom:8px;font-family:"Menlo",monospace;font-size:13px;line-height:1.2;color:var(--muted)}
+#stage .page-number{left:auto;right:10px;bottom:8px;font-family:"Menlo",monospace;font-size:13px;line-height:1.2;color:var(--page-decoration);padding:5px 12px 4px;background:color-mix(in srgb,var(--paper) 88%,var(--mark));border-bottom:2px solid color-mix(in srgb,var(--page-decoration) 55%,var(--paper));box-shadow:1px 2px 0 color-mix(in srgb,var(--rule) 35%,transparent)}
+#stage .page-number::before{content:'';position:absolute;left:-5px;top:-4px;width:22px;height:8px;transform:rotate(-12deg);background:color-mix(in srgb,var(--page-decoration) 24%,var(--paper));pointer-events:none}
 #stage .slide::after{border:0}
 #toolbar button{background:var(--paper);border:1px solid var(--rule);color:var(--ink)}
 #overview,.thumb{background:var(--paper);color:var(--ink)}
@@ -98,9 +122,3 @@
   --block-fold-width:3.5px;
   --block-unframed-radius:0px; --block-unframed-shadow:0.18;
 }
-
-/* 表紙の既定位置（タイトルの上余白・発表者までの間隔） */
-#stage .slide.cover { --cover-title-top:150px; --cover-authors-gap:44px; }
-#stage .slide.cover .cover-title { margin-top:var(--cover-title-top); left:0; top:0; }
-#stage .slide.cover .cover-subtitle { left:0; top:0; }
-#stage .slide.cover .cover-authors { margin-top:var(--cover-authors-gap); left:0; top:0; }

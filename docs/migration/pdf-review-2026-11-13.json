@@ -1,0 +1,315 @@
+{
+  "status": "technical_review_completed_with_documented_differences_not_exact_parity",
+  "user_visual_acceptance": "pending",
+  "input": "tests/fixtures/render/nco-intro.html",
+  "input_sha256": "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9",
+  "output": "/Users/aki/code/slide-studio-migration-artifacts/electron-review-2026-11-13/nco-intro.pdf",
+  "comparison": "Frozen original Python output; all 20 pages rendered to 1280x720 and reviewed side by side. No newly missing or clipped visible content observed. Small glyph position differences remain.",
+  "text": {
+    "pages": 20,
+    "rows": [
+      {
+        "page": 1,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 2,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 3,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 4,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 5,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 6,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 7,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 8,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 9,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 10,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 11,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 12,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 13,
+        "same_text": false,
+        "diff": [
+          {
+            "kind": "delete",
+            "old": "座標(x,y)",
+            "new": ""
+          },
+          {
+            "kind": "delete",
+            "old": "(0.12,0.50)(0.68,0.10)(0.65,0.88)(0.30,0.15)(0.28,0.82)(0.90,0.45)",
+            "new": ""
+          }
+        ],
+        "same_size": true
+      },
+      {
+        "page": 14,
+        "same_text": false,
+        "diff": [
+          {
+            "kind": "delete",
+            "old": "0%0%0%0%100%0%",
+            "new": ""
+          }
+        ],
+        "same_size": true
+      },
+      {
+        "page": 15,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 16,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 17,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 18,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 19,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      },
+      {
+        "page": 20,
+        "same_text": true,
+        "diff": [],
+        "same_size": true
+      }
+    ],
+    "links_equal": true,
+    "links_count": 8,
+    "replacement_characters": 0,
+    "unexpected_controls": [],
+    "old_sha256": "9a33feb606ba60bb5af8e07028b6faeec260f83610d0911d7a87964291da673c",
+    "new_sha256": "63d54c0a6f5efa90b76f5c910beb9d3bc4ac90e7e6c00952bd7166dc510ec39d"
+  },
+  "raster": [
+    {
+      "page": 1,
+      "bounds": null,
+      "mean": 0.0
+    },
+    {
+      "page": 2,
+      "bounds": null,
+      "mean": 0.0
+    },
+    {
+      "page": 3,
+      "bounds": [
+        123,
+        110,
+        1072,
+        584
+      ],
+      "mean": 1.8358506944444446
+    },
+    {
+      "page": 4,
+      "bounds": [
+        122,
+        110,
+        411,
+        671
+      ],
+      "mean": 0.36018699363425927
+    },
+    {
+      "page": 5,
+      "bounds": [
+        63,
+        110,
+        755,
+        531
+      ],
+      "mean": 0.3877032696759259
+    },
+    {
+      "page": 6,
+      "bounds": [
+        61,
+        110,
+        761,
+        607
+      ],
+      "mean": 1.101195384837963
+    },
+    {
+      "page": 7,
+      "bounds": [
+        122,
+        110,
+        411,
+        186
+      ],
+      "mean": 0.2548169849537037
+    },
+    {
+      "page": 8,
+      "bounds": [
+        126,
+        484,
+        408,
+        512
+      ],
+      "mean": 0.18095269097222222
+    },
+    {
+      "page": 9,
+      "bounds": null,
+      "mean": 0.0
+    },
+    {
+      "page": 10,
+      "bounds": [
+        121,
+        110,
+        411,
+        186
+      ],
+      "mean": 0.3551728877314815
+    },
+    {
+      "page": 11,
+      "bounds": null,
+      "mean": 0.0
+    },
+    {
+      "page": 12,
+      "bounds": [
+        122,
+        111,
+        1113,
+        594
+      ],
+      "mean": 0.9921256510416666
+    },
+    {
+      "page": 13,
+      "bounds": null,
+      "mean": 0.0
+    },
+    {
+      "page": 14,
+      "bounds": null,
+      "mean": 0.0
+    },
+    {
+      "page": 15,
+      "bounds": [
+        123,
+        525,
+        411,
+        601
+      ],
+      "mean": 0.4990133101851852
+    },
+    {
+      "page": 16,
+      "bounds": null,
+      "mean": 0.0
+    },
+    {
+      "page": 17,
+      "bounds": [
+        117,
+        109,
+        252,
+        548
+      ],
+      "mean": 0.10517288773148148
+    },
+    {
+      "page": 18,
+      "bounds": [
+        168,
+        147,
+        572,
+        548
+      ],
+      "mean": 0.6171556712962963
+    },
+    {
+      "page": 19,
+      "bounds": null,
+      "mean": 0.0
+    },
+    {
+      "page": 20,
+      "bounds": null,
+      "mean": 0.0
+    }
+  ],
+  "text_difference_review": "Pages 13 and 14 contain the documented hidden SVG coordinate/probability text extraction differences. Their raster images are identical. Poppler has no replacement characters or unexpected control characters. Pypdf normalized only whitespace and controls for comparison.",
+  "scope_limit": "This frozen HTML comparison does not establish final acceptance of every theme, deck or PDF; current-theme UI export is covered separately by legacy-workflow.test.ts."
+}

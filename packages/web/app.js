@@ -8,6 +8,13 @@ import { mountEditor } from './editor.js';
 import './tip.js';
 
 let unmount = null;
+let leaving = null;
+// Called only by the trusted desktop host or navigation within this UI.
+export function flushBeforeLeave() {
+  if (!leaving) leaving = Promise.resolve().then(() => unmount?.flush?.() ?? true)
+    .catch(() => false).finally(() => { leaving = null; });
+  return leaving;
+}
 export function navigate(path, replace = false) {
   if (replace) history.replaceState(null, '', path); else history.pushState(null, '', path);
   route();

@@ -618,5 +618,65 @@
       "Authenticated AI inference behaviour remains unverified; prompt delivery is tested without paid inference.",
       "Windows runtime remains deferred by user."
     ]
+  },
+  "operation_review_followup_2026_11_13": {
+    "status": "in_progress_source_only_installers_deferred",
+    "fixes": [
+      "Use theme CSS from the workspace actually used by the old app (/Users/aki/Slides); retain golden mutation tests against their original committed inputs.",
+      "Carry sparse source stages and live figure step ranges across the isolated preview bridge.",
+      "Pass fractional iframe dimensions to the player to avoid exposed preview edges.",
+      "On desktop close, quit and keyboard reload, await automatic saves of source, direct edits, memo and theme; keep the editor open on save failure instead of offering to discard changes."
+    ],
+    "validation": {
+      "unit": {
+        "passed": 468,
+        "skipped": 7,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/parity-unit-final.txt"
+      },
+      "autosave": {
+        "passed": 8,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/autosave-final.txt"
+      },
+      "bridge": {
+        "passed": 34,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/parity-bridge-final.txt"
+      },
+      "ui": {
+        "passed": 61,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/autosave-regression-ui.txt",
+        "scope": "Final combined authoring/editor/table regression, including 8 autosave exit scenarios."
+      },
+      "workflow": {
+        "passed": 24,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/parity-workflow-final.txt",
+        "scope": "Final desktop/browser, AI process fixtures, materials/assets, workspace switching, presentation, HTML/PDF export regression. Together with authoring/editor/table suite: 85 passing UI scenarios in two runs."
+      }
+    },
+    "actual_ai": {
+      "result": "Passed real Codex inference through the app chat, including draft/review, file update and restoration.",
+      "test": "tests/e2e/legacy-ai-live.test.ts",
+      "log": "/tmp/slide-studio-desktop/parity-live-ai.txt",
+      "authentication": "Used the existing authenticated ~/.codex via a test environment override. Installed application account setup is not claimed.",
+      "scope": "Scratch workspace only; no real user deck was edited. Other providers remain unverified."
+    },
+    "pdf": "pdf-review-2026-11-13.json: all 20 frozen-fixture pages reviewed; no newly missing/clipped visible content. Small raster/text differences documented; not exact parity or user visual acceptance.",
+    "themes": "theme-source-2026-11-13.json",
+    "legacy_mapping": {
+      "covered": 77,
+      "superseded_by_user_decision": 8,
+      "pending": 292,
+      "total": 377
+    },
+    "distribution": "No installer rebuild or installation. Installed application and release artifacts still use runtime 7981dcc.",
+    "remaining": [
+      "Complete individual mapping of the remaining legacy operations and fix mismatches.",
+      "Obtain PDF visual acceptance; exact text/raster parity is not claimed.",
+      "Rebuild and test installers after full operation review. Windows runtime deferred by user."
+    ]
   }
 }

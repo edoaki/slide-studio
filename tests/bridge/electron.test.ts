@@ -870,11 +870,12 @@ test("stage 2 selection stays trusted, keyed and revision-scoped across origins"
     const el = document.querySelector(`iframe[data-bridge-generation="${name}"]`) as HTMLIFrameElement | null;
     if (el) el.style.width = "560px";
   }, generation);
-  await page.waitForFunction(({ generation, sequence }) => {
+  await page.waitForFunction(({ generation, sequence, beforeLeft }) => {
     const harness = (window as any).__bridgeHarness;
     return harness.events(generation, "edit.layout").some((event: { data: EditLayout }) =>
-      event.data.sequence > sequence && event.data.sourceVersion === "v1");
-  }, { generation, sequence: measured.sequence }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
+      event.data.sequence > sequence && event.data.sourceVersion === "v1"
+      && event.data.blocks.find(block => block.key === "p1/0.0.0")?.rects[0]?.left !== beforeLeft);
+  }, { generation, sequence: measured.sequence, beforeLeft }, { timeout: WAIT_TIMEOUT_MS, polling: 50 });
   layouts = await harnessCall<Array<{ generation: string; name: string; data: EditLayout }>>(
     page, "events", generation, "edit.layout",
   );

@@ -46,7 +46,7 @@ interface Identity { deck: string; version: string; generation: string }
 interface Slide {
   index: number; page: number | null; id: string; title: string; chapter: boolean;
   group: string; sectionStart: boolean; maxStep: number; pdfMarks: number[];
-  stageNumbers?: number[]; cites?: string[];
+  stageNumbers?: number[]; cites?: string[]; figures?: Array<{key:string;steps:number}>;
 }
 interface Snapshot extends Identity {
   index: number; step: number; maxStep: number; slides: Slide[];
@@ -319,4 +319,11 @@ test("clipboard bridge accepts only trusted bounded image or HTML file payloads"
   assert.equal(valid({...data,files:[{...file,name:"script.js",type:"text/javascript"}]}),false);
   assert.equal(valid({...data,files:Array(33).fill(file)}),false);
   assert.equal(valid({...data,files:[{...file,bytes:new ArrayBuffer(32*1024*1024+1)}]}),false);
+});
+
+ test("figure step metadata is bounded and copied across the preview boundary", () => {
+ const figures=[{key:'p0/0',steps:5}];const value={...snapshot,slides:[{...slide,figures}]};
+ const parsed=p.parseSnapshot(value,identity);assert.deepEqual(parsed?.slides[0]?.figures,figures);
+ figures[0]!.steps=8;assert.equal(parsed?.slides[0]?.figures?.[0]?.steps,5);
+ for(const bad of [[{key:'p0/0',steps:-1}],[{key:'p0/0',steps:NaN}],[{key:'',steps:1}],[{key:'p0/0',steps:1.5}],Array(10001).fill({key:'p0/0',steps:0})])assert.equal(p.validateSnapshot({...snapshot,slides:[{...slide,figures:bad}]},identity),false);
 });

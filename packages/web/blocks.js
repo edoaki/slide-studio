@@ -938,7 +938,7 @@ export function makeBlocks(ctx) {
     },
     saved() { draw(); },
     // 保存待ちを確かめる前（AI に送る前など）に、スライドで打った分を原稿へ反映する
-    flush() { return session && !session.created && sync(session); },
+    flush() { return session && !session.created ? sync(session) : true; },
     caret() {
       if (editing || !fresh()) return;
       const pos = ctx.editor.caretOffset();

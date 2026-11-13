@@ -221,12 +221,12 @@ export function mountEditor(root, deck) {
   }
   // 保存待ちを直ちに保存し、版が一致したら true（AI に送る前に使う：§6.4）
   ctx.flush = async () => {
-    await Promise.all(ctx.plugins.map(p => p.flush?.()));
+    const results = await Promise.all(ctx.plugins.map(p => p.flush?.()));
     if (ctx.styleSaving) await ctx.styleSaving;
     clearTimeout(ctx.timer); ctx.timer = 0;
     if (ctx.saving) await ctx.saving;
     if (ctx.dirty) await save();
-    return !ctx.conflict && !ctx.dirty;
+    return results.every(result => result !== false) && !ctx.conflict && !ctx.dirty;
   };
   root.querySelector('a[data-nav]').onclick = async e => {
     e.preventDefault(); e.stopPropagation();
@@ -595,7 +595,7 @@ export function mountEditor(root, deck) {
     }
   })();
 
-  return () => {
+  const cleanup = () => {
     alive = false;
     preview.destroy();
     clearTimeout(holdTimer);
@@ -605,4 +605,15 @@ export function mountEditor(root, deck) {
     if (ctx.dirty) ctx.flush();
     ctx.plugins.forEach(p => p.destroy?.());
   };
+  cleanup.flush = async () => {
+    try {
+      document.activeElement?.blur?.();
+      if (!await ctx.flush()) { toast(S.saveFirst); return false; }
+      await ctx.blocks?.finish();
+      const saved = await ctx.flush();
+      if (!saved) toast(S.saveFirst);
+      return saved;
+    } catch { toast(S.saveFirst); return false; }
+  };
+  return cleanup;
 }

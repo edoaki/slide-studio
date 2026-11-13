@@ -133,6 +133,7 @@ function validSlide(value) {
   if (!isFiniteInteger(value.maxStep, 0, MAX_STEPS)) return false;
   if (!Array.isArray(value.pdfMarks) || !value.pdfMarks.every(m => isFiniteInteger(m, 0, MAX_STEPS))) return false;
   if (value.cites !== undefined && (!Array.isArray(value.cites) || value.cites.length > 4096 || !value.cites.every(key => isSafeString(key, {max:4096})))) return false;
+  if (value.figures !== undefined && (!Array.isArray(value.figures) || value.figures.length > 10000 || !value.figures.every(f => isRecord(f) && isSafeString(f.key, {max:4096}) && isFiniteInteger(f.steps, 0, MAX_STEPS)))) return false;
   if (value.stageNumbers !== undefined) {
     if (!Array.isArray(value.stageNumbers)) return false;
     if (!value.stageNumbers.every(n => isFiniteInteger(n, 0, MAX_STEPS))) return false;
@@ -173,6 +174,7 @@ export function parseSnapshot(value, expected) {
         chapter: s.chapter, group: s.group, sectionStart: s.sectionStart,
         maxStep: s.maxStep, pdfMarks: s.pdfMarks.slice(),
       };
+      if (Array.isArray(s.figures)) slide.figures = s.figures.map(f => ({key:f.key, steps:f.steps}));
       if (Array.isArray(s.cites)) slide.cites = s.cites.slice();
       if (Array.isArray(s.stageNumbers)) slide.stageNumbers = s.stageNumbers.slice();
       return slide;
@@ -406,6 +408,7 @@ export function validateParams(method, params) {
     case 'goStage':
       return isFiniteInteger(params.stage, 0, MAX_STEPS);
     case 'resize':
+      return Object.keys(params).length === 0 || Object.keys(params).length === 2 && ['width','height'].every(k => isFiniteNumber(params[k]) && params[k] > 0 && params[k] <= 100000);
     case 'finish':
       return Object.keys(params).length === 0;
     case 'setFilter':

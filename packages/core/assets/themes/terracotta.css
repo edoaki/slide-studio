@@ -19,6 +19,17 @@
   --band-width: 64px;
   --font-head: "Hiragino Mincho ProN","Yu Mincho",serif;
   --font-body: "Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --block-border: 1px solid #cbbfa9ff;
+  --block-background: #fcf9f1ff;
+  --block-top-line: 4px solid #aa8335ff;
+  --block-top-fill: #f2ebdcff;
+  --block-left-line: 4px solid #8b2e3cff;
+  --block-left-fill: #f5ece7ff;
+  --block-shadow-fill: #fcf9f1ff;
+  --block-shadow-color: #33261b18;
+  --block-corner-top: 3px solid #aa8335ff;
+  --block-corner-left: 3px solid #8b2e3cff;
+  --block-corner-fill: #fcf9f1ff;
 }
 :root{--theme-ink:var(--ink);--theme-muted:var(--muted);--theme-accent:var(--accent);--theme-header:var(--header);--theme-rule:var(--rule);--theme-paper:var(--paper);--theme-border:var(--rule)}
 
@@ -26,6 +37,12 @@
 #stage a{color:var(--link)}
 #stage :is(h1,h2,h3,.cover-title){font-family:var(--font-head)}
 #stage h3{font-size:1em;font-weight:600;color:var(--header)}
+
+/* 本文の字下げ：見出し（--text-pad）より本文を --body-indent だけ右へ。
+   ブロックは枠ごと同じだけ右へ寄せ、中の文字は本文の文字とそろう（初期値で見出し12px・本文30px）。 */
+.reveal .slides section.slide{--body-indent:18px}
+#stage .slide:not(.cover):not(.section-slide) :is(p,ul,ol,h3,h4,blockquote):not(li *):not([style*="--block-design"] *):not(div[style*="padding"] > *):not(:is(.citations,.slide-citations,.footnote-small) *){padding-left:calc(var(--text-pad) + var(--body-indent))}
+#stage .slide:not(.cover):not(.section-slide) [style*="--block-design"]:not([style*="--block-design"] *){margin-left:var(--body-indent)}
 
 /* ## 通常ページ：左帯と、帯から離した見出し・本文。 */
 #stage .slide{
@@ -40,7 +57,6 @@
   --band-width:20px;
   --safe-left:calc(var(--band-width) + 24px);
   --safe-right:32px;
-  padding-top:8px; /* 図の多いページでも本文が下の脚注・引用に届かないように */
 }
 #stage .slide::before{
   content:'';position:absolute;left:0;right:auto;top:0;bottom:0;
@@ -50,7 +66,7 @@
 }
 #stage .slide::after{content:none;border:0}
 #stage .slide > h2{
-  position:relative;margin:0 0 18px;padding:12px var(--text-pad) 20px;
+  position:relative;margin:0 0 24px;padding:12px var(--text-pad) 20px;
   width:auto;max-width:none;font-size:1.25em;line-height:1.35;
   font-weight:600;letter-spacing:.04em;color:var(--header);
   border:0;border-radius:0;background:none;box-shadow:none;
@@ -69,7 +85,7 @@
 #stage .section-slide::before{left:auto;right:0;background:linear-gradient(to bottom,var(--accent) 0 18%,var(--gold) 18% 24%,var(--header) 24% 100%)}
 #stage .section-slide h1{
   display:block;margin:0;padding:0 var(--text-pad);
-  font-size:69.6px;font-weight:600;line-height:1.4;letter-spacing:.08em;
+  font-size:58px;font-weight:600;line-height:1.4;letter-spacing:.08em;
   text-align:left;color:var(--header);
 }
 #stage .section-slide h1::before{content:none}
@@ -110,14 +126,14 @@
   font-variant-numeric:tabular-nums;letter-spacing:.08em;color:var(--muted);
 }
 
-#stage table{font-size:.85em;width:auto;max-width:100%;line-height:1.6;margin:0;border-collapse:collapse;border-top:2px solid var(--header);border-bottom:2px solid var(--header)}
+#stage table{font-size:.72em;width:100%;line-height:1.6;margin:0;border-collapse:collapse;border-top:2px solid var(--header);border-bottom:2px solid var(--header)}
 #stage table th{background:color-mix(in srgb,var(--gold) 16%,var(--paper));color:var(--header);font-family:var(--font-head);font-weight:600;border-bottom:1px solid var(--gold)}
 #stage table td{border-bottom:0}
 #toolbar button{background:var(--paper);border:1px solid var(--rule);color:var(--ink)}
 #overview,.thumb{background:var(--paper);color:var(--ink)}
 .thumb{border-top-color:var(--accent)}
 .thumb[aria-current=true]{outline:2px solid var(--accent);background:var(--paper)}
-:root{--summary-paper:var(--paper);--summary-ink:var(--header)}
+:root{--summary-paper:var(--paper);--summary-ink:var(--header);--heading-mode:rule;--heading-rule-style:solid;--heading-rule-width:4px;--heading-rule-inset:12px}
 @media print{#stage .slide,#stage .slide *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 
 /* block palette v4: 整理・結論・補足・引用・定義・メモ */
@@ -160,9 +176,14 @@
   --block-fold-width:3.5px;
   --block-unframed-radius:0px; --block-unframed-shadow:0.18;
 }
+/* slide-studio block background-color */
+:root { --block-background: #ffffffff; }
 
-/* 表紙の既定位置（タイトルの上余白・発表者までの間隔） */
-#stage .slide.cover { --cover-title-top:0px; --cover-authors-gap:36px; }
-#stage .slide.cover .cover-title { margin-top:var(--cover-title-top); left:0; top:0; }
-#stage .slide.cover .cover-subtitle { left:0; top:0; }
-#stage .slide.cover .cover-authors { margin-top:var(--cover-authors-gap); left:0; top:0; }
+/* slide-studio block border */
+:root { --block-border: 1px solid #cbbfa9ff; }
+
+/* slide-studio block left-radius */
+:root { --block-left-radius: 9px; }
+
+/* slide-studio block left-line */
+:root { --block-left-line: 4.5px solid #72794aff; }

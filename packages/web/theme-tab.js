@@ -348,6 +348,7 @@ export function makeThemeTab(ctx) {
   };
 
   return {
+    async flush() { await Promise.all([...pending]); return !failed && !live.size; },
     keydown(e) {
       // 見本を出している間は ↑↓ で見本をめくる
       if (!sampleOn() || !sample?.api || e.metaKey || e.ctrlKey || e.altKey || !['ArrowUp', 'ArrowDown'].includes(e.key)) return false;

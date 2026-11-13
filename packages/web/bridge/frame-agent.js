@@ -221,7 +221,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   }
 
   function snapshotKey(snapshot) {
-    return `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}`;
+    return `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
   }
 
   function clampString(value, max) {
@@ -265,7 +265,17 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         ? marks.filter(mark => Number.isSafeInteger(mark) && mark >= 0).slice(0, 4096)
         : [];
       const stages = [];
-      const count = Math.min(maxStep, MAX_SNAPSHOT_STAGES);
+      const rawStages = Array.from(slide.querySelectorAll('[data-step],[data-highlight-step]'))
+        .flatMap(el => [Number(el.dataset.step), Number(el.dataset.highlightStep)])
+        .filter(n => Number.isSafeInteger(n) && n >= 0);
+      const count = Math.min(Math.max(maxStep, ...rawStages), MAX_SNAPSHOT_STAGES);
+      const figures = Array.from(slide.querySelectorAll('.animation[data-slide-studio]')).slice(0, 10000).map(el => {
+        let steps = 0;
+        for (const frame of el.querySelectorAll('iframe')) {
+          try { const n = frame.contentWindow?.animation?.steps; if (Number.isSafeInteger(n) && n > steps && n <= MAX_SNAPSHOT_STAGES) steps = n; } catch { /* external figure */ }
+        }
+        return {key: clampString(el.dataset.slideStudio || '', 4096), steps};
+      }).filter(f => f.key);
       for (let stage = 0; stage <= count; stage += 1) {
         const n = deckCall('stageNumber', stage, index);
         stages.push(safeInteger(n, stage + 1, 0));
@@ -273,7 +283,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       stageNumbers[index] = stages;
       return {
         index, page, id, title, chapter, group, sectionStart,
-        maxStep, pdfMarks,
+        maxStep, pdfMarks, figures,
         cites: [...new Set(Array.from(slide.querySelectorAll('[data-cites]')).flatMap(n => String(n.dataset.cites || '').split(/\s+/).filter(Boolean)))].slice(0, 4096).map(key => clampString(key, 4096)),
       };
     });
@@ -440,7 +450,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   }
 
   function installReadyListeners() {
-    addWindowListener('deckchange', () => { publish('deckchange'); });
+    addWindowListener('deckchange', () => { publish('deckchange', false, true); });
     watchStageStructure();
     if (presenting) {
       addWindowListener('keydown', presentationKey, true);
@@ -527,7 +537,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       case 'resize':
         selection?.schedule();
         lintEditor?.refresh();
-        return Promise.resolve(invokeDeck('resize'));
+        return Promise.resolve(invokeDeck('resize', params));
       case 'setFilter':
         return Promise.resolve(invokeDeck('setFilter', params.indices));
       case 'pageWheel': {

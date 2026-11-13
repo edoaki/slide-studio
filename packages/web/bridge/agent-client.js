@@ -218,6 +218,9 @@ export class AgentClient {
         if (!snapshot || !Number.isSafeInteger(index)) return [];
         return (snapshot.slides[index]?.pdfMarks ?? []).slice();
       },
+      figureSteps(key) {
+        return client.snapshot?.slides.flatMap(s => s.figures || []).find(f => f.key === key)?.steps ?? 0;
+      },
       stageAt() {
         return client.snapshot?.stageAt ?? client.snapshot?.step ?? 0;
       },
@@ -235,7 +238,7 @@ export class AgentClient {
       move(delta = 1) { return client.request('move', { delta }); },
       jump(delta = 1) { return client.request('jump', { delta }); },
       goStage(stage) { return client.request('goStage', { stage }); },
-      resize() { return client.request('resize', {}); },
+      resize() { const {width, height} = client.frame.getBoundingClientRect(); return client.request('resize', width > 0 && height > 0 ? {width, height} : {}); },
       setFilter(indices) {
         return client.request('setFilter', { indices: Array.isArray(indices) ? indices.slice() : null });
       },
@@ -376,7 +379,7 @@ export class AgentClient {
     // This is the committed frame revision. A later configure request cannot
     // advance it; only a frame snapshot/theme ack can.
     this._frameSourceVersion = snapshot.sourceVersion ?? this.identity.version;
-    const key = `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}`;
+    const key = `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
     if (key === this._lastSnapshotKey) return;
     this._lastSnapshotKey = key;
     this.snapshot = snapshot;
