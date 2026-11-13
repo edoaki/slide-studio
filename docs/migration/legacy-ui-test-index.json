@@ -2239,7 +2239,12 @@
       ],
       "parameterized": false,
       "status": "pending_electron_parity",
-      "replacement_test": null
+      "replacement_test": null,
+      "partial_electron_coverage": {
+        "source": "tests/e2e/legacy-authoring.test.ts; tests/bridge/protocol.test.ts",
+        "note": "Trusted bounded clipboard event transport implemented and protocol rejection tests added; native clipboard-to-save operation remains pending.",
+        "source_commit": "9903509"
+      }
     },
     {
       "id": "tests/e2e/test_insert.py::test_insert_table_and_reload",
@@ -2394,7 +2399,12 @@
       ],
       "parameterized": false,
       "status": "pending_electron_parity",
-      "replacement_test": null
+      "replacement_test": null,
+      "partial_electron_coverage": {
+        "source": "tests/e2e/legacy-authoring.test.ts; tests/bridge/protocol.test.ts",
+        "note": "Live overflow, slide-strip mark, preview box and clearing after external CSS repair are covered; all toolbar/navigation assertions remain pending.",
+        "source_commit": "9903509"
+      }
     },
     {
       "id": "tests/e2e/test_layout_lint.py::test_layout_issues_follow_changes_in_slide",
@@ -3794,7 +3804,12 @@
       ],
       "parameterized": false,
       "status": "pending_electron_parity",
-      "replacement_test": null
+      "replacement_test": null,
+      "partial_electron_coverage": {
+        "source": "tests/e2e/legacy-authoring.test.ts; tests/bridge/protocol.test.ts",
+        "note": "Theme tab stays active while direct text editing saves; delete/undo assertions from the original test are not yet reproduced.",
+        "source_commit": "9903509"
+      }
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_save_edited_theme_on_reset",
@@ -3871,7 +3886,12 @@
       ],
       "parameterized": false,
       "status": "pending_electron_parity",
-      "replacement_test": null
+      "replacement_test": null,
+      "partial_electron_coverage": {
+        "source": "tests/e2e/legacy-authoring.test.ts; tests/bridge/protocol.test.ts",
+        "note": "Missing table-style fallback, sample selection, saved color and return to direct editing are covered; full mark/undo sequence remains pending.",
+        "source_commit": "9903509"
+      }
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_theme_font_samples_and_filtered_navigation",
@@ -3926,7 +3946,12 @@
       ],
       "parameterized": false,
       "status": "pending_electron_parity",
-      "replacement_test": null
+      "replacement_test": null,
+      "partial_electron_coverage": {
+        "source": "tests/e2e/legacy-authoring.test.ts; tests/bridge/protocol.test.ts",
+        "note": "Heading gradient opens and a preset saves after theme color undo; full reload/gradient undo sequence remains pending.",
+        "source_commit": "9903509"
+      }
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_background_controls_are_removed_and_heading_toggle_still_opens",

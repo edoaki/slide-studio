@@ -345,7 +345,7 @@
     }
   },
   "theme_lint_followup_2026_11_13": {
-    "status": "source_verified_packaging_pending",
+    "status": "implemented_and_verified_in_reinstalled_mac_dmg_full_parity_still_pending",
     "changes": [
       "Theme colors, fonts, target detection and highlight rectangles run in the isolated preview frame. Original controls remain in the admin UI.",
       "Gradient preview geometry, inert state and heading content visibility use dedicated validated commands.",
@@ -369,6 +369,26 @@
         "passed": 14,
         "failed": 0,
         "log": "/tmp/slide-studio-desktop/theme-ui-final.txt"
+      },
+      "installed_dmg": {
+        "passed": 13,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/theme-installed.txt",
+        "app": "/Users/aki/Applications/Slide Studio.app",
+        "app_asar_sha256": "9b3f87c7cebe403e4aabce265ec3eb45b6e077dfdbbe39198bc05ff6e4716334",
+        "asar_matches_packaged_app": true,
+        "codesign_integrity": "passed; ad-hoc signature, not Developer ID or notarization"
+      },
+      "clean_clone": {
+        "commit": "9903509",
+        "npm_install": "passed",
+        "build": "passed",
+        "protocol_and_legacy_html_tests": 18,
+        "source": "local Git clone; no GitHub publication claimed"
+      },
+      "post_cleanup_theme_e2e": {
+        "passed": 3,
+        "log": "/tmp/slide-studio-desktop/theme-cleanup-check.txt"
       }
     },
     "limitations": [
@@ -379,7 +399,20 @@
     ],
     "logs": {
       "regression": "/tmp/slide-studio-desktop/theme-regression.txt",
-      "bridge": "/tmp/slide-studio-desktop/theme-bridge2.txt"
+      "bridge": "/tmp/slide-studio-desktop/theme-bridge2.txt",
+      "package_arm64": "/tmp/slide-studio-desktop/theme-package-arm64.txt",
+      "package_x64": "/tmp/slide-studio-desktop/theme-package-x64.txt",
+      "package_win": "/tmp/slide-studio-desktop/theme-package-win.txt",
+      "clone_install": "/tmp/slide-studio-desktop/theme-clone-install.txt",
+      "clone_build": "/tmp/slide-studio-desktop/theme-clone-build.txt",
+      "clone_tests": "/tmp/slide-studio-desktop/theme-clone-test.txt"
+    },
+    "source_commit": "9903509",
+    "artifacts": {
+      "mac_arm64": "release/Slide-Studio-0.1.0-mac-arm64.dmg",
+      "mac_x64": "release/Slide-Studio-0.1.0-mac-x64.dmg",
+      "win_x64": "release/Slide-Studio-0.1.0-win-x64-Setup.exe",
+      "checksums": "release/SHA256SUMS; all six artifact/blockmap checks passed"
     }
   }
 }
