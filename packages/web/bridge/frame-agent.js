@@ -1,3 +1,5 @@
+import { createFrameLint } from './frame-lint.js';
+import { createFrameTheme } from './frame-theme.js';
 import { createFrameBlocks } from './frame-blocks.js';
 import { createFrameCover } from './frame-cover.js';
 import { DESIGN_VARS } from '../block-design.js';
@@ -453,7 +455,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     installLinkInterception();
   }
 
-  let textEditor = null, coverEditor = null, blockEditor = null;
+  let textEditor = null, coverEditor = null, blockEditor = null, themeEditor = null, lintEditor = null;
   function markReady() {
     if (ready || destroyed) return;
     const target = currentDeck();
@@ -468,6 +470,20 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     removeWindowListener('deckready', markReady);
     installReadyListeners();
     if (!presenting) {
+      doc.addEventListener('pointerdown', event => {
+        if(event.isTrusted)sendEvent('insert.pointer',{sourceVersion:liveSourceVersion,trusted:true});
+      },true);
+      doc.addEventListener('paste', async event => {
+        if(!event.isTrusted)return;
+        const files=Array.from(event.clipboardData?.files??[]).filter(f=>f.type.startsWith('image/')||/\.html?$/i.test(f.name));
+        if(!files.length||files.length>32||files.reduce((n,f)=>n+f.size,0)>32*1024*1024)return;
+        event.preventDefault();event.stopPropagation();
+        const sourceVersion=liveSourceVersion;
+        const copied=await Promise.all(files.map(async f=>({name:f.name,type:f.type,bytes:await f.arrayBuffer()})));
+        if(!destroyed&&sourceVersion===liveSourceVersion)sendEvent('insert.paste',{sourceVersion,trusted:true,files:copied});
+      },true);
+      lintEditor = createFrameLint(win,doc,{getSourceVersion:()=>liveSourceVersion,sendEvent});
+      themeEditor = createFrameTheme(win,doc,{getSourceVersion:()=>liveSourceVersion,sendEvent});
       blockEditor = createFrameBlocks(win, doc, { getSourceVersion: () => liveSourceVersion, sendEvent });
       coverEditor = createFrameCover(win, doc, { getSourceVersion: () => liveSourceVersion, sendEvent });
       textEditor = createFrameText(win, doc, { getSourceVersion: () => liveSourceVersion, sendEvent });
@@ -510,6 +526,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       }
       case 'resize':
         selection?.schedule();
+        lintEditor?.refresh();
         return Promise.resolve(invokeDeck('resize'));
       case 'setFilter':
         return Promise.resolve(invokeDeck('setFilter', params.indices));
@@ -531,6 +548,12 @@ export function bootstrapFrameAgent(win = globalThis.window) {
           };
         return Promise.resolve(invokeDeck('pageWheel', event));
       }
+      case 'lint.inspect': return Promise.resolve(lintEditor?.issues??[]);
+      case 'theme.configure': themeEditor?.configure(params);return Promise.resolve(null);
+      case 'theme.preview': { const result=themeEditor?.preview(params); lintEditor?.refresh(); return Promise.resolve(result); }
+      case 'theme.inspect': return Promise.resolve(themeEditor?.inspect(params.key));
+      case 'theme.mark': return Promise.resolve(themeEditor?.mark(params.key));
+      case 'theme.gradient': return Promise.resolve(themeEditor?.gradient(params));
       case 'theme.swap':
         return swapTheme(params.name, params.version, params.sourceVersion);
       case 'block.configure': return Promise.resolve(blockEditor.configure(params));
@@ -635,6 +658,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
           // The revision changed, so the current geometry/layout event must
           // carry the new sourceVersion. The parent reconfigures explicitly.
           selection?.schedule();
+          lintEditor?.refresh();
         }
         resolve(result);
       };
@@ -699,7 +723,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         // the parent's cached backdrop without turning the ack into a snapshot.
         publish('deckchange', true);
         send(makeResponse(identity, message.id, true, result ?? null));
-      } else if ((message.method.startsWith('edit.') || message.method.startsWith('text.') || message.method.startsWith('cover.') || message.method.startsWith('block.'))) {
+      } else if ((message.method.startsWith('edit.') || message.method.startsWith('text.') || message.method.startsWith('cover.') || message.method.startsWith('block.') || message.method.startsWith('theme.') || message.method.startsWith('lint.'))) {
         // Edit acks are direct results (selection already published an
         // edit.layout event). They must not be replaced by a deck snapshot.
         send(makeResponse(identity, message.id, true, result ?? null));

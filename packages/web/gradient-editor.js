@@ -37,7 +37,7 @@ export function gradientEditor({ root, host, target, read, color, palette, previ
   const surface = document.createElement('div'); surface.className = 'gradient-surface';
   const points = document.createElement('div'); points.className = 'gradient-points';
   overlay.append(surface, points); root.append(overlay); editor.append(toolbar, menu); host.querySelector('.tv-themes').after(editor);
-  let base, fill, ground = '', nodes = [], selected = -1, frame = 0, rect, page, editingDoc, oldInert, originalHeadingInk;
+  let base, fill, ground = '', nodes = [], selected = -1, frame = 0, rect, page, editingClient, gradientSnapshot, openEpoch = 0;
   let dragChanged = false, dragging = false, adding = false, showContent = false, lastValue, addButton, hint, contentButtons = [];
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   // ページの外にあるテーマの点は、動かしても端へ寄せない（元の位置までは外へ出せる）
@@ -49,23 +49,21 @@ export function gradientEditor({ root, host, target, read, color, palette, previ
     if (dragging && dragChanged) update(true);
     editor.hidden = true; overlay.hidden = true; host.classList.remove('gradient-editing');
     cancelAnimationFrame(frame); frame = 0; dragging = false;
-    if (editingDoc) {
-      editingDoc.getElementById('gradient-preview-style')?.remove();
-      const stage = editingDoc.querySelector('#stage'); if (stage) stage.inert = oldInert;
-    }
-    editingDoc = null;
+    openEpoch++;
+    editingClient?.request('theme.gradient',{action:'close'}).catch(()=>{});
+    editingClient = null;gradientSnapshot=null;
   }
-  function geometry() {
-    const p = target(), w = p?.win, slide = w?.document.querySelector('#stage > .slide.active');
-    const el = base === '--header' ? slide?.querySelector('h2') : slide;
-    if (!el || w.document !== editingDoc || !w.frameElement || p.index !== page) return null;
-    const f = w.frameElement.getBoundingClientRect();
-    const screen = node => { const r = node.getBoundingClientRect(); return { left: f.left+r.left, top: f.top+r.top, width: r.width, height: r.height }; };
-    return { ...screen(el), slide: screen(slide) };
+  async function geometry() {
+    const p=target(),client=editingClient;
+    if(!client||p?.client!==client||!p.frame||p.index!==page)return null;
+    let data;try{data=await client.request('theme.gradient',{action:'geometry'});}catch{return null;}
+    if(!data||editingClient!==client||data.index!==page)return null;
+    gradientSnapshot=data;const f=p.frame.getBoundingClientRect();
+    return {...data,left:f.left+data.left,top:f.top+data.top,slide:{...data.slide,left:f.left+data.slide.left,top:f.top+data.slide.top}};
   }
-  function layout() {
+  async function layout() {
     if (editor.hidden) return;
-    rect = geometry();
+    const next = await geometry();if(editor.hidden)return;rect=next;
     if (!rect || !rect.width || !rect.height) { close(); return; }
     const area = root.querySelector('#stage').getBoundingClientRect();
     // 見えるスライド領域だけを覆い、テーマ欄や隣のチャットには被せない。
@@ -79,14 +77,7 @@ export function gradientEditor({ root, host, target, read, color, palette, previ
     frame = requestAnimationFrame(layout);
   }
   function content() {
-    let style = editingDoc.getElementById('gradient-preview-style');
-    if (!style) { style = editingDoc.createElement('style'); style.id = 'gradient-preview-style'; editingDoc.head.append(style); }
-    style.dataset.headingInk = originalHeadingInk || '';
-    style.textContent = '#slide-studio-theme-marks { display:none !important; } #stage, #stage * { pointer-events:none !important; user-select:none !important; }';
-    if (!showContent) {
-      style.textContent += '#stage > .slide.active *, #stage > .slide.active::before, #stage > .slide.active::after { visibility:hidden !important; }';
-      if (base === '--header') style.textContent += '#stage > .slide.active h2 { visibility:visible !important; color:transparent !important; -webkit-text-fill-color:transparent !important; }';
-    }
+    editingClient?.request('theme.gradient',{action:'content',showContent}).catch(()=>close());
     contentButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(showContent === !!i)));
   }
   function setAdding(value) {
@@ -192,8 +183,7 @@ export function gradientEditor({ root, host, target, read, color, palette, previ
   }
   // テーマの背景（表示中のページの計算後の値）を点に直す。点で表せない重ね方なら null
   function themeNodes() {
-    const slide = editingDoc?.querySelector('#stage > .slide.active'); if (!slide) return null;
-    const s = editingDoc.defaultView.getComputedStyle(slide);
+    const s=gradientSnapshot;if(!s)return null;
     const layers = s.backgroundImage === 'none' ? [] : split(s.backgroundImage).filter(l => l !== 'none');
     const out = [], num = (v, a, b) => clamp(Math.round(+v), a, b);
     for (const [i, layer] of layers.entries()) {
@@ -226,15 +216,13 @@ export function gradientEditor({ root, host, target, read, color, palette, previ
     const v = read(fill) || 'theme'; if (v === lastValue) return;
     lastValue = v; nodes = decode(v); setAdding(false); renderPoints();
   }
-  function open(key) {
+  async function open(key) {
     close(); if (locked()) return;
     fill = key; base = key === '--header-fill' ? '--header' : '--paper'; page = target()?.index;
-    editingDoc = target()?.win?.document; if (!editingDoc) return;
-    const stage = editingDoc.querySelector('#stage'); oldInert = stage?.inert;
-    rect = geometry(); if (!rect) { close(); return; }
-    stage.inert = true;
-    const headingElement = editingDoc.querySelector('#stage > .slide.active h2');
-    originalHeadingInk = headingElement ? editingDoc.defaultView.getComputedStyle(headingElement).color : null;
+    const ticket=++openEpoch,client=target()?.client;if(!client)return;editingClient=client;
+    try{gradientSnapshot=await client.request('theme.gradient',{action:'open',key});}catch{close();return;}
+    if(ticket!==openEpoch||editingClient!==client)return;
+    rect=await geometry();if(!rect||ticket!==openEpoch){if(ticket===openEpoch)close();return;}
     toolbar.replaceChildren(); showContent = false; selected = -1;
     const heading = document.createElement('div'); heading.className = 'gradient-heading';
     const title = document.createElement('strong'); title.textContent = base === '--paper' ? S.themes.background.title : S.themes.gradient.title; heading.append(title); toolbar.append(heading);

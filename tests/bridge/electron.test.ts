@@ -240,6 +240,7 @@ async function startServers(): Promise<{
         return;
       }
       if (url.pathname === "/block-design.js") { send(response, 200, "text/javascript; charset=utf-8", await readFile(join(root,"packages/web/block-design.js"),"utf8")); return; }
+      if (url.pathname === "/bridge/theme-contract.js") { send(response, 200, "text/javascript; charset=utf-8", await readFile(join(root,"packages/web/bridge/theme-contract.js"),"utf8")); return; }
       if (url.pathname === "/bridge/protocol.js") {
         send(response, 200, "text/javascript; charset=utf-8", protocolSource);
         return;

@@ -343,5 +343,43 @@
       "bridge": "/tmp/slide-studio-desktop/parity-followup-bridge.txt",
       "clean_clone": "/tmp/slide-studio-desktop/parity-followup-clone-tests.txt"
     }
+  },
+  "theme_lint_followup_2026_11_13": {
+    "status": "source_verified_packaging_pending",
+    "changes": [
+      "Theme colors, fonts, target detection and highlight rectangles run in the isolated preview frame. Original controls remain in the admin UI.",
+      "Gradient preview geometry, inert state and heading content visibility use dedicated validated commands.",
+      "Live layout warnings use bounded revision-scoped events, remeasure after resizing, theme updates and content changes.",
+      "Insertion now receives trusted pointer and bounded image/HTML clipboard events without cross-origin document access.",
+      "Finishing an inactive text session is a no-op; returning from a theme sample remains editable.",
+      "Location form waits for initial folder/recent data before accepting input, preventing late rendering from moving controls during submission."
+    ],
+    "validation": {
+      "unit_regression": {
+        "total": 440,
+        "passed": 433,
+        "skipped": 7,
+        "failed": 0
+      },
+      "electron_bridge": {
+        "passed": 33,
+        "failed": 0
+      },
+      "ui": {
+        "passed": 14,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/theme-ui-final.txt"
+      }
+    },
+    "limitations": [
+      "This batch does not establish full equivalence for all 377 original UI tests.",
+      "Native clipboard image upload has protocol boundary coverage; a real clipboard-to-save test is still pending.",
+      "Previously documented PDF rendering differences remain.",
+      "Windows and Intel Mac runtime verification and official code signing remain deferred."
+    ],
+    "logs": {
+      "regression": "/tmp/slide-studio-desktop/theme-regression.txt",
+      "bridge": "/tmp/slide-studio-desktop/theme-bridge2.txt"
+    }
   }
 }

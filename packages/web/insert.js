@@ -741,13 +741,21 @@ export function makeInsert(ctx) {
     openMath(rect, pureMath(raw), md => replaceBlock(key, raw, md));
     return true;
   }
+  let stopFrameInput=()=>{};
   ctx.insert = { anchor, dropItem, pickFiles, editMath };
   return {
     // スライドの中の貼り付けも受ける（ブロックを選んで ⌘V）
     // スライドの中を押したときも、メニュー・入力の画面の外として閉じる
-    previewLoaded(w) {
-      w?.document.addEventListener('paste', e => paste(e, true), true);
-      w?.document.addEventListener('pointerdown', () => { closeMenu(); pop?.confirm(); }, true);
+    previewLoaded() {
+      stopFrameInput();const client=ctx.preview.client;if(!client)return;
+      const current=d=>client===ctx.preview.client&&d.sourceVersion===ctx.preview.sourceVersion;
+      const pointer=client.on('insert.pointer',d=>{if(current(d)){closeMenu();pop?.confirm();}});
+      const clipboard=client.on('insert.paste',d=>{
+        if(!current(d)||dead)return;
+        const files=d.files.map(f=>new File([f.bytes],f.name,{type:f.type}));
+        addFiles(files,anchor());
+      });
+      stopFrameInput=()=>{pointer();clipboard();};
     },
     // ブロックを選んでいるときの /
     keydown(e) {
@@ -760,7 +768,7 @@ export function makeInsert(ctx) {
     },
     enterBlock: editBlock,
     destroy() {
-      dead = true; closeMenu(); closePop();
+      dead = true; stopFrameInput(); closeMenu(); closePop();
       document.removeEventListener('paste', onPaste, true); document.removeEventListener('input', slashInput);
       removeEventListener('keydown', onKey, true); removeEventListener('pointerdown', outside, true);
     },

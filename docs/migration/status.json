@@ -178,7 +178,7 @@
     }
   ],
   "next_work": [
-    "Complete theme-control and live-layout-lint frame adaptation; direct-frame legacy code remains.",
+    "Complete remaining original theme/gradient and clipboard behavior correspondences. Theme controls and live lint now use isolated-frame commands/events; this batch is recorded in full-parity-progress.json.",
     "Finish the remaining original UI correspondences (3 of 377 individually mapped; broader integration coverage is recorded separately).",
     "Finish PDF visual/text acceptance; browser-mode differences diagnosed in pdf-diagnosis-2026-11-13.json.",
     "Verify authenticated inference/recovery for every provider.",

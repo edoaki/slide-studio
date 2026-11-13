@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, {type TestContext} from 'node:test';
-import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
@@ -65,5 +65,56 @@ test('original presentation starts at current page, advances and restores editor
  assert.equal(await page.locator('#root').evaluate(el=>(el as HTMLElement).inert),false);
  await page.frameLocator('#slideBox > iframe:not(.loading)').locator('.slide.active#second').waitFor();
  assert.equal(await page.frameLocator('#slideBox > iframe:not(.loading)').locator('body').evaluate(()=>(window as any).deck.step),1);
+ assert.deepEqual(errors,[]);
+});
+
+
+test('original theme controls preview, save, undo, edit gradients and keep text editable',{timeout:90000},async t=>{
+ const {ws,page,errors}=await setup(t,'## テーマの確認 {#theme}\n\n編集できる本文。\n');
+ const path=join(ws.themes,'default.css'),original=await readFile(path,'utf8');
+ await page.getByRole('tab',{name:'テーマ',exact:true}).click();
+ const ink=page.locator('.theme-fields input[name="--ink"]');await ink.waitFor();
+ await ink.evaluate((el:HTMLInputElement)=>{el.value='#112233';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));});
+ for(let i=0;i<100;i++){if((await readFile(path,'utf8')).includes('#112233'))break;await page.waitForTimeout(50);}assert.match(await readFile(path,'utf8'),/#112233/);
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');
+ for(let i=0;i<100;i++){if(await frame.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--ink').trim())==='#112233')break;await page.waitForTimeout(50);}
+ assert.equal(await frame.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--ink').trim()),'#112233');
+ await page.locator('#undo').click();
+ for(let i=0;i<100;i++){if(await readFile(path,'utf8')===original)break;await page.waitForTimeout(50);}assert.equal(await readFile(path,'utf8'),original);
+ await page.locator('.tv-section-toggle > summary').click();await page.locator('.tv-fill-open').click();
+ await page.locator('.gradient-editor').waitFor();await page.locator('.gradient-presets [data-preset=diagonal]').click();
+ for(let i=0;i<100;i++){if((await readFile(path,'utf8')).includes('radial-gradient'))break;await page.waitForTimeout(50);}assert.match(await readFile(path,'utf8'),/radial-gradient/);
+ await page.locator('.gradient-done').click();await page.locator('.gradient-editor').waitFor({state:'hidden'});
+ await page.locator('.theme-stagebar .tv-reset').click();
+ const paragraph=frame.locator('.slide.active [data-slide-studio]').filter({hasText:'編集できる本文。'}).first();await paragraph.click();await paragraph.click();
+ await frame.locator('.slide-studio-editing').fill('テーマ編集中も編集できる本文。');await page.keyboard.press('Escape');await saved(ws,'テーマ編集中も編集できる本文。');
+ assert.equal(await page.getByRole('tab',{name:'テーマ',exact:true}).getAttribute('aria-selected'),'true');assert.deepEqual(errors,[]);
+});
+
+test('original live layout warnings mark overflow and clear after fixing the source style',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## はみ出し {#low}\n\n::: {.low}\n下の段落。\n:::\n\n## 次 {#next}\n\n本文。\n');
+ const styles=join(ws.deck_dir('talk'),'styles');await mkdir(styles,{recursive:true});const path=join(styles,'slides.css');
+ await writeFile(path,'#stage .low p {position:absolute;left:64px;top:700px;margin:0}');
+ await page.locator('.lint-badge').waitFor();await page.locator('#pagestrip button[data-index="0"] .mark.warning').waitFor();
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');await frame.locator('#slide-studio-lint .slide-studio-lint-box').first().waitFor();
+ await writeFile(path,'#stage .low p {position:static;margin:0}');
+ await page.locator('.lint-badge').waitFor({state:'hidden'});assert.deepEqual(errors,[]);
+});
+
+test('theme sample fallback selects missing table styles and returns to the editable deck',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 本文だけ {#plain}\n\n見本から戻って編集する本文。\n');
+ await page.getByRole('tab',{name:'テーマ',exact:true}).click();
+ const field=page.locator('.theme-fields label[data-key="--table-header-bg"]');await field.waitFor();await field.click();
+ const sample=page.locator('.theme-sample');await sample.waitFor();
+ const preview=page.frameLocator('.theme-sample iframe:not(.loading)');await preview.locator('.slide.active table').waitFor();
+ await preview.locator('.slide.active th').first().click();
+ await page.locator('.theme-fields label[data-key="--table-header-bg"].on').waitFor();
+ const path=join(ws.themes,'default.css');
+ await field.locator('input').evaluate((el:HTMLInputElement)=>{el.value='#334455';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));});
+ for(let i=0;i<100;i++){if((await readFile(path,'utf8')).includes('#334455'))break;await page.waitForTimeout(50);}assert.match(await readFile(path,'utf8'),/#334455/);
+ await page.locator('.theme-stagebar .tv-reset').click();await sample.waitFor({state:'hidden'});
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');
+ const paragraph=frame.locator('.slide.active [data-slide-studio]').filter({hasText:'見本から戻って編集する本文。'}).first();await paragraph.click();await frame.locator('.slide-studio-selected').first().waitFor();await paragraph.click();
+ await frame.locator('.slide-studio-editing').fill('見本から戻った後の本文。');await page.keyboard.press('Escape');await saved(ws,'見本から戻った後の本文。');
  assert.deepEqual(errors,[]);
 });

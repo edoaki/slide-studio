@@ -91,7 +91,7 @@ export function makeBlocks(ctx) {
     start: (key,html,opts) => beginText(key,html,opts),
     startHeading: point => beginText(null,'',{heading:true,point}),
     cellAt: (key,point) => ctx.preview.client.request('text.cellAt',{key,point}),
-    finish: () => textCommand('finish'), focus: () => textCommand('focus'),
+    finish: () => session && textLease ? textCommand('finish') : finishingText, focus: () => textCommand('focus'),
     command: action => textCommand(action), color: value => textCommand('color',value),
     size: value => textCommand('size',Number(value)), stepSize: value => textCommand('stepSize',value),
     clearFormat: () => textCommand('clearFormat'), linkState: () => textCommand('linkState'),

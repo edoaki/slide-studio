@@ -17,6 +17,8 @@ root.innerHTML = `<div class="brand">${S.appName}</div><h1>${T.title}</h1><p>${T
     <button type="submit" class="btn primary">${T.start}</button></div></form>`;
 const form = root.querySelector('form'), input = form.elements.path;
 let mode = 'new', current = null, busy = false;
+// Keep async recent-folder rendering from moving the form during its first click.
+form.inert = true; input.disabled = true;
 const error = e => { root.querySelector('.error').textContent = e.message; };
 async function browse(path) {
   const data = await api('/api/location/folders' + (path ? `?path=${encodeURIComponent(path)}` : ''));
@@ -59,9 +61,9 @@ form.addEventListener('submit', async e => {
   } catch (e) { error(e); }
   finally { busy = false; button.disabled = false; button.textContent = T.start; }
 });
-browse().catch(error);
+const initialBrowse = browse().catch(error);
 
-api('/api/location').then(data => {
+const initialLocations = api('/api/location').then(data => {
   if (data.current) {
     root.querySelector('.location-current').innerHTML = `<p>${T.current}: ${esc(data.current)}</p><a class="btn" href="/">${T.back}</a>`;
   }
@@ -77,3 +79,5 @@ api('/api/location').then(data => {
     };
   }
 }).catch(error);
+
+Promise.allSettled([initialBrowse, initialLocations]).then(() => {form.inert = false; input.disabled = false;});

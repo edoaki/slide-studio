@@ -12,7 +12,8 @@ test('original materials panel uploads, previews, renames, deletes and undoes in
 
   const ws=Workspace.open(join(temp,'workspace'));ws.new_deck('talk','test');
   const env:Record<string,string>=Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string,string]=>entry[1]!==undefined));env.SLIDE_STUDIO_ELECTRON_HOME=join(temp,'profile');delete env.ELECTRON_RUN_AS_NODE;
-  const app=await _electron.launch({executablePath:require('electron'),args:[join(process.cwd(),'dist/apps/desktop/main.js'),'--root',ws.root],env});
+ const installed=process.env.SLIDE_STUDIO_TEST_APP;
+  const app=await _electron.launch({executablePath:installed?.endsWith('.app')?join(installed,'Contents/MacOS/Slide Studio'):installed||require('electron'),args:[...(installed?[]:[join(process.cwd(),'dist/apps/desktop/main.js')]),'--root',ws.root],env});
   t.after(async()=>{await app.close();await rm(temp,{recursive:true,force:true});});
   const page=await app.firstWindow();const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.waitForFunction(()=>!!sessionStorage.getItem('slide-studio:admin-token'));

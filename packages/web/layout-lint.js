@@ -37,8 +37,12 @@ export function makeLayoutLint(ctx) {
     const next = pages.find(i => i > ctx.preview.index) ?? pages[0];
     if (next != null) ctx.preview.go(next, 0);
   };
-  const listen = w => { off?.(); off = w?.slideStudioLint?.subscribe(update) ?? null; };
-  listen(ctx.preview.win);
+  const listen = () => {
+    off?.();const client=ctx.preview.client;
+    off=client?.on('edit.lint',data=>{if(client===ctx.preview.client&&data.sourceVersion===ctx.preview.sourceVersion)update(data.issues);})??null;
+    client?.request('lint.inspect',{}).then(issues=>{if(client===ctx.preview.client)update(issues);}).catch(()=>{});
+  };
+  listen();
 
   return {
     previewLoaded: listen,

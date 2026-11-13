@@ -313,7 +313,7 @@ interface FeatureRoute {
 
 /** Restored UI assets and its private bridge client. Unknown files are never served. */
 export const LEGACY_WEB_FILES: readonly string[] = Object.freeze([
-  "bridge/agent-client.js", "bridge/protocol.js",
+  "bridge/agent-client.js", "bridge/protocol.js", "bridge/theme-contract.js",
   "agents.js", "ai-model.js", "api.js", "app.css", "app.html", "app.js",
   "asset-preview.js", "assets.js", "bib-view.js", "bibliography.js",
   "block-design.js", "block-drag.js", "block-handles.js", "block-nav.js",

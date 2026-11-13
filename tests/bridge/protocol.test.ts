@@ -283,3 +283,40 @@ test("citation keys cross the preview boundary as bounded copied data", () => {
  for(const invalid of [[null], [""], ["x".repeat(4097)],Array(4097).fill("paper")])
   assert.equal(p.validateSnapshot({...value,slides:[{...slide,cites:invalid}]},identity),false);
 });
+
+
+test("theme commands restrict CSS keys, values and gradient operations", () => {
+  const valid = (method:string,params:Record<string,unknown>) => p.validateRequest({protocol:p.PROTOCOL,type:"request",id:1,...identity,method,params},identity);
+  assert.equal(valid("theme.preview",{vars:{"--ink":"#112233"},values:{"--header-fill":"linear-gradient(90deg, red, blue)"},shown:true}),true);
+  for(const values of [{"--unknown":"red"},{"--ink":"red;display:none"},{"--ink":"url(https://example.com)"},{"--ink":"x".repeat(4097)}])
+    assert.equal(valid("theme.preview",{vars:{},values,shown:true}),false);
+  assert.equal(valid("theme.gradient",{action:"open",key:"--header-fill"}),true);
+  assert.equal(valid("theme.gradient",{action:"open",key:"body"}),false);
+  assert.equal(valid("theme.gradient",{action:"eval",code:"alert(1)"}),false);
+  assert.equal(valid("theme.mark",{key:"--ink"}),true);
+  assert.equal(valid("theme.mark",{key:"#admin"}),false);
+});
+test("lint events bound geometry and source keys; theme selections require trusted input", () => {
+  const issue={slide:0,block:"p0/0",message:"overflow",short:"overflow",side:"bottom",rects:[{x:0,y:700,w:100,h:30}],area:null};
+  const valid=(x:unknown)=>p.validateEvent(p.makeEvent(identity,"edit.lint",{sourceVersion:"v1",issues:[x]}),identity);
+  assert.equal(valid(issue),true);
+  assert.equal(valid({...issue,block:42}),false);
+  assert.equal(valid({...issue,rects:[{x:Infinity,y:0,w:1,h:1}]}),false);
+  assert.equal(valid({...issue,area:{x:0,y:0,w:1,h:NaN}}),false);
+  assert.equal(valid({...issue,message:"x".repeat(16385)}),false);
+  const select={sourceVersion:"v1",key:"--ink",index:0,trusted:true};
+  assert.equal(p.validateEvent(p.makeEvent(identity,"theme.select",select),identity),true);
+  assert.equal(p.validateEvent(p.makeEvent(identity,"theme.select",{...select,trusted:false}),identity),false);
+});
+
+test("clipboard bridge accepts only trusted bounded image or HTML file payloads", () => {
+  const file={name:"picture.png",type:"image/png",bytes:new ArrayBuffer(8)};
+  const data={sourceVersion:"v1",trusted:true,files:[file]};
+  const valid=(payload:unknown)=>p.validateEvent(p.makeEvent(identity,"insert.paste",payload),identity);
+  assert.equal(valid(data),true);
+  assert.equal(valid({...data,trusted:false}),false);
+  assert.equal(valid({...data,files:[{...file,bytes:"not bytes"}]}),false);
+  assert.equal(valid({...data,files:[{...file,name:"script.js",type:"text/javascript"}]}),false);
+  assert.equal(valid({...data,files:Array(33).fill(file)}),false);
+  assert.equal(valid({...data,files:[{...file,bytes:new ArrayBuffer(32*1024*1024+1)}]}),false);
+});

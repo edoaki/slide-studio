@@ -71,6 +71,13 @@ export type LayoutCommand =
   | {method:"cover.select";params:{selected:boolean}}
   | {method:"block.configure";params:{sourceVersion:string;key:string|null;live:boolean;padMode:"inner"|"outer"|"gap"|null;color:string;text?:string;structure?:Record<string,unknown>}}
   | {method:"block.dropAt";params:EditPoint};
+export type ThemeCommand =
+  | {method:"theme.configure";params:{shown:boolean;sample:boolean}}
+  | {method:"theme.preview";params:{vars:Record<string,string>;values:Record<string,string>;shown:boolean}}
+  | {method:"theme.inspect";params:{key?:string}}
+  | {method:"theme.mark";params:{key:string|null}}
+  | {method:"theme.gradient";params:{action:"open";key:string}|{action:"content";showContent:boolean}|{action:"close"|"geometry"}}
+  | {method:"lint.inspect";params:Record<string,never>};
 export type SelectionIntent = {
   sourceVersion: string; sequence: number;
 } & (
@@ -86,7 +93,7 @@ export type SelectionIntent = {
 export interface FrameHello {
   protocol: typeof EDIT_BRIDGE_PROTOCOL; type: "hello"; nonce: string;
 }
-export type FrameRequest = (NavigationCommand | SelectionCommand | TextCommand | LayoutCommand) & FrameIdentity & {
+export type FrameRequest = (NavigationCommand | SelectionCommand | TextCommand | LayoutCommand | ThemeCommand) & FrameIdentity & {
   protocol: typeof EDIT_BRIDGE_PROTOCOL; type: "request"; id: number;
 };
 export interface FrameResponse extends FrameIdentity {
@@ -95,7 +102,7 @@ export interface FrameResponse extends FrameIdentity {
 }
 export type FrameEvent = FrameIdentity & {
   protocol: typeof EDIT_BRIDGE_PROTOCOL; type: "event";
-  event: "ready" | "deckchange" | "layout" | "key" | "link.open" | "failure" | "edit.layout" | "edit.intent" | "text.state" | "text.heading" | "cover.intent" | "block.intent";
+  event: "ready" | "deckchange" | "layout" | "key" | "link.open" | "failure" | "edit.layout" | "edit.intent" | "text.state" | "text.heading" | "cover.intent" | "block.intent" | "theme.select" | "edit.lint" | "insert.pointer" | "insert.paste";
   data: unknown;
 };
 // Text sessions carry source revisions and single-session leases; frame events

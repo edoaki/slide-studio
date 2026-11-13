@@ -1,3 +1,4 @@
+import { themeKey, themeValues } from './theme-contract.js';
 import { DESIGN_VARS } from '../block-design.js';
 // Shared, dependency-free contract for the staged secure preview bridge.
 // This file is the runtime half of packages/contracts/src/edit-bridge.ts. Keep
@@ -7,7 +8,7 @@ export const PROTOCOL = 'slide-studio-edit/1';
 
 export const EVENT_TYPES = Object.freeze([
   'ready', 'deckchange', 'layout', 'key', 'link.open', 'failure',
-  'edit.layout', 'edit.intent', 'text.state', 'text.heading', 'cover.intent', 'block.intent',
+  'insert.pointer', 'insert.paste', 'edit.lint', 'theme.select', 'edit.layout', 'edit.intent', 'text.state', 'text.heading', 'cover.intent', 'block.intent',
 ]);
 
 // Stage 1 only forwards presentation keys. Keep this an allowlist; do not
@@ -18,7 +19,7 @@ export const KEY_ALLOWLIST = Object.freeze(['Escape', 'f']);
 // HTML, JavaScript, selectors, filesystem paths or an arbitrary remote URL.
 export const COMMAND_METHODS = Object.freeze([
   'go', 'move', 'jump', 'goStage', 'resize', 'setFilter', 'theme.swap', 'finish', 'pageWheel',
-  'edit.configure', 'edit.select', 'edit.hover', 'edit.designing', 'edit.measure', 'edit.locks', 'edit.issues', 'edit.markStep', 'text.begin', 'text.command', 'text.cellAt', 'edit.themeValues', 'edit.themePreview', 'cover.inspect', 'cover.configure', 'cover.select', 'block.configure', 'block.dropAt', 'block.clear', 'block.cancel',
+  'lint.inspect', 'theme.configure', 'theme.preview', 'theme.inspect', 'theme.mark', 'theme.gradient', 'edit.configure', 'edit.select', 'edit.hover', 'edit.designing', 'edit.measure', 'edit.locks', 'edit.issues', 'edit.markStep', 'text.begin', 'text.command', 'text.cellAt', 'edit.themeValues', 'edit.themePreview', 'cover.inspect', 'cover.configure', 'cover.select', 'block.configure', 'block.dropAt', 'block.clear', 'block.cancel',
 ]);
 
 const MAX_SLIDES = 10000;
@@ -449,6 +450,12 @@ export function validateParams(method, params) {
       if (params.action === 'align') return ['left','center','right','justify'].includes(params.value);
       if (params.action === 'setLink') return (params.value == null || isSafeString(params.value, {allowEmpty:true,max:8192})) && (params.text == null || isSafeString(params.text, {allowEmpty:true,max:100000}));
       return false;
+    case 'lint.inspect': return Object.keys(params).length===0;
+    case 'theme.configure': return isBoolean(params.shown) && isBoolean(params.sample);
+    case 'theme.preview': return themeValues(params.vars) && themeValues(params.values) && isBoolean(params.shown);
+    case 'theme.inspect': return params.key === undefined || themeKey(params.key);
+    case 'theme.mark': return params.key === null || themeKey(params.key);
+    case 'theme.gradient': return params.action === 'open' ? ['--header-fill','--background-fill','--section-fill','--cover-fill'].includes(params.key) : params.action === 'content' ? isBoolean(params.showContent) : ['close','geometry'].includes(params.action);
     case 'edit.configure':
       return validateEditConfigure(params);
     case 'edit.select':
@@ -550,6 +557,27 @@ export function validateEvent(value, expected) {
     return isBoolean(data.mods.shift) && isBoolean(data.mods.alt)
       && isBoolean(data.mods.ctrl) && isBoolean(data.mods.meta);
   }
+  if (value.event === 'insert.pointer' || value.event === 'insert.paste') {
+    const d=value.data;
+    if(!isRecord(d)||d.trusted!==true||!isSafeString(d.sourceVersion,{max:256}))return false;
+    if(value.event==='insert.pointer')return true;
+    return Array.isArray(d.files)&&d.files.length>0&&d.files.length<=32&&d.files.every(f=>isRecord(f)
+      &&isSafeString(f.name,{max:4096})&&isSafeString(f.type,{allowEmpty:true,max:256})
+      &&(f.type.startsWith('image/')||/\.html?$/i.test(f.name))&&f.bytes instanceof ArrayBuffer)
+      &&d.files.reduce((n,f)=>n+f.bytes.byteLength,0)<=32*1024*1024;
+  }
+  if (value.event === 'edit.lint') {
+    const rect = r => isRecord(r) && ['x','y','w','h'].every(k => Number.isFinite(r[k]) && Math.abs(r[k]) <= 1000000);
+    return isRecord(value.data) && isSafeString(value.data.sourceVersion,{max:256})
+      && Array.isArray(value.data.issues) && value.data.issues.length <= 2048
+      && value.data.issues.every(x => isRecord(x) && isFiniteInteger(x.slide,0,MAX_SLIDES)
+        && (x.block === null || isEditKey(x.block))
+        && isSafeString(x.message,{allowEmpty:true,max:16384}) && isSafeString(x.short,{allowEmpty:true,max:16384})
+        && [null,'left','right','top','bottom'].includes(x.side)
+        && Array.isArray(x.rects) && x.rects.length <= 256 && x.rects.every(rect)
+        && (x.area === null || rect(x.area))) && JSON.stringify(value.data).length <= 1500000;
+  }
+  if (value.event === 'theme.select') return isRecord(value.data) && value.data.trusted === true && themeKey(value.data.key) && isFiniteInteger(value.data.index,0,MAX_SLIDES) && isSafeString(value.data.sourceVersion,{max:256});
   if (value.event === 'block.intent') return validBlockIntent(value.data);
   if (value.event === 'cover.intent') return validEditEnvelope(value.data) && value.data.trusted === true && ['select','layout','commit'].includes(value.data.kind) && validCoverState(value.data.state);
   if (value.event === 'text.heading') return isRecord(value.data) && value.data.trusted === true && isSafeString(value.data.sourceVersion,{max:256}) && isRecord(value.data.point) && ['x','y'].every(k=>Number.isFinite(value.data.point[k]));
