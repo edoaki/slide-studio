@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -37,5 +37,21 @@ test('original materials panel uploads, previews, renames, deletes and undoes in
   await renamed.waitFor({state:'detached'});
   await page.keyboard.press('Meta+z');await renamed.waitFor();
   assert.equal(await readFile(join(ws.deck_dir('talk'),'materials/結果/renamed.csv'),'utf8'),'x,y\n1,2\n');
+  // Folder import retains bytes and previews Shift_JIS, as in the old app.
+  const imported=join(temp,'results');await mkdir(imported);
+  const sjis=Buffer.from([0x90,0xb8,0x93,0x78,...Buffer.from(',0.93\n')]);
+  await writeFile(join(imported,'精度.csv'),sjis);
+  const folderChooser=page.waitForEvent('filechooser');
+  await page.getByRole('button',{name:'パソコンからフォルダを追加',exact:true}).click();
+  await (await folderChooser).setFiles(imported);
+  const importedRow=page.locator('.mt-row[data-path="結果/results/精度.csv"]');
+  await importedRow.waitFor();await importedRow.click();
+  await page.waitForFunction(()=>document.querySelector('.mt-pvb pre')?.textContent==='精度,0.93\n');
+  assert.deepEqual(await readFile(join(ws.deck_dir('talk'),'materials/結果/results/精度.csv')),sjis);
+  await app.evaluate(({shell})=>{shell.openPath=async path=>{(globalThis as any).openedMaterial=path;return '';};});
+  const opened=page.waitForResponse(r=>r.url().endsWith('/materials/open')&&r.status()===200);
+  await page.getByRole('button',{name:'既定のアプリで開く',exact:true}).click();await opened;
+  assert.equal(await app.evaluate(()=>(globalThis as any).openedMaterial),join(ws.deck_dir('talk'),'materials/結果/results/精度.csv'));
+  await page.getByRole('tab',{name:'スライド',exact:true}).click();assert.equal(await page.locator('.mt-pv').isVisible(),false);
   assert.deepEqual(errors,[]);
 });

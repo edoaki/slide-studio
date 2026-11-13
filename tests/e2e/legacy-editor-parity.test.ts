@@ -186,3 +186,27 @@ test('preview resizing immediately uses the current viewport and ignores delayed
  }
  assert.deepEqual(errors,[]);
 });
+
+for(const action of ['export','present'] as const)for(const failFirst of [false,true])test(`new block is committed before ${action} failFirst=${failFirst}`,{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,DOC);let fail=failFirst,requests=0;
+ await page.route('**/api/deck/talk/chunks',async route=>{
+  if(route.request().postDataJSON()?.action==='markdown'){await new Promise(r=>setTimeout(r,250));if(fail){await route.fulfill({status:503,json:{error:'conversion unavailable'}});return;}}
+  await route.continue();
+ });
+ await page.route('**/api/deck/talk/build',async route=>{requests++;assert.match(await readFile(ws.qmd('talk'),'utf8'),/操作前の新規入力/);await route.fulfill({json:{files:[]}});});
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');await frame.locator('.slide.active p').filter({hasText:'最初の段落。'}).click();await page.keyboard.press('Alt+KeyS');await frame.locator('.slide-studio-editing').fill('操作前の新規入力');
+ // Keyboard/assistive activation does not dispatch pointerdown to finish the input.
+ const activate=async()=>{
+  if(action==='export'){
+   if(!await page.locator('.output-popover').count())await page.locator('[data-output=build]').evaluate((e:HTMLButtonElement)=>e.click());
+   await page.locator('[data-format=html]').evaluate((e:HTMLButtonElement)=>e.click());
+  }else await page.locator('.present-tools button').first().evaluate((e:HTMLButtonElement)=>e.click());
+ };
+ await activate();
+ if(failFirst){
+  await page.waitForTimeout(800);assert.equal(requests,0);assert.equal(await page.locator('.present-screen').count(),0);assert.doesNotMatch(await readFile(ws.qmd('talk'),'utf8'),/操作前の新規入力/);assert.equal(await page.locator('#status').innerText(),'保存待ち');fail=false;await activate();
+ }
+ if(action==='export')await page.locator('.output-body .done').waitFor();
+ else await page.frameLocator('.present-screen iframe').locator('.slide.active').filter({hasText:'操作前の新規入力'}).waitFor();
+ const text=await readFile(ws.qmd('talk'),'utf8');assert.equal(text.split('操作前の新規入力').length,2);assert.deepEqual(errors,[]);
+});

@@ -965,6 +965,13 @@ export function makeBlocks(ctx) {
     saved() { draw(); },
     // 保存待ちを確かめる前（AI に送る前など）に、スライドで打った分を原稿へ反映する
     async flush() {
+      // Actions invoked without pointerdown (keyboard/assistive activation)
+      // must also commit a new block before exporting, presenting or using AI.
+      await finishingText;
+      if (session?.created) {
+        await legacyEdit()?.finish?.();
+        if (pendingCreation || session?.created) return false;
+      }
       if (!await commitCreation()) return false;
       return session && !session.created ? sync(session) : true;
     },

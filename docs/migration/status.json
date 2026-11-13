@@ -144,6 +144,11 @@
       "name": "navigation_spacing_resize_followup_2026_11_13",
       "result": "Feature-scoped verification only: save-safe navigation and conversion recovery; symmetric editor margins at 390/600 px; immediate preview scaling and stale-size rejection. Current arm64 app installed from DMG and reopened, runtime cdc91ff. No whole-product suite rerun.",
       "details": "full-parity-progress.json#preview_resize_followup_2026_11_13"
+    },
+    {
+      "name": "action_flush_materials_followup_2026_11_13",
+      "result": "Fixed unsaved new blocks reaching export/presentation when activated without pointerdown. Seven focused cases passed; materials folder/encoding/native-open parity checked separately. No full suite or installer rebuild.",
+      "details": "full-parity-progress.json#action_flush_materials_followup_2026_11_13"
     }
   ],
   "signing": {
