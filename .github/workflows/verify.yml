@@ -25,4 +25,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run setup:pandoc
       - run: npm test
+        env:
+          SLIDE_STUDIO_PANDOC: ${{ github.workspace }}/resources/pandoc/bin/pandoc
