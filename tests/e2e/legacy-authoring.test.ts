@@ -207,3 +207,73 @@ test('heading design is AI-only while direct heading text color preserves the de
  await code.press('Escape');await page.locator('#undo').click();await waitCss(path,s=>s===designed);await page.locator('#redo').click();await waitCss(path,s=>s.includes('#123abc'));await page.reload();await page.getByRole('tab',{name:'テーマ',exact:true}).click();await color.waitFor();assert.equal(await color.inputValue(),'#123abc');assert.deepEqual(await design(),beforeDesign);assert.deepEqual(errors,[]);
  if(process.env.SLIDE_STUDIO_TEST_SCREENSHOT){await color.scrollIntoViewIfNeeded();await page.screenshot({path:process.env.SLIDE_STUDIO_TEST_SCREENSHOT});}
 });
+
+test('page counter stays centered while step count appears, advances and disappears',{timeout:60000},async t=>{
+ const {page,errors}=await setup(t,'## 一枚目 {#one}\n\n本文。\n\n## 段階 {#steps}\n\n::: {data-step="1"}\n段落A。\n:::\n\n::: {data-step="2"}\n段落B。\n:::\n\n## 最後 {#last}\n\n本文。\n');
+ const counter=page.locator('#pageCount'),steps=page.locator('#stepCount'),original=await counter.boundingBox();assert.ok(original);
+ const centered=async()=>{const c=await counter.boundingBox(),p=await page.locator('#stepPrev').boundingBox(),n=await page.locator('#stepNext').boundingBox();assert.ok(c&&p&&n);assert.ok(Math.abs(c.x+c.width/2-(p.x+p.width/2+n.x+n.width/2)/2)<1);assert.ok(Math.abs(c.x-original.x)<1);assert.ok(Math.abs(c.width-original.width)<1);};
+ assert.equal(await counter.innerText(),'1ページ');assert.equal(await steps.isVisible(),false);await centered();
+ await page.locator('#pagestrip button[data-index="1"]').click();
+ for(const value of ['1 / 3','2 / 3','3 / 3']){await page.waitForFunction(value=>document.querySelector('#stepCount')?.textContent===value,value);await centered();await page.locator('#stepNext').click();}
+ await page.waitForFunction(()=>document.querySelector('#pageCount')?.textContent==='3ページ');assert.equal(await steps.isVisible(),false);assert.equal(await steps.textContent(),'');await centered();assert.deepEqual(errors,[]);
+});
+
+test('block alignment cycles left center right and removes its wrapper on return to left',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 揃え {#align}\n\n揃えを変える本文。\n');const original=await readFile(ws.qmd('talk'),'utf8');
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');await frame.locator('.slide.active p').click();const bar=page.locator('#blockTools'),align=bar.getByRole('button',{name:'揃え',exact:true});assert.equal(await align.getAttribute('data-align'),'left');
+ for(const value of ['center','right','left']){
+  await align.click();await page.waitForFunction(value=>document.querySelector('#blockTools [data-align]')?.getAttribute('data-align')===value,value);
+  for(let i=0;i<100;i++){const text=await readFile(ws.qmd('talk'),'utf8');if(value==='left'?text===original:text.includes(`text-align:${value}`))break;await page.waitForTimeout(50);}
+  const text=await readFile(ws.qmd('talk'),'utf8');if(value==='left')assert.equal(text,original);else assert.ok(text.includes(`text-align:${value}`));assert.equal(await bar.getByRole('group',{name:'揃え',exact:true}).count(),0);
+  await page.locator('#stage[data-blocks=ready]').waitFor();
+ }
+ assert.deepEqual(errors,[]);
+});
+
+test('step menu groups paragraphs, shows peer count, aligns and undoes without losing steps',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 段階 {#steps}\n\n最初の段落。\n\n二番目の段落。\n');
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)'),bar=page.locator('#blockTools');await frame.locator('p').filter({hasText:'最初の段落。'}).click();
+ await bar.getByRole('button',{name:'段階表示',exact:true}).click();assert.deepEqual(await bar.locator('.step-chip').allTextContents(),['0 → ①','1 → ②']);await bar.getByRole('button',{name:'段 1（新しい段）',exact:true}).click();await saved(ws,'data-step="1"');
+ await page.locator('#stage[data-blocks=ready]').waitFor();await page.locator('#qblocks .page.cur .step-badge').filter({hasText:'2'}).waitFor();assert.equal(await frame.locator('.slide-studio-step-badge').count(),0);
+ await frame.locator('p').filter({hasText:'二番目の段落。'}).click();await bar.getByRole('button',{name:'段階表示',exact:true}).click();assert.deepEqual(await bar.locator('.step-chip').allTextContents(),['0 → ①','1 → ②','2 → ③']);const peer=bar.getByRole('button',{name:'段 1・ほかに 1 個',exact:true});await peer.hover();await frame.locator('.slide-studio-step-mark').waitFor({state:'attached'});await peer.click();
+ for(let i=0;i<100;i++){if((await readFile(ws.qmd('talk'),'utf8')).split('data-step="1"').length===3)break;await page.waitForTimeout(50);}assert.equal((await readFile(ws.qmd('talk'),'utf8')).split('data-step="1"').length,3);
+ await bar.getByRole('button',{name:'揃え',exact:true}).click();await saved(ws,'text-align:center');await page.locator('#undo').click();
+ for(let i=0;i<100;i++){if(!(await readFile(ws.qmd('talk'),'utf8')).includes('text-align:center'))break;await page.waitForTimeout(50);}const text=await readFile(ws.qmd('talk'),'utf8');assert.ok(!text.includes('text-align:center'));assert.equal(text.split('data-step="1"').length,3);assert.deepEqual(errors,[]);
+});
+
+test('incremental list menu persists steps and remains editable after reload',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 項目 {#list}\n\n- 最初\n- 次\n');const frame=page.frameLocator('#slideBox > iframe:not(.loading)'),bar=page.locator('#blockTools');
+ await frame.locator('.slide.active li').first().click();
+ await bar.getByRole('button',{name:'段階表示',exact:true}).click();await bar.getByRole('checkbox',{name:'1項目ずつ',exact:true}).check();await saved(ws,'.incremental data-step="0"');
+ await page.reload();await page.locator('#stage[data-blocks=ready]').waitFor();const items=frame.locator('.incremental > ul > li');assert.equal(await items.nth(0).getAttribute('data-step'),'0');assert.equal(await items.nth(1).getAttribute('data-step'),'1');assert.equal(await items.nth(1).isVisible(),true);
+ await items.first().click();await bar.getByRole('button',{name:'段階表示',exact:true}).click();assert.equal(await bar.getByRole('checkbox',{name:'1項目ずつ',exact:true}).isChecked(),true);
+ assert.equal(await items.nth(1).evaluate(el=>getComputedStyle(el).opacity),'0.28');
+ if(process.env.SLIDE_STUDIO_STEP_SCREENSHOT)await page.screenshot({path:process.env.SLIDE_STUDIO_STEP_SCREENSHOT});
+ await page.keyboard.press('Escape');await page.evaluate(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(Error('test denial'));});await page.getByRole('button',{name:'最初から',exact:true}).click();
+ const player=page.frameLocator('.present-screen iframe');await player.locator('.slide.active').waitFor();assert.equal(await player.locator('.incremental > ul > li').nth(1).isVisible(),false);await page.keyboard.press('Escape');await page.locator('.present-screen').waitFor({state:'detached'});assert.deepEqual(errors,[]);
+});
+
+test('alignment during direct text editing saves and undoes after leaving the text session',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 文字編集 {#align}\n\n本文。\n'),frame=page.frameLocator('#slideBox > iframe:not(.loading)');const paragraph=frame.locator('.slide.active p');await paragraph.click();await paragraph.click();await frame.locator('.slide-studio-editing').waitFor();
+ const bar=page.locator('#blockTools'),align=bar.getByRole('button',{name:'揃え',exact:true});await align.click();await page.waitForFunction(()=>document.querySelector('#blockTools [data-align]')?.getAttribute('data-align')==='center');await align.click();await saved(ws,'text-align:right');await bar.getByRole('button',{name:'外側を選択',exact:true}).click();await page.locator('#stage[data-blocks=ready]').waitFor();await page.locator('#undo').click();
+ for(let i=0;i<100;i++){if(!(await readFile(ws.qmd('talk'),'utf8')).includes('text-align:right'))break;await page.waitForTimeout(50);}assert.ok(!(await readFile(ws.qmd('talk'),'utf8')).includes('text-align:right'));assert.deepEqual(errors,[]);
+});
+
+for(const prefix of ['', '😀'])test(`PDF step checkbox preserves heading and final-step inclusion with prefix ${prefix||'none'}`,{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,`## ${prefix}段階 {#steps}\n\n::: {data-step="1"}\n最初。\n:::\n\n::: {data-step="2"}\n次。\n:::\n`);const box=page.locator('#pdfStep');if(prefix){await writeFile(ws.qmd('talk'),(await readFile(ws.qmd('talk'),'utf8')).replace('title: 編集の確認',`title: ${prefix}編集の確認`));await page.reload();await page.locator('#stage[data-blocks=ready]').waitFor();}await page.waitForFunction(()=>document.querySelector('#stepCount')?.textContent==='1 / 3');assert.equal(await box.isChecked(),false);
+ await box.check();await saved(ws,`## ${prefix}段階 {#steps pdf="1"}`);await page.locator('#stepNext').click();await page.locator('#stepNext').click();await page.waitForFunction(()=>document.querySelector('#stepCount')?.textContent==='3 / 3');assert.equal(await box.isChecked(),true);assert.equal(await box.isDisabled(),true);
+ await page.locator('#stepPrev').click();await page.waitForFunction(()=>document.querySelector('#stepCount')?.textContent==='2 / 3');await box.check();await saved(ws,`## ${prefix}段階 {#steps pdf="1 2"}`);await page.locator('#stepPrev').click();await page.waitForFunction(()=>document.querySelector('#stepCount')?.textContent==='1 / 3');await box.uncheck();await saved(ws,`## ${prefix}段階 {#steps pdf="2"}`);
+ await page.reload();await page.locator('#stage[data-blocks=ready]').waitFor();const frame=page.frameLocator('#slideBox > iframe:not(.loading)');assert.deepEqual(await frame.locator('body').evaluate(()=>(window as any).deck.pdfSteps(0)),[1,2]);assert.deepEqual(errors,[]);
+});
+
+test('preview replacement waits for an in-flight step move and preserves its destination',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 更新前 {#steps}\n\n::: {data-step="1"}\n最初。\n:::\n\n::: {data-step="2"}\n次。\n:::\n');
+ await page.locator('#stepNext').click();await page.locator('#stepNext').click();await page.waitForFunction(()=>document.querySelector('#stepCount')?.textContent==='3 / 3');
+ const old=await (await page.locator('#slideBox > iframe:not(.loading)').elementHandle())!.contentFrame();assert.ok(old);
+ await old.evaluate(()=>{const w=window as any,move=w.deck.move.bind(w.deck);w.deck.move=async(delta:number)=>{w.__moveStarted=true;await new Promise<void>(resolve=>w.__releaseMove=resolve);return move(delta);};});
+ await page.locator('#stepPrev').click();await old.waitForFunction(()=>(window as any).__moveStarted);
+ await writeFile(ws.qmd('talk'),(await readFile(ws.qmd('talk'),'utf8')).replace('更新前','更新後'));
+ await page.locator('#slideBox > iframe.loading').waitFor({state:'attached'});const pending=page.frameLocator('#slideBox > iframe.loading');await pending.locator('body').evaluate(async()=>{await (window as any).deckReady;});
+ assert.equal(old.isDetached(),false);await old.evaluate(()=>(window as any).__releaseMove());
+ await page.frameLocator('#slideBox > iframe:not(.loading)').locator('h2').filter({hasText:'更新後'}).waitFor();await page.waitForFunction(()=>document.querySelector('#stepCount')?.textContent==='2 / 3');assert.deepEqual(errors,[]);
+});

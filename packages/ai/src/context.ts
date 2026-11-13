@@ -67,6 +67,7 @@ export function prompt(ws: Workspace, deck: string, mode: Mode, items: Item[], a
     talk ? '[話し合い] ファイルを変えずに質問・相談に答える。分からないことは推測で埋めない。'
       : `[指示の数] ${items.length} 件。変えるのは各件の対象の範囲だけ。意図が不明・資料が不足する場合は推測で変えず、その件の ok を false にする。利用者への確認は questions に入れる。`,
   ];
+  if (mode === 'slides' && !talk) lines.push('[HTML 編集のルール] 要素の名前・概念説明を除き、各 step に書く本文は基本的にメインメッセージ1文を1ブロックにまとめる。');
   lines.push(...prompt_lines(ws, deck));
   for (const attachment of attach) {
     const folder = attachment.kind === 'image' ? ws.asset_root(deck) : ws.deck_dir(deck);

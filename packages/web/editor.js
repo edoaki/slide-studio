@@ -401,8 +401,8 @@ export function mountEditor(root, deck) {
     });
   }
   ctx.renderStrip = renderStrip;
-  $('#stepPrev', root).onclick = () => preview.api?.move(-1);
-  $('#stepNext', root).onclick = () => preview.api?.move(1);
+  $('#stepPrev', root).onclick = () => preview.move(-1);
+  $('#stepNext', root).onclick = () => preview.move(1);
 
   // ------------------------------------------------------------ 変換の結果
   function showRender(ev) {
@@ -563,13 +563,13 @@ export function mountEditor(root, deck) {
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); preview.go(preview.index + (e.key === 'ArrowDown' ? 1 : -1)); }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault(); if (held) return; held = e.key; long = false;
-      holdTimer = setTimeout(() => { long = true; preview.api.jump(e.key === 'ArrowRight' ? 1 : -1); }, 450);
+      holdTimer = setTimeout(() => { long = true; preview.jump(e.key === 'ArrowRight' ? 1 : -1); }, 450);
     }
   }
   function keyup(e) {
     if (e.key !== held) return;
     clearTimeout(holdTimer);
-    if (!long) preview.api?.move(e.key === 'ArrowRight' ? 1 : -1);
+    if (!long) preview.move(e.key === 'ArrowRight' ? 1 : -1);
     held = null;
   }
   addEventListener('keydown', keydown); addEventListener('keyup', keyup);

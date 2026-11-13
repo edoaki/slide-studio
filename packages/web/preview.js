@@ -34,6 +34,7 @@ export class Preview {
     this.fitFrame = 0;
     this.editLayoutListeners = new Set();
     this.editIntentListeners = new Set();
+    this.navigation = new Set();
     // 枠の大きさが変わったら、同じフレームのうちに中の縮尺も合わせる。
     // iframe の中の ResizeObserver だけだと1フレーム遅れ、広げた分が一瞬むき出しになる。
     // The bridge call is asynchronous now; coalesce to one resize per frame.
@@ -167,12 +168,13 @@ export class Preview {
         f.remove();
         return;
       }
-      // 読み込みを待つ間にユーザーが移ったページを引き継ぐ。The user can
-      // move again while this RPC is in flight, so retry a bounded number of
-      // times before swapping the frames.
-      for (let attempt = 0; attempt < 3; attempt += 1) {
+      // Drain commands sent to the visible frame before retiring it. A move
+      // can be in flight even though its deckchange snapshot has not arrived.
+      while (true) {
+        await this.settleNavigation();
         const want = [this.index, this.step];
         await client.api.go(want[0], want[1]);
+        await this.settleNavigation();
         if (token !== this.loadSeq || this.pending !== f || this.destroyed) {
           client.destroy();
           unregisterFrameClient(f, client);
@@ -259,7 +261,20 @@ export class Preview {
     // Record the user's target before the asynchronous RPC so a pending reload
     // can carry the newest position across the swap.
     this.index = index; this.step = step;
-    return this.api?.go(index, step);
+    return this.navigate('go', index, step);
+  }
+  move(delta) { return this.navigate('move', delta); }
+  jump(delta) { return this.navigate('jump', delta); }
+  navigate(method, ...args) {
+    const pending = this.api?.[method](...args);
+    if (!pending) return pending;
+    this.navigation.add(pending);
+    const done = () => this.navigation.delete(pending);
+    pending.then(done, done);
+    return pending;
+  }
+  async settleNavigation() {
+    while (this.navigation.size) await Promise.allSettled([...this.navigation]);
   }
   destroy() {
     this.destroyed = true;

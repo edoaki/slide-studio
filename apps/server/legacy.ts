@@ -822,7 +822,6 @@ function injectPreview(
       + ` data-studio-mode="${input.mode}"`
       + ` src="${escapeAttribute(input.contentOrigin)}/bridge/frame-agent.classic.js"></script>`,
     `<script>${flags.join("")}</script>`,
-    ...(input.mode === "edit" ? [`<link rel="stylesheet" href="${escapeAttribute(input.contentOrigin)}/bridge/edit.css">`] : []),
   ].join("");
 
   // parse5 has already normalized malformed input (including scripts before
@@ -831,6 +830,10 @@ function injectPreview(
   // served from the deck directory, so fragment links resolve within the same
   // document without an injected <base>.
   $("head").prepend(injected);
+  // Editing overlays must override the player's pending-step visibility.
+  // Keep only the trusted bootstrap ahead of authored scripts; append the
+  // editing stylesheet after the document's normal styles, as in the old UI.
+  if (input.mode === "edit") $("head").append(`<link rel="stylesheet" href="${escapeAttribute(input.contentOrigin)}/bridge/edit.css">`);
   const serialized = $.html();
   return typeof serialized === "string" ? serialized : "";
 }
