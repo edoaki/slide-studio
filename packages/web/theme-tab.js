@@ -260,7 +260,7 @@ export function makeThemeTab(ctx) {
     section(S.themes.controls.text, ['--ink', '--muted', '--accent', '--link'].map(k => colors.querySelector(`[data-key="${k}"]`)));
     section(S.themes.controls.emphasis, ['--good', '--warn', '--mark', '--mark-ink', ...Object.keys(CONTENT)].map(k => colors.querySelector(`[data-key="${k}"]`)));
     const heading = section(S.themes.controls.heading, [colors.querySelector('[data-key="--header-ink"]')]);
-    const hint = document.createElement('p'); hint.className = 'hint'; hint.textContent = S.themes.controls.headingHint; heading.append(hint);
+    const hint = document.createElement('p'); hint.className = 'tv-heading-hint'; hint.textContent = S.themes.controls.headingHint; heading.append(hint);
     fill();
   }
   function fill() {
