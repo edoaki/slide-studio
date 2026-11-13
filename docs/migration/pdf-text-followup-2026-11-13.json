@@ -131,5 +131,27 @@
   "external_links_equal_including_duplicates": true,
   "external_link_count": 8,
   "poppler_unexpected_control_characters": {},
-  "interpretation": "Pages 13 and 14 differ only in the listed SVG coordinate/probability text. Their raster images were identical in the previous 72 dpi comparison. Pypdf adds control characters in Electron text extraction, while Poppler does not. This does not resolve the remaining raster position differences."
+  "interpretation": "Pages 13 and 14 differ only in the listed SVG coordinate/probability text. Their raster images were identical in the previous 72 dpi comparison. Pypdf adds control characters in Electron text extraction, while Poppler does not. This does not resolve the remaining raster position differences.",
+  "visual_review_followup": {
+    "pages_reviewed": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      10,
+      12,
+      15,
+      17,
+      18
+    ],
+    "method": "Side-by-side review of all 11 non-identical page raster pairs from the existing 72 dpi comparison. Page 3 individually; other pages in contact sheets.",
+    "observation": "No newly missing visible diagram, table, formula or paragraph was observed in these pairs. Small glyph/position differences remain. This is a coarse visual review, not pixel equality or final PDF acceptance.",
+    "artifacts": [
+      "/tmp/slide-studio-desktop/pdf-diagnosis/visual-review-0.png",
+      "/tmp/slide-studio-desktop/pdf-diagnosis/visual-review-1.png",
+      "/tmp/slide-studio-desktop/pdf-diagnosis/visual-review-2.png"
+    ]
+  }
 }

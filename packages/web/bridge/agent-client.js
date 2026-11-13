@@ -123,6 +123,9 @@ export function clientForFrame(frame) {
 export function forwardWheel(frame, event) {
   const client = clientForFrame(frame);
   if (!client || !event) return;
+  // Cancellation must happen in the original event turn, before the async RPC.
+  // Leave vertical scrolling and pinch zoom to the browser as the player does.
+  if (!event.ctrlKey && event.deltaX && Math.abs(event.deltaX) > Math.abs(event.deltaY)) event.preventDefault();
   client.pageWheel(event).catch(() => {});
 }
 

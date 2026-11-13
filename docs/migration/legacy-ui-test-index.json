@@ -3133,8 +3133,9 @@
         "outside"
       ],
       "parameterized": true,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_repeated_swipes_during_momentum",
@@ -3146,8 +3147,9 @@
         "outside"
       ],
       "parameterized": true,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_first_and_fixed_until_exit",
@@ -3157,8 +3159,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_flushes_pending_source_before_start",
@@ -3168,8 +3171,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_fullscreen_exit_finishes_presentation",
@@ -3179,8 +3183,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_save_failure_does_not_start",
@@ -3190,8 +3195,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_render_failure_does_not_start",
@@ -3201,8 +3207,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_start_shortcuts",
@@ -3215,8 +3222,9 @@
         "focus"
       ],
       "parameterized": true,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_shortcuts_do_not_interrupt_typing",
@@ -3226,8 +3234,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_p_opens_export_choices",
@@ -3239,8 +3248,9 @@
         "format"
       ],
       "parameterized": true,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_f_key_release_keeps_fullscreen",
@@ -3250,8 +3260,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_present.py::test_export_progress_updates_during_check",
@@ -3261,8 +3272,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-present.test.ts",
+      "coverage_note": "Ported to isolated Electron frames; includes editor/player and inside/outside wheel combinations, trusted focus shortcuts, save/render failures and authenticated-fetch SSE progress simulation. Fullscreen transitions use a fixture implementation rather than OS permissions."
     },
     {
       "id": "tests/e2e/test_qmd_blocks.py::test_table_text_selection_does_not_delete_block",

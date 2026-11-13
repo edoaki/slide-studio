@@ -22,11 +22,11 @@ const RUN = 1500; // この間隔で続けた並べ替えは ⌘Z の1回分に�
 const DIRS = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right' };
 const HOLD = { KeyR: 'inner', KeyF: 'outer' };
 const PAD_ICON = { inner: 'padInner', outer: 'padOuter', gap: 'padGap' };
-// Stage 2 pushes this explicit keymap into the frame. Only plain navigation /
-// padding keys are consumed synchronously; modified keys (source writes) stay
-// in the parent and are not part of this lease.
+// The frame consumes only these explicit shortcuts. Their validated intents
+// return to the parent, which owns source writes and presentation/export UI.
 const BRIDGE_KEYMAP = Object.freeze([
- ...['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','Escape','Enter','Delete','Backspace'].map(code=>({code,shift:false,alt:false,ctrl:false,meta:false,preventDefault:true})),
+ ...['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','KeyP','Escape','Enter','Delete','Backspace'].map(code=>({code,shift:false,alt:false,ctrl:false,meta:false,preventDefault:true})),
+ {code:'KeyF',shift:true,alt:false,ctrl:false,meta:false,preventDefault:true},
  ...['KeyW','KeyA','KeyS','KeyD'].flatMap(code=>[{code,shift:true,alt:false,ctrl:false,meta:false,preventDefault:true},{code,shift:false,alt:true,ctrl:false,meta:false,preventDefault:true}]),
  ...[true,false].flatMap(shift=>[{code:'KeyZ',shift,alt:false,ctrl:false,meta:true,preventDefault:true},{code:'KeyZ',shift,alt:false,ctrl:true,meta:false,preventDefault:true}]),
 ]);
@@ -205,8 +205,14 @@ export function makeBlocks(ctx) {
   }
   function handleBridgeKey(intent) {
     if(!intent.trusted||intent.isComposing||intent.sourceVersion!==frameSourceVersion())return;
-    const event={...intent,shiftKey:intent.mods.shift,altKey:intent.mods.alt,ctrlKey:intent.mods.ctrl,metaKey:intent.mods.meta,target:document.body,preventDefault(){}};
+    const event={...intent,shiftKey:intent.mods.shift,altKey:intent.mods.alt,ctrlKey:intent.mods.ctrl,metaKey:intent.mods.meta,target:document.body,preventDefault(){},stopImmediatePropagation(){}};
     if(intent.type==='keyup'){holdKey(event);return;}
+    // Presentation/export shortcuts also work when focus is inside the isolated
+    // preview. Keep F reserved for padding while a block is selected.
+    if (!editing && (intent.code === 'KeyP' || (intent.code === 'KeyF' && !selected))) {
+      ctx.plugins.some(plugin => plugin.keydown?.(event));
+      return;
+    }
     if(!selected||editing||readOnly)return;
     const writingKey=intent.mods.alt||intent.mods.shift||intent.mods.meta||intent.mods.ctrl||['Delete','Backspace','Enter'].includes(intent.key);
     if(writingKey&&!live())return;
