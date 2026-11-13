@@ -1,0 +1,23 @@
+{
+  "runtime_commit": "ad743a664bac7956b6632442d0d0d6a44ccd0b3e",
+  "cause": "Legacy agents.js styled the entire role row as clickable but registered click only on the eye icon button. Role labels and row whitespace were inert.",
+  "change": "Use a native button for the entire role row with keyboard activation and visible focus. Mandatory prompt catalog is unchanged.",
+  "verification": {
+    "installed_app_passed": 4,
+    "failed": 0,
+    "scope": [
+      "click names for all five roles and compare every displayed mandatory prompt against the workspace files",
+      "Enter and Space activation",
+      "independent additional instruction persistence",
+      "close waits for save; failed save retains input and retries"
+    ],
+    "log": "/tmp/slide-studio-desktop/agent-role-installed.txt"
+  },
+  "install": {
+    "runtime_commit": "ad743a664bac7956b6632442d0d0d6a44ccd0b3e",
+    "installed": "/Users/aki/Applications/Slide Studio.app",
+    "backup": "/Users/aki/Applications/.slide-studio-backups/install-ZZr3Dy/previous.app",
+    "asar_sha256": "4acba82334cb16cbb55c46b8ed1a524b2552fd3c2a6ed10ebe32248adc6bddb0",
+    "dmg_sha256": "430dadcedd89fdd3248a2f180a2122536d23dc8c405319afe01ce41f5b5ba763"
+  }
+}
