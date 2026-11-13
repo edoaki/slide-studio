@@ -112,6 +112,12 @@
       "result": "433 regression tests passed, 7 skipped; 33 bridge tests passed; 21 source UI and 20 installed-app tests passed at functional commit 9bf0302. Final guidance-layout change 467a43d reinstalled and heading color/undo scenario passed with visual inspection.",
       "scope": "Direct heading design controls intentionally removed per user instruction; text color retained. Native clipboard and theme AI fixture coverage expanded.",
       "details": "full-parity-progress.json#heading_ai_followup_2026_11_13"
+    },
+    {
+      "name": "presentation_followup_2026_11_13",
+      "source_commit": "7981dcc52ec28713f01c70b5c8271362b66296f2",
+      "result": "433 regression tests passed, 7 conditional skips; 33 bridge tests passed; 32 source UI tests passed before five test-only additions; all 36 final installed Electron UI tests passed, including all 16 presentation scenarios. All three installers rebuilt, arm64 DMG installed and tested.",
+      "details": "full-parity-progress.json#presentation_followup_2026_11_13"
     }
   ],
   "signing": {
@@ -199,7 +205,7 @@
   ],
   "next_work": [
     "Finish remaining original UI correspondences with the heading-design AI-only exception. Real native clipboard paste is verified, including pixels, undo/redo and reload.",
-    "Continue individual UI mapping: 7 covered and 8 superseded by the heading-design decision; broader integration coverage remains separate.",
+    "Continue individual UI mapping: 19 covered, 8 superseded by the heading-design decision, 350 pending; all 13 original presentation tests now have Electron correspondences.",
     "Finish PDF visual/text acceptance; browser-mode differences diagnosed in pdf-diagnosis-2026-11-13.json.",
     "Verify authenticated inference/recovery for every provider.",
     "Windows runtime is deferred by user. Intel runtime, Developer ID/notarization, Windows signing and public GitHub source/release are not completed."

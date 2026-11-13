@@ -493,5 +493,69 @@
       "checksums": "All six DMG/EXE/blockmap checks passed against release/SHA256SUMS",
       "runtime": "Apple Silicon Mac verified. Intel Mac and Windows runtime not verified."
     }
+  },
+  "presentation_followup_2026_11_13": {
+    "status": "implemented_packaged_and_reinstalled_full_migration_not_complete",
+    "source_commit": "7981dcc52ec28713f01c70b5c8271362b66296f2",
+    "changes": [
+      "Forward trusted F, Shift+F and P shortcuts from the isolated preview to presentation/export plugins. Preserve selected-block padding and text-editing priority.",
+      "Cancel the original horizontal wheel event synchronously before forwarding to the content frame; vertical scrolling and pinch zoom remain uncancelled.",
+      "Add 16 Electron presentation scenarios covering all 13 original presentation test functions, including focus variants, wheel variants, save/render failure recovery, document freezing, fullscreen transitions and export progress."
+    ],
+    "validation": {
+      "regression": {
+        "passed": 433,
+        "skipped": 7,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/present-regression.txt"
+      },
+      "bridge": {
+        "passed": 33,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/present-bridge.txt"
+      },
+      "source_ui": {
+        "passed": 32,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/present-ui-all.txt",
+        "scope": "Full suite before adding four repeated-momentum cases and export-progress simulation; those five additions also passed in the final installed suite."
+      },
+      "installed_ui": {
+        "passed": 36,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/present-installed.txt",
+        "scope": "Every Electron E2E suite including all 16 presentation scenarios, actual native clipboard, AI fixture process, HTML/PDF export/download and native CLI check/audit. Browser-only test excluded."
+      },
+      "fullscreen_limit": "Fullscreen transitions are exercised with a fixture implementation; no new claim about native OS fullscreen permission behaviour.",
+      "ai_limit": "Native fixture processes, not authenticated paid inference."
+    },
+    "artifacts": {
+      "installed_app": "/Users/aki/Applications/Slide Studio.app",
+      "installed_from": "release/Slide-Studio-0.1.0-mac-arm64.dmg",
+      "installed_asar_sha256": "ed97fc84281639fd253533ec1c052e0fc90f0f7b37faf0656c572a6c8200b6aa",
+      "mac_arm64": "release/Slide-Studio-0.1.0-mac-arm64.dmg",
+      "mac_x64": "release/Slide-Studio-0.1.0-mac-x64.dmg",
+      "windows_x64": "release/Slide-Studio-0.1.0-win-x64-Setup.exe",
+      "checksums": "All six SHA256SUMS entries verified.",
+      "signature": "Ad hoc macOS integrity check passed; no Developer ID, notarization or Windows signing.",
+      "package_logs": [
+        "/tmp/slide-studio-desktop/present-package-arm64.txt",
+        "/tmp/slide-studio-desktop/present-package-x64.txt",
+        "/tmp/slide-studio-desktop/present-package-win.txt"
+      ]
+    },
+    "individual_legacy_mapping": {
+      "covered": 19,
+      "superseded_by_user_decision": 8,
+      "pending": 350,
+      "total": 377
+    },
+    "pdf": "All 11 previously non-identical raster pairs visually reviewed at 72 dpi; no newly missing visible element observed, fine glyph/position differences remain. See pdf-text-followup-2026-11-13.json. Not full PDF acceptance.",
+    "remaining": [
+      "Complete remaining legacy UI correspondences under the heading-design AI-only exception.",
+      "Finish PDF visual/text acceptance.",
+      "Authenticated provider inference/recovery remains unverified.",
+      "Windows runtime deferred by user; Intel runtime, public source/release publishing and distribution signing remain incomplete."
+    ]
   }
 }
