@@ -678,5 +678,68 @@
       "Obtain PDF visual acceptance; exact text/raster parity is not claimed.",
       "Rebuild and test installers after full operation review. Windows runtime deferred by user."
     ]
+  },
+  "home_topic_autosave_followup_2026_11_13": {
+    "status": "source_verified_installers_deferred",
+    "legacy_mapping": {
+      "covered": 102,
+      "superseded_by_user_decision": 8,
+      "pending": 267,
+      "total": 377
+    },
+    "new_operation_coverage": [
+      "All 5 legacy home-management functions: title/folder rename, undo, deletion/trash, keyboard menu and running-deck restrictions.",
+      "All 12 topic-page functions: creation/defaults, responsive cards, bibliography search/sort/details, figure thumbnails/preview/steps, selection and deletion protection.",
+      "All 5 home-environment functions using mocked provider APIs: explicit installation/login, retry, resumed polling, delayed account status and transient polling errors.",
+      "Home create/resume/copy and compact export-panel behavior.",
+      "Directional block insertion, empty insertion and adjacent columns."
+    ],
+    "fix": {
+      "reproduction": "A newly inserted block whose HTML-to-Markdown conversion returned 503 was lost when closing: the editor closed because its source was still clean. The regression test failed before the repair.",
+      "behavior": "Retain the pending insertion until conversion reaches the source. Flush retries it, including a subsequent close attempt, and new insertion cannot replace it. Existing paragraph conversions can retry identical HTML after failure.",
+      "status_and_browser_guard": "Pending block conversions participate in the save status and beforeunload guard. Source and installed app remain separate."
+    },
+    "validation": {
+      "home_topic_initial": {
+        "passed": 18,
+        "failed": 0,
+        "logs": [
+          "/tmp/slide-studio-desktop/home-test.txt",
+          "/tmp/slide-studio-desktop/topic-test.txt"
+        ]
+      },
+      "environment_and_export_panel": {
+        "passed": 6,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/environment-test.txt"
+      },
+      "autosave_conversion": {
+        "passed": 10,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/autosave-created-after.txt",
+        "scope": "Before final status display/beforeunload additions."
+      },
+      "insertion": {
+        "passed": 1,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/insertion-final.txt"
+      },
+      "full_ui": {
+        "total": 114,
+        "passed": 113,
+        "skipped": 1,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/home-autosave-ui-final.txt",
+        "scope": "All UI suites after pending-insertion retry fix, before the final pending-status and beforeunload additions. Opt-in real-AI test skipped; authenticated inference had already passed in the preceding followup."
+      },
+      "final_autosave_and_insertion": {
+        "passed": 12,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/autosave-status-final.txt",
+        "scope": "Final source including pending status and browser beforeunload guard; conversion failure retains input and a subsequent close retries conversion without duplication."
+      },
+      "typecheck": "npm run typecheck and final TypeScript compilation passed."
+    },
+    "distribution": "Not rebuilt or installed. Installed macOS application still contains runtime 7981dcc. Full individual legacy operation review is incomplete; Windows runtime deferred by user."
   }
 }

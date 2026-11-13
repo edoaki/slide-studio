@@ -359,8 +359,8 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-editor-parity.test.ts: legacy directional block insertion ignores empty input and adds adjacent columns"
     },
     {
       "id": "tests/e2e/test_block_ops.py::test_handles_change_size_and_survive_reload",
@@ -2111,8 +2111,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy home creates resumes and duplicates a presentation with saved edits"
     },
     {
       "id": "tests/e2e/test_home.py::test_export_and_download",
@@ -2145,8 +2145,8 @@
         "tmp_path"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy export panel stays compact and anchored and dismisses with focus restored"
     },
     {
       "id": "tests/e2e/test_home_environment.py::test_home_installs_ai_then_logs_in_and_fits_narrow_screen",
@@ -2158,8 +2158,8 @@
         "tmp_path"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy environment installs then logs in explicitly and fits a narrow screen"
     },
     {
       "id": "tests/e2e/test_home_environment.py::test_home_login_failure_and_pending_login_can_be_retried",
@@ -2170,8 +2170,8 @@
         "home_ai"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy environment retries failed and pending logins without reinstalling"
     },
     {
       "id": "tests/e2e/test_home_environment.py::test_home_resumes_monitoring_install_after_reload",
@@ -2182,8 +2182,8 @@
         "home_ai"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy environment resumes installation polling after reload without resubmission"
     },
     {
       "id": "tests/e2e/test_home_environment.py::test_home_install_progress_does_not_wait_for_account_status",
@@ -2194,8 +2194,8 @@
         "home_ai"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy environment installation progress proceeds while account status is delayed"
     },
     {
       "id": "tests/e2e/test_home_environment.py::test_home_install_poll_retries_after_temporary_error",
@@ -2206,8 +2206,8 @@
         "home_ai"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy environment installation polling recovers from a transient error"
     },
     {
       "id": "tests/e2e/test_home_manage.py::test_rename_and_undo_by_notification",
@@ -2217,8 +2217,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy home renames a title and restores its exact source through the notification"
     },
     {
       "id": "tests/e2e/test_home_manage.py::test_folder_rename_keeps_title",
@@ -2228,8 +2228,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy home renames only the folder and supports keyboard undo"
     },
     {
       "id": "tests/e2e/test_home_manage.py::test_menu_keyboard_and_outside_click",
@@ -2239,8 +2239,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy home menu preserves keyboard focus and dismisses on outside click"
     },
     {
       "id": "tests/e2e/test_home_manage.py::test_delete_cancel_confirm_and_keyboard_undo",
@@ -2250,8 +2250,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy home deletion cancels or moves to trash and keyboard undo restores bytes"
     },
     {
       "id": "tests/e2e/test_home_manage.py::test_running_deck_has_no_actions",
@@ -2261,8 +2261,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy home hides management actions while a deck is running"
     },
     {
       "id": "tests/e2e/test_insert.py::test_paste_image_after_selected_block_and_save",
@@ -4188,8 +4188,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy creation chooses existing and new topics and follows local date naming"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_no_topics",
@@ -4199,8 +4199,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy creation can initialize the first topic"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_topic_navigation_and_initial_value",
@@ -4210,8 +4210,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy topic navigation sets the new deck topic and resumes an existing deck"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_topic_html_rows_and_bib",
@@ -4221,8 +4221,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy topic HTML grid scrolls in three rows and bibliography supports selection sorting and search"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_home_card_sizes",
@@ -4233,8 +4233,8 @@
         "tmp_path"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy home cards keep their column counts without horizontal page overflow"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_add_buttons_hide_while_untouched",
@@ -4244,8 +4244,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy home add buttons hide untouched drafts and return after editing"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_remove_theme_from_home",
@@ -4255,8 +4255,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy home removes unused themes but protects default"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_dialog_initial_values",
@@ -4266,8 +4266,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy creation dialog resolves saved recent and explicit topic preferences"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_delete_unused_topic",
@@ -4277,8 +4277,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy topic deletion handles cancellation usage protection and trash used=false"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_delete_used_topic_shows_reason",
@@ -4288,8 +4288,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy topic deletion handles cancellation usage protection and trash used=true"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_topic_steps_selection_and_delete",
@@ -4299,8 +4299,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy topic figure thumbnails show each step and used HTML cannot be deleted"
     },
     {
       "id": "tests/e2e/test_topic_page.py::test_topic_preview_steps_and_long_press",
@@ -4310,8 +4310,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-home-topic.test.ts: legacy topic preview steps clamp at bounds and long press selects materials"
     }
   ],
   "coverage_note": "Individual correspondence is recorded separately from broad integration coverage. superseded_by_user_decision is an intentional scope change, not a passing legacy test."

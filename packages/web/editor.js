@@ -130,7 +130,7 @@ export function mountEditor(root, deck) {
     if (ctx.allLocked) [text, tone] = [S.status.ai(ctx.aiTabs || 1), 'ai'];
     else if (ctx.conflict) [text, tone] = [S.status.conflict, 'error'];
     else if (partial) [text, tone] = [S.status.aiPart(ctx.aiTabs || 1, partial), ctx.lock.pages?.length ? 'ai' : 'ai-soft'];
-    else if (ctx.dirty || ctx.timer) [text, tone] = [S.status.pending, 'busy'];
+    else if (ctx.dirty || ctx.timer || ctx.blocks?.pending) [text, tone] = [S.status.pending, 'busy'];
     else if (ctx.saving) [text, tone] = [S.status.saving, 'busy'];
     else if (ctx.rendering) [text, tone] = [S.status.rendering, 'busy'];
     else if (!ctx.renderOk) [text, tone] = [S.status.stale, 'error'];
@@ -234,7 +234,7 @@ export function mountEditor(root, deck) {
     else toast(S.saveFirst);
   };
   const beforeUnload = e => {
-    if (ctx.dirty || ctx.saving || ctx.styleSaving || ctx.conflict) { e.preventDefault(); e.returnValue = ''; }
+    if (ctx.dirty || ctx.saving || ctx.styleSaving || ctx.conflict || ctx.blocks?.pending) { e.preventDefault(); e.returnValue = ''; }
   };
   addEventListener('beforeunload', beforeUnload);
   async function save() {

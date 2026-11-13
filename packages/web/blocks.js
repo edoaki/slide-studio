@@ -515,31 +515,45 @@ export function makeBlocks(ctx) {
         if (s.mark) { ctx.editor.mark = { start: s.mark.start + shift, end: s.mark.end + shift + r.text.length - s.text.length }; ctx.editor.highlight(); }
         s.failed = false;
       } catch (e) { s.failed = true; toast(e.message); }
-      s.sent = html;
+      if (!s.failed) s.sent = html;
     })();
     await s.running; s.running = null;
+    ctx.showStatus();
     return !s.failed;
   }
   function endSession() {
     removeEventListener('pointerdown', outside, true);
     session = null; editing = false; ctx.preview.defer = false; armed = null;
   }
+  // Keep newly typed HTML until conversion has actually reached the source.
+  // Conversion failure must not turn a pending insertion into a clean editor.
+  let pendingCreation = null, committingCreation = null;
+  async function commitCreation() {
+    if (committingCreation) return committingCreation;
+    if (!pendingCreation) return true;
+    const pending = pendingCreation;
+    committingCreation = (async () => {
+      try {
+        const { markdown } = await api(`/api/deck/${encodeURIComponent(ctx.deck)}/chunks`, { method: 'POST', body: { action: 'markdown', html: pending.html } });
+        const fresh = await ensure(), md = markdown.trim();
+        if (md && (!fresh || !write(pending.make(md, fresh), { finishSession: true }))) throw new Error(S.blockWait);
+        pendingCreation = null;
+        return true;
+      } catch (e) { toast(e.message); return false; }
+    })();
+    ctx.showStatus();
+    try { return await committingCreation; } finally { committingCreation = null; ctx.showStatus(); }
+  }
   async function finished(html, { created = false } = {}) {
     const s = session;
     if (created) {
-      // 足したブロックは、書いた時点で原稿に入れる。何も書かなければ原稿は変えない
       endSession();
       const v = ctx.preview.deferredVersion; ctx.preview.deferredVersion = null;
-      if (html) {
-        try {
-          const { markdown } = await api(`/api/deck/${encodeURIComponent(ctx.deck)}/chunks`, { method: 'POST', body: { action: 'markdown', html } });
-          const fresh = await ensure(), md = markdown.trim();
-          if (md && fresh) write(s.make(md, fresh), { finishSession: true });
-        } catch (e) { toast(e.message); }
-      }
-      if (v) ctx.preview.load(v);
+      if (html) pendingCreation = { html, make: s.make };
+      const ok = await commitCreation();
+      if (v && ok) ctx.preview.load(v);
       draw();
-      return;
+      return ok;
     }
     removeEventListener('pointerdown', outside, true);
     clearTimeout(s.timer);
@@ -570,7 +584,7 @@ export function makeBlocks(ctx) {
   async function addBlock(dir) {
     if (adding || editing) return;
     adding = true;
-    try { if (!await whenLive()) { toast(S.blockWait); return; } } finally { adding = false; }
+    try { if (!await commitCreation()) return; if (!await whenLive()) { toast(S.blockWait); return; } } finally { adding = false; }
     const f = found(), w = legacyEdit();
     if (!f || editing || !w || op.coverPart(f.chunk)) return;
     const key = selected, c = f.chunk, o = op.outer(c);
@@ -885,6 +899,7 @@ export function makeBlocks(ctx) {
 
   const figOf = c => c?.kind === 'fig' ? op.figRef(ctx.text.slice(c.start, c.end)) : null;
   ctx.blocks = {
+    get pending() { return !!pendingCreation || !!session?.failed; },
     finish: () => legacyEdit()?.finish?.(),
     setReadOnly(value) {
       readOnly = value;
@@ -938,7 +953,10 @@ export function makeBlocks(ctx) {
     },
     saved() { draw(); },
     // 保存待ちを確かめる前（AI に送る前など）に、スライドで打った分を原稿へ反映する
-    flush() { return session && !session.created ? sync(session) : true; },
+    async flush() {
+      if (!await commitCreation()) return false;
+      return session && !session.created ? sync(session) : true;
+    },
     caret() {
       if (editing || !fresh()) return;
       const pos = ctx.editor.caretOffset();
