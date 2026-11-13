@@ -13,7 +13,7 @@
 
 ## ソースから起動
 
-Node.js 24.18.xとnpmを使います。移行中のコードは `migration/electron` ブランチにあります。この作業ツリーの最新の変更には、GitHubへ未反映のものがあります。下記の取得先とローカル版の検証状態を混同しないでください。
+Node.js 24.18.xとnpmを使います。TS・Electron版のソースは、GitHubの `migration/electron` ブランチから取得できます。
 
 ```sh
 git clone --branch migration/electron https://github.com/edoaki/slide-studio.git

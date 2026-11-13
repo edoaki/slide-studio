@@ -134,6 +134,11 @@
       "name": "home_topic_autosave_followup_2026_11_13",
       "result": "25 more legacy operation functions mapped: 102 covered, 8 intentionally superseded and 267 pending. All UI suites: 113 passed, 1 opt-in real-AI skip. Final pending-status/beforeunload additions: 12 related autosave/insertion tests passed. Fixed loss of newly inserted text after conversion failure during close; installers unchanged.",
       "details": "full-parity-progress.json#home_topic_autosave_followup_2026_11_13"
+    },
+    {
+      "name": "delivery_followup_2026_11_13",
+      "result": "Published migration/electron; fresh remote clone/npm install/npm start and presentation creation/autosave succeeded. Updated arm64 DMG installed; one installed workflow and three focused fix checks passed. Windows EXE rebuilt without runtime testing.",
+      "details": "full-parity-progress.json#delivery_followup_2026_11_13"
     }
   ],
   "signing": {
@@ -222,11 +227,11 @@
     }
   ],
   "next_work": [
-    "Finish remaining original UI correspondences with the heading-design AI-only exception. Real native clipboard paste is verified, including pixels, undo/redo and reload.",
-    "Continue individual UI mapping: 102 covered, 8 superseded by the heading-design decision, 267 pending. Do not rebuild or reinstall distribution artifacts until the full legacy operation review is complete.",
-    "PDF technical review completed with documented differences (pdf-review-2026-11-13.json); user visual acceptance remains pending.",
-    "Real Codex inference and restoration verified using existing authenticated Codex home. Installed-app login and other providers remain unverified.",
-    "Windows runtime is deferred by user. Intel runtime, Developer ID/notarization, Windows signing and public GitHub source/release are not completed."
+    "Preserve the full legacy feature migration scope. For each feature, compare old behavior, implement missing behavior, then run only its relevant tests. Run the whole suite once all features are migrated.",
+    "Use the 102 covered / 8 superseded / 267 pending legacy-function mapping as supplementary evidence, not as a missing-feature count or a requirement to port every test before delivery.",
+    "Continue unresolved PDF text/visual equivalence review; technical findings are in pdf-review-2026-11-13.json.",
+    "Installed-app AI login and providers beyond the authenticated Codex connection remain to be verified.",
+    "Windows runtime is deferred. Intel installer is older; signing/notarization and binary GitHub Releases remain incomplete."
   ],
   "source_commits": {
     "renderer": "b53890b",

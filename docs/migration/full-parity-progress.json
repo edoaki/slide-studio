@@ -81,27 +81,12 @@
     "note": "Index counts test functions, not executed or parametrized cases"
   },
   "delivery": {
-    "status": "local_installers_and_clean_clone_verified_full_parity_pending",
-    "source_commit": "1f2d210",
-    "installed_dmg": "Latest Apple Silicon DMG installed into /Users/aki/Applications/Slide Studio.app; 7 installed tests passed, including bibliography/table/presentation, original full workflow, AI fixture and sandbox CLI check/audit.",
-    "windows_exe": "NSIS x64 generated from the same implementation. Runtime verification deferred by user.",
-    "intel_dmg": "x64 DMG generated; Intel runtime not tested.",
-    "github_clean_clone": "Local Git clone, npm install and npm start verified. Remote GitHub branch/main/release not published.",
-    "sha256sums": [
-      "ae88a0b3df6692c9f1d6110c292cf5c460336e0ba867a833ee4dbd0d182c93e0  Slide-Studio-0.1.0-mac-arm64.dmg",
-      "2213b85f3298e0149d8d86a22828e4a23d848d9d04eb26fec65b65a59ab9a8de  Slide-Studio-0.1.0-mac-arm64.dmg.blockmap",
-      "a4052a4eab4d7a21eb0a00c956f4daca6d246b079277f09a2f0944320f38f2a7  Slide-Studio-0.1.0-mac-x64.dmg",
-      "f9be79f9da6d784da9b388c05269e21830faf74e7b96f56db41a2fe7ee9f6928  Slide-Studio-0.1.0-mac-x64.dmg.blockmap",
-      "b1ebc06aa085910e02e5100d95f1e91f5103afb78fe019e0dc2a28ea476ef229  Slide-Studio-0.1.0-win-x64-Setup.exe",
-      "49881ac578d1021a7887cac8fa8a09cbc051adf999c8d73b4d8bf3782aa18eac  Slide-Studio-0.1.0-win-x64-Setup.exe.blockmap"
-    ],
-    "clean_clone_evidence": {
-      "install_log": "/tmp/slide-studio-desktop/clean-clone-install.txt",
-      "latest_start_log": "/tmp/slide-studio-desktop/final-clone-start.txt",
-      "commit": "1c1fcf4",
-      "result": "npm start opened the original editor; created the first topic/deck in an empty workspace and saved its memo."
-    },
-    "integrity": "codesign --verify --deep --strict passed for the installed ad-hoc-signed Mac app; all six entries in release/SHA256SUMS verified. This is not Developer ID signing or notarization."
+    "status": "local_app_updated_remote_source_available_full_feature_migration_not_claimed",
+    "source_commit": "faefa61",
+    "installed_dmg": "/Users/aki/Applications/Slide Studio.app",
+    "windows_exe": "release/Slide-Studio-0.1.0-win-x64-Setup.exe",
+    "github_branch": "https://github.com/edoaki/slide-studio/tree/migration/electron",
+    "details": "delivery_followup_2026_11_13"
   },
   "integrated_foundation_tests": {
     "passed": 45,
@@ -149,7 +134,7 @@
     "tests": 54,
     "status": "review repairs pass native tests; seven extra old render goldens find raw-tags/cover-authors differences queued for repair"
   },
-  "distribution_status": "Original UI replaces the reduced prototype in the local DMG/EXE. Full legacy parity, signing and public release are not claimed.",
+  "distribution_status": "Current arm64 DMG installed and checked; current Windows x64 NSIS built without runtime verification. Intel DMG remains older. Remote migration/electron branch is published; full feature migration is not claimed.",
   "bridge_and_api_tests": {
     "tests": 23,
     "passed": 23,
@@ -741,5 +726,44 @@
       "typecheck": "npm run typecheck and final TypeScript compilation passed."
     },
     "distribution": "Not rebuilt or installed. Installed macOS application still contains runtime 7981dcc. Full individual legacy operation review is incomplete; Windows runtime deferred by user."
+  },
+  "delivery_followup_2026_11_13": {
+    "status": "local_app_updated_remote_source_available_full_feature_migration_not_claimed",
+    "runtime_commit": "faefa61",
+    "workflow": "Preserve full feature migration scope. Compare and implement each feature, test that feature, then run the overall suite after all features are migrated. Do not repeatedly run the full suite or mechanically port every legacy test as a delivery gate.",
+    "macos": {
+      "installer": "release/Slide-Studio-0.1.0-mac-arm64.dmg",
+      "sha256": "f349e43e2cde94c898ff1c1d31723c0c9ba4e68f9651801ffd88f548e8a37766",
+      "installed": "/Users/aki/Applications/Slide Studio.app",
+      "backup": "/Users/aki/Applications/.slide-studio-backups/install-rrojsqoe/previous.app",
+      "method": "Mounted the produced DMG read-only, copied its app with ditto, verified ad-hoc code signature, retained previous app, installed and compared app.asar SHA-256 with the packaged app.",
+      "asar_sha256": "24461c748e3941935a3bc148405d7aed1e95eb238858ec0c29a1aa8ca6921228"
+    },
+    "windows": {
+      "installer": "release/Slide-Studio-0.1.0-win-x64-Setup.exe",
+      "sha256": "c1ea0c25bd26251a242552438cf86f4154f5d81c0669f1c5273354b7164f81b7",
+      "runtime": "Not tested; deferred by user."
+    },
+    "intel_mac": "Existing x64 DMG was not rebuilt in this delivery; it still contains the older runtime. Only the arm64 DMG and Windows x64 EXE are current.",
+    "installed_validation": {
+      "workflow": "Creation/setup, source/direct edits, preview/presentation, native HTML/PDF export and CLI inspection passed using a scratch workspace.",
+      "fixes": "Three focused installed checks passed: restored default theme, new-block autosave success, conversion failure retention/retry.",
+      "logs": [
+        "/tmp/slide-studio-desktop/delivery-installed-workflow.txt",
+        "/tmp/slide-studio-desktop/delivery-installed-fixes.txt"
+      ],
+      "scope": "No full regression rerun and no new permanent tests in this delivery."
+    },
+    "source": {
+      "url": "https://github.com/edoaki/slide-studio/tree/migration/electron",
+      "published_runtime": "faefa61",
+      "verification": "Cloned this remote branch into a new temporary directory, ran npm install and npm start, created a presentation and verified automatic memo saving.",
+      "record": "/tmp/slide-studio-desktop/delivery-clone-result.json",
+      "notes": "Initial smoke harness attempts used a missing workspace directory and an insufficient startup wait; corrected the harness without changing application behavior."
+    },
+    "limits": [
+      "Full feature and operation equivalence is still under review; the legacy test correspondence count is not a count of missing implementations.",
+      "Developer ID/notarization, Windows signing and binary GitHub Releases are not provided."
+    ]
   }
 }
