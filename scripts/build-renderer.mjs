@@ -1,4 +1,4 @@
-import { cp, copyFile, mkdir, rm, stat } from "node:fs/promises";
+import { cp, copyFile, mkdir, rm, stat, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -80,4 +80,31 @@ if (!process.argv.includes("--clean") && await exists(frameAgent)) {
     sourcemap: false,
     legalComments: "inline",
   });
+}
+
+// A portable workspace carries compiled JS and assets, never this repository
+// or Python. Dependencies/native tools are installed explicitly with --setup.
+if (!process.argv.includes('--clean')) {
+  const portable = resolve(dist, 'packages/core/assets/portable');
+  const compiler = resolve(portable, 'compiler');
+  for (const name of ['core', 'renderer']) {
+    await mkdir(resolve(compiler, `packages/${name}`), {recursive:true});
+    await cp(resolve(dist, `packages/${name}/src`), resolve(compiler, `packages/${name}/src`), {recursive:true,filter:p=>!p.endsWith('.map')});
+    await cp(resolve(root, `packages/${name}/assets`), resolve(compiler, `packages/${name}/assets`), {recursive:true});
+  }
+  await copyFile(stringsModule, resolve(compiler,'packages/core/assets/strings.js'));
+  for (const path of ['apps/portable/main.js','apps/server/legacy-output.js']) {
+    await mkdir(dirname(resolve(compiler,path)),{recursive:true});await copyFile(resolve(dist,path),resolve(compiler,path));
+  }
+  await mkdir(resolve(compiler,'scripts'),{recursive:true});
+  await copyFile(resolve(root,'scripts/setup-pandoc.mjs'),resolve(compiler,'scripts/setup-pandoc.mjs'));
+  await mkdir(resolve(compiler,'resources/pandoc'),{recursive:true});
+  await copyFile(resolve(root,'resources/pandoc/manifest.json'),resolve(compiler,'resources/pandoc/manifest.json'));
+  await copyFile(resolve(root,'resources/pandoc/COPYING.md'),resolve(compiler,'resources/pandoc/COPYING.md'));
+  const pkg=JSON.parse(await readFile(resolve(root,'package.json'),'utf8'));
+  const dependencies={...pkg.dependencies,electron:pkg.devDependencies.electron,'@electron-internal/extract-zip':pkg.devDependencies['@electron-internal/extract-zip']};
+  await writeFile(resolve(compiler,'package.json'),JSON.stringify({name:'slide-studio-portable',version:pkg.version,private:true,type:'module',engines:pkg.engines,dependencies},null,2)+'\n');
+  await copyFile(resolve(root,'LICENSE'),resolve(compiler,'LICENSE'));
+  await copyFile(resolve(root,'NOTICE.md'),resolve(compiler,'NOTICE.md'));
+  await copyFile(resolve(root,'scripts/portable-launcher.mjs'),resolve(portable,'build.mjs'));
 }

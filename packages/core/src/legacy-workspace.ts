@@ -127,7 +127,7 @@ function packageVersion(): string {
         name?: unknown;
         version?: unknown;
       };
-      if (value.name === "slide-studio" && typeof value.version === "string") return value.version;
+      if (["slide-studio", "slide-studio-portable"].includes(String(value.name)) && typeof value.version === "string") return value.version;
     } catch {
       // Keep walking up until the repository/package root is found.
     }
@@ -1923,9 +1923,8 @@ export class Workspace {
 
   // ------------------------------------------------------------ agent files
   #ensureAgentFiles(): void {
-    // PENDING integration: the generated agent-file writer must own
-    // `agent-files.json` and `_version`; this copy path stays the legacy port
-    // until that generator is wired.
+    // This writer owns agent-files.json and its version stamp, including the
+    // native CLI guidance shipped in the Electron templates.
     const templateDirectory = join(this.#templates, "workspace");
     if (!this.#isDirectory(templateDirectory)) return;
     const stamp = join(this.state, "agent-files.json");
@@ -2095,11 +2094,28 @@ export class Workspace {
   }
 
   #ensurePortable(): void {
-    // PENDING: compiler provisioning and the generated CLI are not bundled.
-    // The README below deliberately does not advertise a command that is not
-    // available yet.
     const compiler = join(this.state, "compiler");
     this.#ensureDirectory(compiler, "compiler");
+    const bundled = assetPath('portable');
+    const stamp = join(this.state,'portable-files.json'), known = readJsonObject(stamp);
+    const copy = (directory:string, prefix=''):void => {
+      for (const entry of this.#listEntries(directory)) {
+        if (entry.isSymbolicLink()) continue;
+        const key = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) { copy(join(directory,entry.name),key); continue; }
+        if (!entry.isFile()) continue;
+        const rel = key === 'build.mjs' ? key : `.slide-studio/${key}`;
+        const target = this.#relativeToRoot(rel); if (!target) continue;
+        try {
+          this.#assertParentRealInside(target,rel);
+          const current=readIfFile(target),data=readFileSync(join(directory,entry.name));
+          if (existsNoFollow(target) && (!current || (!current.equals(data) && known[rel] !== sha256Bytes(current)))) continue;
+          if (!current || !current.equals(data)) this.#write(target,data);
+          known[rel]=sha256Bytes(data);
+        } catch { /* Preserve user-owned files and unsafe paths. */ }
+      }
+    };
+    if (this.#isDirectory(bundled)) { copy(bundled); this.#write(stamp,JSON.stringify(known,null,1)); }
     for (const readme of [join(this.root, "README.md"), join(compiler, "README.md")]) {
       const current = readIfFile(readme);
       // A symlink or directory is neither our README nor safe to overwrite.
@@ -2339,7 +2355,7 @@ try {
   // Asset-less test runs keep only the pinned hash.
 }
 
-const PORTABLE_README = `# スライドの保管フォルダ
+const PREVIOUS_PORTABLE_README = `# スライドの保管フォルダ
 
 このフォルダは Slide Studio で編集・再ビルドできます。フォルダ名と置き場所は自由です。共有する際は、隠しフォルダ \`.slide-studio/\` も含めてフォルダ全体をコピーしてください。
 
@@ -2352,3 +2368,6 @@ const PORTABLE_README = `# スライドの保管フォルダ
 
 Slide Studio のアプリ画面から HTML と PDF を書き出せます。ソース版では、そのリポジトリで \`npm run cli -- build <発表名> --root <このフォルダの絶対パス>\` を実行して書き出すこともできます。このフォルダに含まれる原稿・図・テーマは、アプリを入れていない環境でもテキストエディタで編集できます。
 `;
+
+OLD_PORTABLE_READMES.add(sha256Bytes(PREVIOUS_PORTABLE_README));
+const PORTABLE_README = readFileSync(join(TEMPLATES, "portable", "README.md"), "utf8");

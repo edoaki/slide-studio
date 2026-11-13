@@ -73,6 +73,14 @@ npm run cli -- --help
 
 `build` はHTMLとPDFを書き出します。`--html-only` はHTMLだけを選び、`--force` は検査エラーがあっても書き出します。ただし、素材の欠落などで単一HTMLを作れない場合は停止します。AI用の `consult` と、画像・指摘の確認を記録する `audit` も同じCLIに含まれます。
 
+保管フォルダには、アプリなしで再ビルドするためのコードも同梱します。Node.jsとnpmを用意して、そのフォルダで実行できます。初回の準備にはネット接続が必要です。
+
+```sh
+node build.mjs --setup
+node build.mjs --list
+node build.mjs 発表名
+```
+
 描画サービス単体の検証には、素材を埋め込んだSlide Studio形式の単一HTMLを使います。ジョブJSONの入力・出力は絶対パス、出力先は未作成のディレクトリを指定します。
 
 ```json

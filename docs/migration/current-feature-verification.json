@@ -1,0 +1,516 @@
+{
+  "date": "2026-11-13",
+  "scope": "All feature IDs from the original M0 inventory, grouped by user workflow. Does not assert that every legacy E2E function was ported or executed.",
+  "feature_count": 72,
+  "status": "final_regression_in_progress",
+  "groups": [
+    {
+      "name": "workspace_and_launch",
+      "features": [
+        "cli.global.root",
+        "cli.global.port",
+        "cli.global.no-browser",
+        "cli.serve",
+        "cli.open",
+        "http.location",
+        "http.setup",
+        "http.env",
+        "http.pages",
+        "http.web-mount",
+        "http.files-mount",
+        "http.events"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-location.test.ts",
+        "tests/e2e/legacy-browser.test.ts",
+        "tests/desktop/legacy-server.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "home_and_topic",
+      "features": [
+        "http.home",
+        "http.home.manage",
+        "http.topic.get",
+        "http.new",
+        "http.topics.new",
+        "cli.new",
+        "cli.import"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-home-topic.test.ts",
+        "tests/core/legacy-deck-manage.test.ts",
+        "tests/core/legacy-importer.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "source_and_direct_edit",
+      "features": [
+        "http.deck.get",
+        "http.deck.source",
+        "http.deck.chunks",
+        "http.structure",
+        "http.deck.operation",
+        "feature.direct-edit"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-editor-parity.test.ts",
+        "tests/e2e/legacy-composition.test.ts",
+        "tests/core/legacy-edit.test.ts",
+        "tests/core/legacy-block-ops.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "memo",
+      "features": [
+        "http.deck.memo",
+        "feature.notes"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-workflow.test.ts",
+        "tests/e2e/legacy-editor-parity.test.ts",
+        "tests/e2e/legacy-ai.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "themes_and_style",
+      "features": [
+        "http.deck.style",
+        "http.themes.sample",
+        "http.themes",
+        "feature.themes"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-authoring.test.ts",
+        "tests/core/legacy-theme-edit.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "materials_and_assets",
+      "features": [
+        "http.deck.materials",
+        "http.deck.assets",
+        "feature.assets"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-materials.test.ts",
+        "tests/e2e/legacy-assets.test.ts",
+        "tests/core/legacy-materials.test.ts",
+        "tests/core/legacy-assets.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "library_and_bibliography",
+      "features": [
+        "http.deck.library",
+        "http.deck.bib",
+        "http.topic.bib",
+        "http.math",
+        "feature.bibliography"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-authoring.test.ts",
+        "tests/e2e/legacy-composition.test.ts",
+        "tests/core/legacy-library.test.ts",
+        "tests/core/legacy-bibliography.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "figures",
+      "features": [
+        "cli.fig.new",
+        "feature.figures"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-workflow.test.ts",
+        "tests/e2e/legacy-authoring.test.ts",
+        "tests/core/legacy-figures.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "preview_and_presentation",
+      "features": [
+        "http.preview",
+        "feature.preview-iframe",
+        "feature.present",
+        "http.open-external"
+      ],
+      "evidence": [
+        "tests/bridge/electron.test.ts",
+        "tests/e2e/legacy-present.test.ts",
+        "tests/e2e/legacy-composition.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "checks_and_export",
+      "features": [
+        "http.deck.download",
+        "http.shots",
+        "http.checks",
+        "cli.check",
+        "cli.build",
+        "cli.doctor",
+        "feature.export",
+        "feature.checks"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-workflow.test.ts",
+        "tests/e2e/desktop.test.ts",
+        "tests/desktop/legacy-checks.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "ai_runtime_and_roles",
+      "features": [
+        "http.ai.status",
+        "http.ai.roles",
+        "http.ai.runtimes",
+        "http.ai.login",
+        "http.ai.runtime",
+        "http.ai.favorites",
+        "feature.ai-roles"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-home-topic.test.ts",
+        "tests/e2e/legacy-composition.test.ts",
+        "tests/ai/runtime.test.ts",
+        "tests/ai/login.test.ts",
+        "tests/core/legacy-ai-roles.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "chat_and_history",
+      "features": [
+        "http.chat.state",
+        "http.chat.tabs",
+        "http.chat.rounds",
+        "feature.chat-ai-rounds",
+        "feature.history",
+        "cli.consult"
+      ],
+      "evidence": [
+        "tests/e2e/legacy-ai.test.ts",
+        "tests/ai/workflow.test.ts",
+        "tests/core/legacy-chat-store.test.ts",
+        "tests/core/legacy-snapshot.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "audit",
+      "features": [
+        "cli.audit.tools",
+        "cli.audit.run",
+        "cli.audit.review",
+        "cli.audit.status",
+        "feature.audit"
+      ],
+      "evidence": [
+        "tests/desktop/legacy-audit.test.ts",
+        "tests/ai/launcher.test.ts"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    },
+    {
+      "name": "portable",
+      "features": [
+        "feature.portable"
+      ],
+      "evidence": [
+        "tests/core/portable.test.ts",
+        "tests/core/legacy-workspace.test.ts",
+        "portable-delivery-2026-11-13.json"
+      ],
+      "implementation": "present",
+      "validation": "existing and focused checks; final regression pending"
+    }
+  ],
+  "legacy_web_files": [
+    {
+      "file": "agents.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "ai-model.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "api.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "app.css",
+      "status": "adapted_source"
+    },
+    {
+      "file": "app.html",
+      "status": "identical_source"
+    },
+    {
+      "file": "app.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "asset-preview.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "assets.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "bib-view.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "bibliography.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "block-design.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "block-drag.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "block-handles.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "block-nav.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "block-ops.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "blocks.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "chat.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "checks.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "clipboard.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "color-picker.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "cover-authors.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "cover-form.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "decoration.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "editor.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "external-links.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "gradient-editor.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "history.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "home-ai.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "home-manage.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "home.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "icons.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "insert.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "layout-lint.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "left-tabs.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "link-input.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "location.css",
+      "status": "identical_source"
+    },
+    {
+      "file": "location.html",
+      "status": "identical_source"
+    },
+    {
+      "file": "location.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "materials.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "memo.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "output.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "overview.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "page-reorder.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "page-strip.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "page-templates.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "pdf-step.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "present.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "preview.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "qmd-blocks.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "qmd-editor.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "scroll-anchor.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "shared.css",
+      "status": "identical_source"
+    },
+    {
+      "file": "shot-thumbs.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "step-badge.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "strings.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "structure.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "table-tools.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "text-format.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "text-tools.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "theme-tab.js",
+      "status": "adapted_source"
+    },
+    {
+      "file": "themes.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "tip.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "toc-settings.js",
+      "status": "identical_source"
+    },
+    {
+      "file": "topic.js",
+      "status": "adapted_source"
+    }
+  ],
+  "exceptions": [
+    "Heading design controls intentionally removed at user request; direct text color retained.",
+    "Windows and Intel runtime tests deferred; signing and notarization unavailable.",
+    "Only authenticated Codex has live-service evidence; other providers use fixture protocol tests.",
+    "PDF technical review retains documented glyph/text-layer differences; user visual acceptance pending."
+  ]
+}

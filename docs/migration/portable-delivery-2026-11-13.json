@@ -1,0 +1,63 @@
+{
+  "root": "/private/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/slide-studio-portable-hCEXt2/移動した保管フォルダ",
+  "runs": [
+    {
+      "args": [
+        "--setup"
+      ],
+      "exit": 0,
+      "stdout": "\nup to date in 145ms\nsetup-pandoc: Pandoc 3.9 を準備しました: /private/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/slide-studio-portable-hCEXt2/移動した保管フォルダ/.slide-studio/compiler/resources/pandoc/bin/pandoc\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "--list"
+      ],
+      "exit": 0,
+      "stdout": "talk\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "talk",
+        "--html-only"
+      ],
+      "exit": 0,
+      "stdout": "/private/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/slide-studio-portable-hCEXt2/移動した保管フォルダ/decks/talk/可搬の確認.html\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "talk"
+      ],
+      "exit": 0,
+      "stdout": "/private/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/slide-studio-portable-hCEXt2/移動した保管フォルダ/decks/talk/可搬の確認.html\n/private/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/slide-studio-portable-hCEXt2/移動した保管フォルダ/decks/talk/可搬の確認.pdf\n",
+      "stderr": ""
+    }
+  ],
+  "pdfPages": 1,
+  "source": "Standalone compiler with workspace-local npm dependencies and Pandoc; no app or repository runtime imports.",
+  "figuresAndImages": {
+    "runs": [
+      {
+        "args": [
+          "talk",
+          "--html-only"
+        ],
+        "exit": 0,
+        "stdout": "/private/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/slide-studio-portable-hCEXt2/移動した保管フォルダ/decks/talk/可搬の確認.html\n",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "talk"
+        ],
+        "exit": 0,
+        "stdout": "/private/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/slide-studio-portable-hCEXt2/移動した保管フォルダ/decks/talk/可搬の確認.html\n/private/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/slide-studio-portable-hCEXt2/移動した保管フォルダ/decks/talk/可搬の確認.pdf\n",
+        "stderr": ""
+      }
+    ],
+    "pdfPages": 3,
+    "sourceUnchanged": true
+  }
+}
