@@ -88,6 +88,16 @@
       "installed_dmg": "3 passed after reinstalling latest DMG",
       "distribution": "mac-arm64 DMG, mac-x64 DMG and win-x64 NSIS regenerated; mac-arm64 runtime verified only",
       "record": "full-parity-progress.json"
+    },
+    {
+      "name": "parity_followup_2026_11_13",
+      "source_commit": "1f2d210",
+      "unit": "430 passed; 7 skipped; 0 TODO; 0 failures",
+      "original_ui": "11 passed",
+      "installed_mac": "7 passed",
+      "frame_bridge": "30 passed",
+      "clean_clone": "npm ci/build and 45 renderer parsing tests passed",
+      "record": "full-parity-progress.json"
     }
   ],
   "signing": {

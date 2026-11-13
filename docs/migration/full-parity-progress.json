@@ -82,18 +82,18 @@
   },
   "delivery": {
     "status": "local_installers_and_clean_clone_verified_full_parity_pending",
-    "source_commit": "1c1fcf4",
-    "installed_dmg": "Latest Apple Silicon DMG installed to /Users/aki/Applications/Slide Studio.app. Installed application passed 3 integration tests including empty PATH/bundled Pandoc, original editor workflow, AI fixture workflow and actual Codex sandbox CLI check/audit.",
+    "source_commit": "1f2d210",
+    "installed_dmg": "Latest Apple Silicon DMG installed into /Users/aki/Applications/Slide Studio.app; 7 installed tests passed, including bibliography/table/presentation, original full workflow, AI fixture and sandbox CLI check/audit.",
     "windows_exe": "NSIS x64 generated from the same implementation. Runtime verification deferred by user.",
     "intel_dmg": "x64 DMG generated; Intel runtime not tested.",
     "github_clean_clone": "Local Git clone, npm install and npm start verified. Remote GitHub branch/main/release not published.",
     "sha256sums": [
-      "8b553b12bf95c9bbf9023447c711abd7bbc0fddbacb10e7bbd4090bab70d54f1  Slide-Studio-0.1.0-mac-arm64.dmg",
-      "cc7204f33e17ec54f3aa029f01ae7f395d5f33422fb326b5c7988f6d7db51102  Slide-Studio-0.1.0-mac-arm64.dmg.blockmap",
-      "4a73504839986b2aaa3d7a6d0494653ec62569b0eec10594e4ce0e251931a637  Slide-Studio-0.1.0-mac-x64.dmg",
-      "c8951f43d599090eb6ceb7df58a8b02a8509bebbb95d09d0852beb67c523f663  Slide-Studio-0.1.0-mac-x64.dmg.blockmap",
-      "ecdd3f030d7e7df2be9e86d9aaaa1c62c2b89a08d5b0183a4c338ad1ff25dd27  Slide-Studio-0.1.0-win-x64-Setup.exe",
-      "989a48e89d706c5a39a7fbce5b6b70389bd883f0702738d108d8af903e5a3fb2  Slide-Studio-0.1.0-win-x64-Setup.exe.blockmap"
+      "ae88a0b3df6692c9f1d6110c292cf5c460336e0ba867a833ee4dbd0d182c93e0  Slide-Studio-0.1.0-mac-arm64.dmg",
+      "2213b85f3298e0149d8d86a22828e4a23d848d9d04eb26fec65b65a59ab9a8de  Slide-Studio-0.1.0-mac-arm64.dmg.blockmap",
+      "a4052a4eab4d7a21eb0a00c956f4daca6d246b079277f09a2f0944320f38f2a7  Slide-Studio-0.1.0-mac-x64.dmg",
+      "f9be79f9da6d784da9b388c05269e21830faf74e7b96f56db41a2fe7ee9f6928  Slide-Studio-0.1.0-mac-x64.dmg.blockmap",
+      "b1ebc06aa085910e02e5100d95f1e91f5103afb78fe019e0dc2a28ea476ef229  Slide-Studio-0.1.0-win-x64-Setup.exe",
+      "49881ac578d1021a7887cac8fa8a09cbc051adf999c8d73b4d8bf3782aa18eac  Slide-Studio-0.1.0-win-x64-Setup.exe.blockmap"
     ],
     "clean_clone_evidence": {
       "install_log": "/tmp/slide-studio-desktop/clean-clone-install.txt",
@@ -308,7 +308,7 @@
     }
   },
   "followup_2026_11_13": {
-    "status": "source_verified_installers_refreshing",
+    "status": "source_and_installed_mac_verified_full_migration_pending",
     "resolved": [
       "Malformed raw HTML differential: all 27 legacy render fixtures now pass, including all seven edge cases.",
       "Bibliography editor: citation-page usage travels over the validated frame bridge; year/date editing, cancellation and reload work in editor and topic views.",
@@ -321,7 +321,11 @@
       "unit_contract_passed": 430,
       "unit_contract_skipped": 7,
       "unit_contract_todo": 0,
-      "unit_contract_failed": 0
+      "unit_contract_failed": 0,
+      "original_ui_passed": 11,
+      "installed_mac_passed": 7,
+      "bridge_passed": 30,
+      "clean_clone_render_passed": 45
     },
     "legacy_ui_mapping": "3 of 377 legacy test functions now have individually recorded Electron replacements. Other integration coverage must not be counted as full correspondence.",
     "pdf_diagnosis": "pdf-diagnosis-2026-11-13.json",
@@ -330,6 +334,14 @@
       "Complete the remaining legacy UI test correspondences, including gradient editing and advanced interactions.",
       "PDF raster/text acceptance: browser-mode differences isolated but all output quality gates are not accepted.",
       "Authenticated provider inference, signing/notarization and remote source/release publication remain unverified/unperformed. Windows runtime is deferred."
-    ]
+    ],
+    "source_commit": "1f2d210",
+    "logs": {
+      "unit": "/tmp/slide-studio-desktop/parity-followup-regression-final.txt",
+      "ui": "/tmp/slide-studio-desktop/parity-followup-ui-final.txt",
+      "installed": "/tmp/slide-studio-desktop/parity-followup-installed.txt",
+      "bridge": "/tmp/slide-studio-desktop/parity-followup-bridge.txt",
+      "clean_clone": "/tmp/slide-studio-desktop/parity-followup-clone-tests.txt"
+    }
   }
 }
