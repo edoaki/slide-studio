@@ -261,7 +261,10 @@ function move(dir) {
 function jump(dir) { return go(index, dir > 0 ? Infinity : 0); }
 let previewSize = null;
 function resize(size) {
-  if (size && Number.isFinite(size.width) && Number.isFinite(size.height) && size.width > 0 && size.height > 0) previewSize = size;
+  const currentViewport = value => value && Number.isFinite(value.width) && Number.isFinite(value.height)
+    && value.width > 0 && value.height > 0 && Math.abs(value.width - innerWidth) < 1 && Math.abs(value.height - innerHeight) < 1;
+  if (currentViewport(size)) previewSize = size;
+  else if (!currentViewport(previewSize)) previewSize = null;
   if (document.body.classList.contains('export')) return;
   // iframe の innerWidth/Height は整数に丸められるため、端に白い隙間が出る。
   // GUI のプレビューは実際の枠の小数を含む寸法で合わせる。

@@ -176,3 +176,13 @@ for(const area of ['paragraph','heading','cell'] as const)test(`direct ${area} e
  else{const target=area==='cell'?frame.locator('td').filter({hasText:'一'}):frame.locator('.slide.active p').filter({hasText:'最初の段落。'});await target.click();await target.click({position:{x:10,y:10}});}
  const input=frame.locator('.slide-studio-editing');await input.fill('失敗しても残る入力');const failure=page.waitForResponse(r=>r.url().endsWith('/chunks')&&r.status()===503);await page.keyboard.press('Escape');await failure;await page.waitForFunction(()=>document.querySelector('#status')?.textContent==='保存待ち');await input.waitFor();assert.equal(await input.innerText(),'失敗しても残る入力');assert.doesNotMatch(await readFile(ws.qmd('talk'),'utf8'),/失敗しても残る入力/);fail=false;await page.keyboard.press('Escape');await saved(ws,'失敗しても残る入力');await page.waitForFunction(()=>!['保存待ち','保存中','変換中'].includes(document.querySelector('#status')?.textContent||''));assert.deepEqual((await readFile(ws.qmd('talk'),'utf8')).match(/失敗しても残る入力/g)?.length,1);
 });
+
+test('preview resizing immediately uses the current viewport and ignores delayed old dimensions',{timeout:60000},async t=>{
+ const {page,errors}=await setup(t,DOC),frame=page.frameLocator('#slideBox > iframe:not(.loading)');let old={width:300,height:168.75};
+ for(const width of [400,714.25,900,1100,500]){
+  await page.locator('#slideBox').evaluate((el,w)=>(el as HTMLElement).style.width=`${w}px`,width);
+  const result=await frame.locator('#stage').evaluate((el,old)=>{dispatchEvent(new Event('resize'));const native=el.getBoundingClientRect().width;(window as any).deck.resize(old);return {native,delayed:el.getBoundingClientRect().width,viewport:innerWidth};},old);
+  assert.ok(Math.abs(result.native-width)<1,JSON.stringify(result));assert.ok(Math.abs(result.delayed-width)<1,JSON.stringify(result));old={width,height:width*9/16};
+ }
+ assert.deepEqual(errors,[]);
+});

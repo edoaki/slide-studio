@@ -31,20 +31,14 @@ export class Preview {
     this.failureReloads = 0;
     this.failureReloadAt = 0;
     this.failureTimer = 0;
-    this.fitFrame = 0;
     this.editLayoutListeners = new Set();
     this.editIntentListeners = new Set();
     this.navigation = new Set();
-    // 枠の大きさが変わったら、同じフレームのうちに中の縮尺も合わせる。
-    // iframe の中の ResizeObserver だけだと1フレーム遅れ、広げた分が一瞬むき出しになる。
-    // The bridge call is asynchronous now; coalesce to one resize per frame.
+    // ResizeObserver already batches layout changes. Send the fractional
+    // dimensions now; another animation frame would leave an old-sized slide.
     this.fit = new ResizeObserver(() => {
-      if (this.fitFrame) return;
-      this.fitFrame = requestAnimationFrame(() => {
-        this.fitFrame = 0;
-        this.client?.api.resize().catch(() => {});
-        this.pendingClient?.api.resize().catch(() => {});
-      });
+      this.client?.api.resize().catch(() => {});
+      this.pendingClient?.api.resize().catch(() => {});
     });
     this.fit.observe(box);
   }
@@ -283,8 +277,6 @@ export class Preview {
     this.onChange = () => {}; this.onLoad = () => {};
     if (this.failureTimer) clearTimeout(this.failureTimer);
     this.failureTimer = 0;
-    if (this.fitFrame) cancelAnimationFrame(this.fitFrame);
-    this.fitFrame = 0;
     this.fit.disconnect();
     for (const [frame, client] of [[this.pending, this.pendingClient], [this.frame, this.client]]) {
       client?.destroy();

@@ -769,7 +769,7 @@ function headSignature(html: string): Record<string, unknown> {
 function migratedHeadSignature(html: string): Record<string, unknown> {
   const head = headSignature(html);
   head.player = String(head.player).replace('function resize() {',
-    'let previewSize = null;\nfunction resize(size) {\n  if (size && Number.isFinite(size.width) && Number.isFinite(size.height) && size.width > 0 && size.height > 0) previewSize = size;')
+    'let previewSize = null;\nfunction resize(size) {\n  const currentViewport = value => value && Number.isFinite(value.width) && Number.isFinite(value.height)\n    && value.width > 0 && value.height > 0 && Math.abs(value.width - innerWidth) < 1 && Math.abs(value.height - innerHeight) < 1;\n  if (currentViewport(size)) previewSize = size;\n  else if (!currentViewport(previewSize)) previewSize = null;')
     .replace('const frame = window.__slideStudioFill ? window.frameElement?.getBoundingClientRect() : null;',
       'const frame = window.__slideStudioFill ? previewSize ?? window.frameElement?.getBoundingClientRect() : null;');
   return head;
