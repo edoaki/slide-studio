@@ -181,7 +181,7 @@ test('native image paste inserts after the selected paragraph, preserves pixels 
  const {ws,page,errors,app}=await setup(t,'## 貼り付け {#one}\n\n最初の段落。\n\n次の段落。\n');const original=await readFile(ws.qmd('talk'),'utf8');
  const png='iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAIAAADwyuo0AAAAEElEQVR4nGP4z8AARwzIHABvqgf5gNwAKAAAAABJRU5ErkJggg==';
  await app.evaluate(async({clipboard,ClipboardItem},png)=>{
-   const backup=await Promise.all((await clipboard.read()).map(async item=>new ClipboardItem(Object.fromEntries(await Promise.all(item.types.map(async type=>[type,await item.getType(type)]))))));
+   const backup=await Promise.all((await clipboard.read()).filter(item=>item.types.length>0).map(async item=>new ClipboardItem(Object.fromEntries(await Promise.all(item.types.map(async type=>[type,await item.getType(type)]))))));
    await clipboard.write([new ClipboardItem({'image/png':new Blob([Buffer.from(png,'base64')],{type:'image/png'})})]);
    const signature=async()=>Promise.all((await clipboard.read()).map(async item=>Promise.all(item.types.map(async type=>{const data=await item.getType(type);return [type,data instanceof Blob?Buffer.from(await data.arrayBuffer()).toString('base64'):JSON.stringify(data)];}))));
    const written=JSON.stringify(await signature());
