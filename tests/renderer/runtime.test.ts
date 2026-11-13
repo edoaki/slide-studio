@@ -330,3 +330,28 @@ test("blocked HTTPS image and fetch fail without incomplete output", {
   assert.equal(existsSync(files.outputDir), false);
   await assertProfilesRemoved(root);
 });
+
+test("selected steps may return to zero without capturing the previous step", { timeout: TEST_TIMEOUT_MS, skip: !E2E }, async (t) => {
+  const root = await scratch(t);
+  const files = await writeCase(root, "unordered-steps", deckHtml({script: `
+window.deck.pdfSteps = () => [2, 0];
+window.deck.go = async (i, step) => {
+  await go(i, step);
+  requestAnimationFrame(() => {
+    document.querySelector('h1').textContent = 'Step ' + step;
+    document.body.style.background = step === 0 ? '#ff0000' : '#0000ff';
+  });
+};
+`}), {screenshots: true});
+  const run = await runJob(files.jobPath, childEnv(root));
+  assert.equal(run.code, 0, run.stderr);
+  const result = parseResult(run);
+  assert.deepEqual(resultErrors(result), []);
+  const manifest = JSON.parse(await readFile(join(files.outputDir, "manifest.json"), "utf8"));
+  assert.deepEqual(manifest.steps.map((step: {step:number}) => step.step), [2, 0]);
+  const images = await readdir(join(files.outputDir, "screenshots"));
+  assert.equal(images.length, 2);
+  const [first, second] = await Promise.all(images.map(name => readFile(join(files.outputDir, "screenshots", name))));
+  assert.ok(!first!.equals(second!), "returning to zero must paint a different slide state");
+  await assertProfilesRemoved(root);
+});

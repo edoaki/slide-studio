@@ -490,16 +490,23 @@ export async function renderDeck(
       const captureSteps = job.allSteps
         ? await deadline.race(contents.executeJavaScript(`Array.from({length: deck.maxStep(${slide}) + 1}, (_, i) => i)`, true)) as number[]
         : selected;
+      let settledStep = 0;
       for (const value of captureSteps) {
         const step = Number(value);
         if (!Number.isInteger(step) || step < 0) {
           throw new Error(`deck.pdfSteps(${slide}) returned an invalid step: ${String(value)}`);
         }
-        await deadline.race(contents.executeJavaScript(
-          `deck.go(${slide}, ${step}, false)`,
-          true,
-        ));
-        await deadline.race(contents.executeJavaScript(SETTLE_EXPRESSION, true));
+        // Step zero was already positioned and settled before reading metadata.
+        // Retain the paint barrier for every actual step change, including a
+        // later return to zero when a custom deck supplies unordered steps.
+        if (step !== settledStep) {
+          await deadline.race(contents.executeJavaScript(
+            `deck.go(${slide}, ${step}, false)`,
+            true,
+          ));
+          await deadline.race(contents.executeJavaScript(SETTLE_EXPRESSION, true));
+          settledStep = step;
+        }
 
         const layout = await collectLayout();
         let screenshot: string | undefined;
