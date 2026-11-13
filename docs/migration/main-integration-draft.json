@@ -1,0 +1,35 @@
+{
+  "repository": "edoaki/slide-studio",
+  "base": "main",
+  "head": "migration/electron",
+  "draft": true,
+  "title": "Migrate Slide Studio from Python to TypeScript and Electron",
+  "summary": "Preserve the original editor and migrate workspace, AI, rendering, CLI and desktop hosting to TypeScript/Electron. Source startup uses npm install / npm start; packaged applications bundle Pandoc without requiring Python or uv. Preserve the Python reference on legacy/python.",
+  "verification": [
+    "478 core/integration tests passed; 148 non-live GUI scenarios have passing evidence across the complete run and one targeted clipboard test-setup recheck.",
+    "Current arm64 DMG installed and verified; current Intel workflow passed under Rosetta. Windows installer built; runtime verification deferred.",
+    "Authenticated Codex and Antigravity editing/review/restoration verified.",
+    "Isolated packaged macOS app replacement, app-only removal and reinstall preserve authored files and saved workspace selection.",
+    "71 renderer state screenshots remain byte-identical after the rendering optimization."
+  ],
+  "remaining": [
+    "User visual acceptance of application, PDF and locally prepared website",
+    "Claude login and live verification",
+    "Signing/notarization and formal public release",
+    "Automatic update UI/download/restart and signed update delivery are not implemented; manual replacement is verified",
+    "Native Intel hardware verification and explicitly deferred Windows verification"
+  ],
+  "creation_attempt": {
+    "result": "blocked",
+    "http_status": 403,
+    "message": "Resource not accessible by integration",
+    "tool": "GitHub create_pull_request",
+    "remote_pr_created": false,
+    "main_merged": false
+  },
+  "records": [
+    "status.json",
+    "autonomous-followup-2026-11-13.json",
+    "manual-lifecycle-2026-11-13.json"
+  ]
+}
