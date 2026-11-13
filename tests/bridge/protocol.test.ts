@@ -46,7 +46,7 @@ interface Identity { deck: string; version: string; generation: string }
 interface Slide {
   index: number; page: number | null; id: string; title: string; chapter: boolean;
   group: string; sectionStart: boolean; maxStep: number; pdfMarks: number[];
-  stageNumbers?: number[];
+  stageNumbers?: number[]; cites?: string[];
 }
 interface Snapshot extends Identity {
   index: number; step: number; maxStep: number; slides: Slide[];
@@ -270,4 +270,16 @@ test('direct editing boundary rejects unknown operations, invalid author layouts
  assert.equal(event('text.state',{...base,lease:'session',kind:'finished',html:'text',state:null}),true);
  assert.equal(event('text.state',{...base,lease:'session',kind:'finished',html:'x'.repeat(1000001),state:null}),false);
  assert.equal(event('text.state',{...base,lease:'session',kind:'finished',html:'text',state:{rect:{left:NaN}}}),false);
+});
+
+
+test("citation keys cross the preview boundary as bounded copied data", () => {
+ const cites=["paper", "日本語-key"];
+ const value={...snapshot,slides:[{...slide,cites}]};
+ assert.equal(p.validateSnapshot(value,identity),true);
+ const parsed=p.parseSnapshot(value,identity)!;
+ assert.deepEqual(parsed.slides[0]?.cites,cites);
+ cites.push("changed");assert.deepEqual(parsed.slides[0]?.cites,["paper","日本語-key"]);
+ for(const invalid of [[null], [""], ["x".repeat(4097)],Array(4097).fill("paper")])
+  assert.equal(p.validateSnapshot({...value,slides:[{...slide,cites:invalid}]},identity),false);
 });

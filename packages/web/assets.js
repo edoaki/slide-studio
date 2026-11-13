@@ -121,6 +121,7 @@ export function makeAssets(ctx) {
     c._item = item;
     return mark(c, item);
   }
+  let renderedItems = null;
   function render() {
     if (dead) return;
     const imgs = data?.images || [], html = data?.html || [];
@@ -129,6 +130,11 @@ export function makeAssets(ctx) {
       b.querySelector('.n').textContent = data ? (b.dataset.kind === 'images' ? imgs.length : html.length) : '';
     });
     if (!shown()) return;
+    const signature = JSON.stringify([kind, listed(), ctx.text]);
+    // An identical background refresh must not replace a pressed upload or
+    // preview button between pointerdown and click.
+    if (signature === renderedItems && view.querySelector('.as-grid')) { paint(); return; }
+    renderedItems = signature;
     const keep = view.scrollTop;
     const g = document.createElement('div'); g.className = 'as-grid';
     // HTML は トピックの図 → 図の形式でない の順（区切りは線だけ）

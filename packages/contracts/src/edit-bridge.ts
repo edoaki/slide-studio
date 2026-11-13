@@ -3,6 +3,7 @@ export const EDIT_BRIDGE_PROTOCOL = "slide-studio-edit/1" as const;
 export interface FrameIdentity { deck: string; version: string; generation: string }
 export interface SlideSnapshot {
   index: number; page: number | null; id: string; title: string; chapter: boolean;
+  cites?: string[];
   group: string; sectionStart: boolean; maxStep: number; pdfMarks: number[];
 }
 export interface FrameSnapshot extends FrameIdentity {

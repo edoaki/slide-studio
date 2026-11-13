@@ -1,3 +1,4 @@
+import { legacyHtml } from './legacy-html.js';
 /**
  * Faithful TypeScript port of `.reference/parity/render.py` plus
  * `.reference/parity/steps.py`.
@@ -495,7 +496,7 @@ function assemble(
   missing: string[],
 ): LegacyRendered {
   const folder = ws.deck_dir(deck);
-  const $ = cheerio.load(`<div id="slide-studio-root">${body}</div>`, null, false);
+  const $ = legacyHtml(`<div id="slide-studio-root">${body}</div>`);
   const root = $("#slide-studio-root").first();
 
   if (pyTruthy(doc.meta.topic)) {
@@ -787,7 +788,7 @@ function assemble(
   }
   shell("body").attr("data-slide-studio-deck", deck);
   const stage = shell("#stage").first();
-  for (const section of sections) stage.append(section);
+  for (const section of sections) stage.append($.html(section));
   for (const anchor of stage.find("a[href]").toArray() as any[]) {
     const link = shell(anchor);
     const href = link.attr("href") ?? "";

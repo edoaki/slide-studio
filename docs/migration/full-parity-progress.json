@@ -294,7 +294,7 @@
     "remaining": [
       "Complete the 377-case legacy UI test correspondence; integration coverage is not a claim that every old test passes.",
       "Live authenticated inference for each provider and full OS capability classification.",
-      "Finish edge rendering goldens and PDF visual/text comparison.",
+      "Finish PDF visual/text comparison; all seven edge rendering goldens now pass.",
       "Windows runtime and Intel Mac runtime verification are not performed; Windows is deferred by user.",
       "Developer ID/notarization, Windows signing and public GitHub release are not configured."
     ],
@@ -302,9 +302,34 @@
     "edge_rendering": {
       "reference_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
       "reference_regenerated_exactly": 7,
-      "passed": 6,
-      "todo": 1,
-      "pending": "Malformed raw HTML parser repair differs; retained as an explicit TODO test, not counted as passing. PDF visual/text acceptance remains pending."
+      "passed": 7,
+      "todo": 0,
+      "pending": "Raw HTML differential resolved in followup; PDF visual/text acceptance still pending."
     }
+  },
+  "followup_2026_11_13": {
+    "status": "source_verified_installers_refreshing",
+    "resolved": [
+      "Malformed raw HTML differential: all 27 legacy render fixtures now pass, including all seven edge cases.",
+      "Bibliography editor: citation-page usage travels over the validated frame bridge; year/date editing, cancellation and reload work in editor and topic views.",
+      "Insertion finishes the existing text lease through the bridge instead of accessing a cross-origin Window property.",
+      "Identical asset refresh preserves pressed upload/preview controls.",
+      "Cover-author toolbar only targets the active cover slide and disappears on page navigation."
+    ],
+    "new_e2e": "tests/e2e/legacy-authoring.test.ts verifies bibliography year/date, table populated/empty cells, and presentation current-page/first-step/return behavior.",
+    "test_accounting": {
+      "unit_contract_passed": 430,
+      "unit_contract_skipped": 7,
+      "unit_contract_todo": 0,
+      "unit_contract_failed": 0
+    },
+    "legacy_ui_mapping": "3 of 377 legacy test functions now have individually recorded Electron replacements. Other integration coverage must not be counted as full correspondence.",
+    "pdf_diagnosis": "pdf-diagnosis-2026-11-13.json",
+    "remaining": [
+      "Complete theme-control and live-layout-lint frame adaptation; old direct-frame code remains in those modules.",
+      "Complete the remaining legacy UI test correspondences, including gradient editing and advanced interactions.",
+      "PDF raster/text acceptance: browser-mode differences isolated but all output quality gates are not accepted.",
+      "Authenticated provider inference, signing/notarization and remote source/release publication remain unverified/unperformed. Windows runtime is deferred."
+    ]
   }
 }

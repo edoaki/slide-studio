@@ -14,11 +14,11 @@
       "cover-authors",
       "topic-image",
       "figure-title",
-      "bibliography"
+      "bibliography",
+      "raw-tags"
     ],
     "normalization": "Only whitespace-only nodes inside empty cover-author placeholders are normalized.",
-    "pending": [
-      "raw-tags: malformed raw HTML is repaired differently by parse5 and BeautifulSoup html.parser; test remains TODO and is not counted as passing."
-    ]
+    "pending": [],
+    "fix": "Preserve legacy explicit-close parsing before final browser HTML parsing; no adoption of unterminated formatting across source blocks."
   }
 }

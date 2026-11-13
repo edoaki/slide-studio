@@ -18,10 +18,10 @@ export function makeBibliography(ctx) {
   let entries = [], dead = false, request = 0;
   function draw() {
     if (dead) return;
-    const slides = [...(ctx.preview.win?.document.querySelectorAll('section.slide') || [])];
+    const slides = ctx.preview.client?.snapshot?.slides || [];
     const bib = entries.map(e => {
-      const pages = slides.flatMap((s, index) => [...s.querySelectorAll('[data-cites]')].some(n => n.dataset.cites.split(/\s+/).includes(e.key))
-        ? [{index, title: `${index + 1} · ${s.querySelector('h1,h2')?.textContent || s.id}`}] : []);
+      const pages = slides.flatMap((s, index) => s.cites?.includes(e.key)
+        ? [{index, title: `${index + 1} · ${s.title || s.id}`}] : []);
       return {...e, pages, decks: pages.length ? [ctx.deck] : []};
     });
     view.update({bib, recent: []});

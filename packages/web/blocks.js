@@ -879,6 +879,7 @@ export function makeBlocks(ctx) {
 
   const figOf = c => c?.kind === 'fig' ? op.figRef(ctx.text.slice(c.start, c.end)) : null;
   ctx.blocks = {
+    finish: () => legacyEdit()?.finish?.(),
     setReadOnly(value) {
       readOnly = value;
       if (!value) { configureFrame(); return; }

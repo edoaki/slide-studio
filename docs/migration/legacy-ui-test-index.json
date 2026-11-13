@@ -237,8 +237,9 @@
         "field"
       ],
       "parameterized": true,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "original bibliography edits year/date in editor and topic, cancels and survives reload"
     },
     {
       "id": "tests/e2e/test_bibliography.py::test_bibliography_edit_form_shows_whole_text",
@@ -3114,8 +3115,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "original presentation starts at current page, advances and restores editor state"
     },
     {
       "id": "tests/e2e/test_present.py::test_horizontal_wheel_moves_pages_once_per_gesture",
@@ -3657,8 +3659,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "evidence": "original table edits populated and empty cells, saves and reloads"
     },
     {
       "id": "tests/e2e/test_table_edit.py::test_table_size_bold_and_reset",
@@ -4224,5 +4227,6 @@
       "status": "pending_electron_parity",
       "replacement_test": null
     }
-  ]
+  ],
+  "coverage_note": "Only individually checked correspondences are marked covered. Broader integration tests do not imply all 377 legacy functions are equivalent."
 }

@@ -131,6 +131,7 @@ function validSlide(value) {
   if (!isSafeString(value.group, { allowEmpty: true })) return false;
   if (!isFiniteInteger(value.maxStep, 0, MAX_STEPS)) return false;
   if (!Array.isArray(value.pdfMarks) || !value.pdfMarks.every(m => isFiniteInteger(m, 0, MAX_STEPS))) return false;
+  if (value.cites !== undefined && (!Array.isArray(value.cites) || value.cites.length > 4096 || !value.cites.every(key => isSafeString(key, {max:4096})))) return false;
   if (value.stageNumbers !== undefined) {
     if (!Array.isArray(value.stageNumbers)) return false;
     if (!value.stageNumbers.every(n => isFiniteInteger(n, 0, MAX_STEPS))) return false;
@@ -171,6 +172,7 @@ export function parseSnapshot(value, expected) {
         chapter: s.chapter, group: s.group, sectionStart: s.sectionStart,
         maxStep: s.maxStep, pdfMarks: s.pdfMarks.slice(),
       };
+      if (Array.isArray(s.cites)) slide.cites = s.cites.slice();
       if (Array.isArray(s.stageNumbers)) slide.stageNumbers = s.stageNumbers.slice();
       return slide;
     }),

@@ -64,6 +64,7 @@ test('original Electron editor renders shared figures, checks all steps and expo
  const paragraph=preview.locator('.slide.active [data-slide-studio]').filter({hasText:'日本語の本文'});
  await page.locator('#stage[data-blocks=ready]').waitFor();
 
+ await page.getByRole('toolbar',{name:'名前と所属',exact:true}).waitFor({state:'hidden'});
  const plot=preview.locator('.slide.active img[src*="plot.png"]');await plot.click();
  const corner=preview.locator('.bh.corner').last();await corner.waitFor();let bounds=await corner.boundingBox();
  for(let attempt=0;!bounds&&attempt<20;attempt++){await page.waitForTimeout(50);bounds=await corner.boundingBox();}assert.ok(bounds);

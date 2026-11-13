@@ -1,0 +1,242 @@
+{
+  "status": "diagnosed_partially_not_accepted",
+  "input_sha256": "f043c564e66b78550f1ddedbb8b9879d11fd61d7742486401fb200517fdc26e9",
+  "reference": "Frozen original Python PDF and regenerated original pdf_from_html; same input HTML.",
+  "browser_isolation": [
+    {
+      "page": 3,
+      "headless_shell_matches_legacy_raw": true,
+      "full_chromium_matches_electron_raw": false,
+      "electron_merge_preserves_text": true
+    },
+    {
+      "page": 12,
+      "headless_shell_matches_legacy_raw": true,
+      "full_chromium_matches_electron_raw": false,
+      "electron_merge_preserves_text": true
+    },
+    {
+      "page": 13,
+      "headless_shell_matches_legacy_raw": true,
+      "full_chromium_matches_electron_raw": true,
+      "electron_merge_preserves_text": true
+    },
+    {
+      "page": 14,
+      "headless_shell_matches_legacy_raw": true,
+      "full_chromium_matches_electron_raw": true,
+      "electron_merge_preserves_text": true
+    }
+  ],
+  "raster_comparison": {
+    "dpi": 72,
+    "pages": [
+      {
+        "page": 1,
+        "exact": true,
+        "mean_channel_error": 0.0,
+        "changed_pixel_fraction": 0.0,
+        "difference_bounds": null
+      },
+      {
+        "page": 2,
+        "exact": true,
+        "mean_channel_error": 0.0,
+        "changed_pixel_fraction": 0.0,
+        "difference_bounds": null
+      },
+      {
+        "page": 3,
+        "exact": false,
+        "mean_channel_error": 1.7009362139917696,
+        "changed_pixel_fraction": 0.031267361111111114,
+        "difference_bounds": [
+          135,
+          82,
+          803,
+          436
+        ]
+      },
+      {
+        "page": 4,
+        "exact": false,
+        "mean_channel_error": 0.08219585905349794,
+        "changed_pixel_fraction": 0.0009490740740740741,
+        "difference_bounds": [
+          134,
+          84,
+          243,
+          498
+        ]
+      },
+      {
+        "page": 5,
+        "exact": false,
+        "mean_channel_error": 0.2689988425925926,
+        "changed_pixel_fraction": 0.005925925925925926,
+        "difference_bounds": [
+          47,
+          83,
+          565,
+          426
+        ]
+      },
+      {
+        "page": 6,
+        "exact": false,
+        "mean_channel_error": 0.9472003600823046,
+        "changed_pixel_fraction": 0.016095679012345678,
+        "difference_bounds": [
+          46,
+          82,
+          570,
+          454
+        ]
+      },
+      {
+        "page": 7,
+        "exact": false,
+        "mean_channel_error": 0.0610789609053498,
+        "changed_pixel_fraction": 0.0007600308641975309,
+        "difference_bounds": [
+          136,
+          118,
+          242,
+          138
+        ]
+      },
+      {
+        "page": 8,
+        "exact": false,
+        "mean_channel_error": 0.04356610082304527,
+        "changed_pixel_fraction": 0.0005767746913580247,
+        "difference_bounds": [
+          135,
+          364,
+          240,
+          383
+        ]
+      },
+      {
+        "page": 9,
+        "exact": true,
+        "mean_channel_error": 0.0,
+        "changed_pixel_fraction": 0.0,
+        "difference_bounds": null
+      },
+      {
+        "page": 10,
+        "exact": false,
+        "mean_channel_error": 0.08289994855967078,
+        "changed_pixel_fraction": 0.000939429012345679,
+        "difference_bounds": [
+          136,
+          83,
+          242,
+          137
+        ]
+      },
+      {
+        "page": 11,
+        "exact": true,
+        "mean_channel_error": 0.0,
+        "changed_pixel_fraction": 0.0,
+        "difference_bounds": null
+      },
+      {
+        "page": 12,
+        "exact": false,
+        "mean_channel_error": 1.3123951903292181,
+        "changed_pixel_fraction": 0.020733024691358026,
+        "difference_bounds": [
+          107,
+          178,
+          833,
+          445
+        ]
+      },
+      {
+        "page": 13,
+        "exact": true,
+        "mean_channel_error": 0.0,
+        "changed_pixel_fraction": 0.0,
+        "difference_bounds": null
+      },
+      {
+        "page": 14,
+        "exact": true,
+        "mean_channel_error": 0.0,
+        "changed_pixel_fraction": 0.0,
+        "difference_bounds": null
+      },
+      {
+        "page": 15,
+        "exact": false,
+        "mean_channel_error": 0.1350192901234568,
+        "changed_pixel_fraction": 0.0015567129629629629,
+        "difference_bounds": [
+          134,
+          394,
+          242,
+          450
+        ]
+      },
+      {
+        "page": 16,
+        "exact": true,
+        "mean_channel_error": 0.0,
+        "changed_pixel_fraction": 0.0,
+        "difference_bounds": null
+      },
+      {
+        "page": 17,
+        "exact": false,
+        "mean_channel_error": 0.04585133744855967,
+        "changed_pixel_fraction": 0.0007060185185185185,
+        "difference_bounds": [
+          102,
+          81,
+          188,
+          410
+        ]
+      },
+      {
+        "page": 18,
+        "exact": false,
+        "mean_channel_error": 0.2896855709876543,
+        "changed_pixel_fraction": 0.004211033950617284,
+        "difference_bounds": [
+          126,
+          151,
+          417,
+          410
+        ]
+      },
+      {
+        "page": 19,
+        "exact": true,
+        "mean_channel_error": 0.0,
+        "changed_pixel_fraction": 0.0,
+        "difference_bounds": null
+      },
+      {
+        "page": 20,
+        "exact": true,
+        "mean_channel_error": 0.0,
+        "changed_pixel_fraction": 0.0,
+        "difference_bounds": null
+      }
+    ],
+    "exact_pages": 9,
+    "total_pages": 20,
+    "status": "comparison_only_not_visual_acceptance"
+  },
+  "findings": [
+    "The original exporter uses Chromium Headless Shell 156.0.8078.4. Running full Chromium of that exact version changes extracted text on pages 13 and 14; full Chromium and Electron raw text match on those pages.",
+    "All four inspected raw Electron pages retain exactly the same extracted text after pdf-lib merging. Disabling PDF tagging makes no difference on these pages.",
+    "Original raw pages 3, 12, 13 and 14 match the original pypdf-merged pages; page merging is not the cause of these differences.",
+    "Page 13 is pixel-identical at 72 dpi despite text extraction differences. Do not classify text as lost merely from a string mismatch, or accept PDF parity solely from raster equality.",
+    "All 20 pages were raster-compared at 72 dpi: 9 exact, 11 have differences. Visible text, glyph positions, links and search/copy quality still require acceptance checks."
+  ],
+  "artifacts": "/tmp/slide-studio-desktop/pdf-diagnosis"
+}

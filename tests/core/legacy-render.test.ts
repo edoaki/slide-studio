@@ -875,7 +875,7 @@ test("render_text matches the Python render golden", async (t) => {
 
 test("render_text retains legacy raw HTML, cover, figure and bibliography edge cases", async (t) => {
  const entries=JSON.parse(readFileSync(join(ROOT,"tests/fixtures/render-parity/edge-golden.json"),"utf8")) as (GoldenEntry & {files:Record<string,string>})[];
- for(const entry of entries) await t.test(entry.name,{todo:entry.name==="raw-tags" ? "Malformed raw HTML adoption differs from the legacy html.parser; retain the differential until fixed" : false},async()=>{
+ for(const entry of entries) await t.test(entry.name,async()=>{
   const root=await scratch(t),ws=Workspace.open(root);ws.new_deck("parity","test");
   for(const [path,content] of Object.entries(entry.files)){await mkdir(dirname(join(root,path)),{recursive:true});await writeFile(join(root,path),content);}
   const rendered=await render_text(ws,"parity",entry.text,{pandocPath:PANDOC!});

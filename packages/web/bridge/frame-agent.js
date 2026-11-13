@@ -272,6 +272,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       return {
         index, page, id, title, chapter, group, sectionStart,
         maxStep, pdfMarks,
+        cites: [...new Set(Array.from(slide.querySelectorAll('[data-cites]')).flatMap(n => String(n.dataset.cites || '').split(/\s+/).filter(Boolean)))].slice(0, 4096).map(key => clampString(key, 4096)),
       };
     });
     cachedSlides = slides;

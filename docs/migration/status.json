@@ -168,11 +168,11 @@
     }
   ],
   "next_work": [
-    "Resolve malformed raw HTML differential and finish all 377 original UI test correspondences.",
-    "Finish PDF visual/text comparison against the frozen Python baseline.",
-    "Verify authenticated live inference and recovery for every provider when accounts are available.",
-    "Windows runtime validation is deferred by explicit user instruction; Intel runtime remains untested.",
-    "Configure signing/notarization and publish GitHub source/releases when the migration acceptance gates are satisfied."
+    "Complete theme-control and live-layout-lint frame adaptation; direct-frame legacy code remains.",
+    "Finish the remaining original UI correspondences (3 of 377 individually mapped; broader integration coverage is recorded separately).",
+    "Finish PDF visual/text acceptance; browser-mode differences diagnosed in pdf-diagnosis-2026-11-13.json.",
+    "Verify authenticated inference/recovery for every provider.",
+    "Windows runtime is deferred by user. Intel runtime, Developer ID/notarization, Windows signing and public GitHub source/release are not completed."
   ],
   "source_commits": {
     "renderer": "b53890b",

@@ -179,7 +179,7 @@ export function makeInsert(ctx) {
   async function settle() {
     ctx.qmdBlocks?.input?.blur();
     if (ctx.blocks?.editing) {
-      ctx.preview.win?.slideStudioEdit?.finish?.();
+      await ctx.blocks.finish?.();
       for (let i = 0; i < 100 && ctx.blocks.editing && !dead; i++) await sleep(30);
     }
   }
