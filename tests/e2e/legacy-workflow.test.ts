@@ -12,7 +12,7 @@ import { add } from '../../packages/core/src/legacy-assets.js';
 import { new_figure } from '../../packages/core/src/legacy-figures.js';
 import { execute } from '../../packages/ai/src/process.js';
 const require=createRequire(import.meta.url);
-test('original Electron editor renders shared figures, checks all steps and exports offline HTML and selected-step PDF', {timeout:120000}, async t=>{
+test('original Electron editor renders shared figures, checks all steps and exports offline HTML and selected-step PDF', {timeout:Number(process.env.SLIDE_STUDIO_WORKFLOW_TIMEOUT||120000)}, async t=>{
  const temp=await mkdtemp(join(tmpdir(),'studio-workflow-'));const ws=Workspace.open(join(temp,'workspace'));ws.new_deck('talk','test');await new_figure(ws,'chart',ws.shelf_dir('test'));add(ws,'talk','plot.png',Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWZkAAAAASUVORK5CYII=','base64'));
  await writeFile(ws.qmd('talk'),'---\ntitle: 日本語の発表\nauthor:\n  - name: 発表者\n    affiliation: 研究室\ntopic: test\ntheme: default\n---\n\n## 発表タイトル {#cover .cover}\n\n::: {.cover-title}\n日本語の発表\n:::\n\n## 原稿と数式 {#intro}\n\n日本語の本文と $a+b$。\n\n![](images/plot.png){width=80}\n\n## 図の説明 {#chart pdf="1,2"}\n\n{{< fig test/chart >}}\n');
  const env:Record<string,string>=Object.fromEntries(Object.entries(process.env).filter((e):e is [string,string]=>e[1]!==undefined));env.SLIDE_STUDIO_ELECTRON_HOME=join(temp,'profile');delete env.ELECTRON_RUN_AS_NODE;

@@ -7,15 +7,20 @@ import {createRequire} from 'node:module';
 import {_electron} from 'playwright-core';
 import {Workspace} from '../../packages/core/src/legacy-workspace.js';
 const require=createRequire(import.meta.url);
+const liveProvider=process.env.SLIDE_STUDIO_LIVE_PROVIDER||'codex';
 // Explicit opt-in: this test sends real inference requests using an existing login.
-test('live Codex edits a scratch memo through chat and restores the saved original',{
+test(`live ${liveProvider} edits a scratch memo through chat and restores the saved original`,{
  skip:process.env.SLIDE_STUDIO_LIVE_AI!=='1',timeout:300000,
 },async t=>{
  const temp=await mkdtemp(join(tmpdir(),'studio-live-ai-')),ws=Workspace.open(join(temp,'workspace'));ws.new_deck('talk','test');
  const before='接続確認用の原稿。\n';await writeFile(ws.memo('talk'),before);
  const env:Record<string,string>=Object.fromEntries(Object.entries(process.env).filter((e):e is [string,string]=>e[1]!==undefined));delete env.ELECTRON_RUN_AS_NODE;
- Object.assign(env,{SLIDE_STUDIO_ELECTRON_HOME:join(temp,'profile'),SLIDE_STUDIO_CODEX_HOME:process.env.SLIDE_STUDIO_CODEX_HOME||join(homedir(),'.codex'),SLIDE_STUDIO_CLAUDE:'none',SLIDE_STUDIO_AGY:'none'});
- const app=await _electron.launch({executablePath:require('electron'),args:[join(process.cwd(),'dist/apps/desktop/main.js'),'--root',ws.root,'--deck','talk'],env});
+ assert.ok(['codex','claude','agy'].includes(liveProvider));
+ Object.assign(env,{SLIDE_STUDIO_ELECTRON_HOME:join(temp,'profile')});
+ for(const id of ['codex','claude','agy'])if(id!==liveProvider)env[`SLIDE_STUDIO_${id.toUpperCase()}`]='none';
+ if(liveProvider==='codex')env.SLIDE_STUDIO_CODEX_HOME=process.env.SLIDE_STUDIO_CODEX_HOME||join(homedir(),'.codex');
+ const installed=process.env.SLIDE_STUDIO_TEST_APP;
+ const app=await _electron.launch({executablePath:installed?.endsWith('.app')?join(installed,'Contents/MacOS/Slide Studio'):installed||require('electron'),args:[...(installed?[]:[join(process.cwd(),'dist/apps/desktop/main.js')]),'--root',ws.root,'--deck','talk'],env});
  t.after(async()=>{await app.close();if(process.env.SLIDE_STUDIO_KEEP_LIVE_AI!=='1')await rm(temp,{recursive:true,force:true});});
  const page=await app.firstWindow();page.setDefaultTimeout(20000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.locator('[data-tab="memo"]').click();

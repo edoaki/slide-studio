@@ -8,8 +8,12 @@ permissions:
 
 jobs:
   macos:
-    name: macOS arm64 DMG
+    name: macOS ${{ matrix.arch }} DMG
     runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -34,12 +38,12 @@ jobs:
         run: npm test
 
       - name: Build macOS DMG (ad-hoc, no publish)
-        run: npm run dist:mac
+        run: node scripts/package-desktop.mjs --mac --arch ${{ matrix.arch }}
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: slide-studio-mac-arm64
+          name: slide-studio-mac-${{ matrix.arch }}
           if-no-files-found: error
           retention-days: 14
           path: |
