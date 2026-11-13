@@ -1,0 +1,412 @@
+{
+  "scope": "Fresh profiles and workspace copies per mode; same nco-intro fixture, Chrome binary and host Mac; AI disabled. RSS sum is sampled every 200 ms across host and every descendant plus isolated browser descendants. ps CPU is lifetime averaged, not an instantaneous utilization measure. Shared pages may be counted more than once. Not physical/private memory or an OS cold-cache benchmark.",
+  "fixture_sha256": "b6c1d3d1499e67a728709341038e8438c8e4573ee3d1588d4749bbcc5ef09be4",
+  "runs": [
+    {
+      "mode": "python-browser",
+      "run": 1,
+      "editable_ms": 1375.813292,
+      "edit_and_preview_ms": 495.7843329999996,
+      "html_ms": 7221.867458000001,
+      "pdf_ms": 9242.128,
+      "idle_before": {
+        "rss_kib": 2156980,
+        "cpu_percent": 25.799999999999997,
+        "processes": 22
+      },
+      "idle_after": {
+        "rss_kib": 2492100,
+        "cpu_percent": 231.20000000000002,
+        "processes": 25
+      },
+      "peak_rss_kib": 2807456,
+      "peak_cpu_percent": 398.90000000000003,
+      "residual_processes": 2
+    },
+    {
+      "mode": "electron-desktop",
+      "run": 1,
+      "editable_ms": 1936.7617500000051,
+      "edit_and_preview_ms": 398.9847079999963,
+      "html_ms": 8294.149416,
+      "pdf_ms": 10450.121833999998,
+      "idle_before": {
+        "rss_kib": 684368,
+        "cpu_percent": 14.299999999999999,
+        "processes": 4
+      },
+      "idle_after": {
+        "rss_kib": 846640,
+        "cpu_percent": 154.7,
+        "processes": 4
+      },
+      "peak_rss_kib": 1703760,
+      "peak_cpu_percent": 280.2,
+      "residual_processes": 0
+    },
+    {
+      "mode": "electron-browser",
+      "run": 1,
+      "editable_ms": 2032.0634170000121,
+      "edit_and_preview_ms": 396.9192500000063,
+      "html_ms": 8253.093041,
+      "pdf_ms": 10517.848333000002,
+      "idle_before": {
+        "rss_kib": 1440384,
+        "cpu_percent": 20.700000000000003,
+        "processes": 13
+      },
+      "idle_after": {
+        "rss_kib": 1775856,
+        "cpu_percent": 117.5,
+        "processes": 16
+      },
+      "peak_rss_kib": 2828672,
+      "peak_cpu_percent": 320.5,
+      "residual_processes": 2
+    },
+    {
+      "mode": "python-browser",
+      "run": 2,
+      "editable_ms": 1700.3837090000015,
+      "edit_and_preview_ms": 464.90916599999764,
+      "html_ms": 7240.982040999996,
+      "pdf_ms": 9235.124875000009,
+      "idle_before": {
+        "rss_kib": 2166256,
+        "cpu_percent": 21.599999999999998,
+        "processes": 22
+      },
+      "idle_after": {
+        "rss_kib": 2454956,
+        "cpu_percent": 226.8,
+        "processes": 25
+      },
+      "peak_rss_kib": 2795444,
+      "peak_cpu_percent": 401.4,
+      "residual_processes": 0
+    },
+    {
+      "mode": "electron-desktop",
+      "run": 2,
+      "editable_ms": 1455.7912080000096,
+      "edit_and_preview_ms": 401.04087500000605,
+      "html_ms": 8391.384874999989,
+      "pdf_ms": 10471.498166000005,
+      "idle_before": {
+        "rss_kib": 679264,
+        "cpu_percent": 13.9,
+        "processes": 4
+      },
+      "idle_after": {
+        "rss_kib": 894784,
+        "cpu_percent": 104,
+        "processes": 4
+      },
+      "peak_rss_kib": 1931328,
+      "peak_cpu_percent": 265.7,
+      "residual_processes": 0
+    },
+    {
+      "mode": "electron-browser",
+      "run": 2,
+      "editable_ms": 1904.1478329999954,
+      "edit_and_preview_ms": 394.14179199998034,
+      "html_ms": 8046.283292000007,
+      "pdf_ms": 10500.012916999985,
+      "idle_before": {
+        "rss_kib": 1436016,
+        "cpu_percent": 17.5,
+        "processes": 13
+      },
+      "idle_after": {
+        "rss_kib": 1762368,
+        "cpu_percent": 153.6,
+        "processes": 16
+      },
+      "peak_rss_kib": 2701856,
+      "peak_cpu_percent": 317.9,
+      "residual_processes": 2
+    },
+    {
+      "mode": "python-browser",
+      "run": 3,
+      "editable_ms": 1734.600999999995,
+      "edit_and_preview_ms": 455.5087090000161,
+      "html_ms": 7293.861875000002,
+      "pdf_ms": 9225.622457999998,
+      "idle_before": {
+        "rss_kib": 2176564,
+        "cpu_percent": 26.1,
+        "processes": 22
+      },
+      "idle_after": {
+        "rss_kib": 2443380,
+        "cpu_percent": 215.6,
+        "processes": 25
+      },
+      "peak_rss_kib": 2809948,
+      "peak_cpu_percent": 390.70000000000005,
+      "residual_processes": 2
+    },
+    {
+      "mode": "electron-desktop",
+      "run": 3,
+      "editable_ms": 1989.6351670000004,
+      "edit_and_preview_ms": 418.6624999999767,
+      "html_ms": 8392.123292000033,
+      "pdf_ms": 10563.535459000035,
+      "idle_before": {
+        "rss_kib": 684848,
+        "cpu_percent": 18.299999999999997,
+        "processes": 4
+      },
+      "idle_after": {
+        "rss_kib": 883872,
+        "cpu_percent": 163.7,
+        "processes": 4
+      },
+      "peak_rss_kib": 1739200,
+      "peak_cpu_percent": 266.7,
+      "residual_processes": 0
+    },
+    {
+      "mode": "electron-browser",
+      "run": 3,
+      "editable_ms": 1831.6051670000306,
+      "edit_and_preview_ms": 446.6594580000383,
+      "html_ms": 8166.641291000007,
+      "pdf_ms": 10546.849416999961,
+      "idle_before": {
+        "rss_kib": 1433792,
+        "cpu_percent": 15.400000000000002,
+        "processes": 13
+      },
+      "idle_after": {
+        "rss_kib": 1773600,
+        "cpu_percent": 175.5,
+        "processes": 16
+      },
+      "peak_rss_kib": 2810736,
+      "peak_cpu_percent": 347.50000000000006,
+      "residual_processes": 2
+    },
+    {
+      "mode": "python-browser",
+      "run": 4,
+      "editable_ms": 1744.6482500000275,
+      "edit_and_preview_ms": 486.28120899997884,
+      "html_ms": 7268.259290999966,
+      "pdf_ms": 9239.284624999971,
+      "idle_before": {
+        "rss_kib": 2179272,
+        "cpu_percent": 24.8,
+        "processes": 22
+      },
+      "idle_after": {
+        "rss_kib": 2402736,
+        "cpu_percent": 218,
+        "processes": 25
+      },
+      "peak_rss_kib": 2801900,
+      "peak_cpu_percent": 396.90000000000003,
+      "residual_processes": 2
+    },
+    {
+      "mode": "electron-desktop",
+      "run": 4,
+      "editable_ms": 1982.1701659999671,
+      "edit_and_preview_ms": 407.97958400001517,
+      "html_ms": 8311.636707999976,
+      "pdf_ms": 10497.832999999984,
+      "idle_before": {
+        "rss_kib": 706224,
+        "cpu_percent": 16.7,
+        "processes": 4
+      },
+      "idle_after": {
+        "rss_kib": 881776,
+        "cpu_percent": 131.1,
+        "processes": 4
+      },
+      "peak_rss_kib": 1858032,
+      "peak_cpu_percent": 307.6,
+      "residual_processes": 0
+    },
+    {
+      "mode": "electron-browser",
+      "run": 4,
+      "editable_ms": 1827.7222079999628,
+      "edit_and_preview_ms": 395.32716599997366,
+      "html_ms": 8041.446540999983,
+      "pdf_ms": 10486.576208000013,
+      "idle_before": {
+        "rss_kib": 1434624,
+        "cpu_percent": 14,
+        "processes": 13
+      },
+      "idle_after": {
+        "rss_kib": 1761328,
+        "cpu_percent": 152.2,
+        "processes": 16
+      },
+      "peak_rss_kib": 2683584,
+      "peak_cpu_percent": 345.5,
+      "residual_processes": 2
+    },
+    {
+      "mode": "python-browser",
+      "run": 5,
+      "editable_ms": 1701.2505000000237,
+      "edit_and_preview_ms": 486.44666699995287,
+      "html_ms": 7254.363957999973,
+      "pdf_ms": 9245.638000000035,
+      "idle_before": {
+        "rss_kib": 2166720,
+        "cpu_percent": 17.900000000000002,
+        "processes": 22
+      },
+      "idle_after": {
+        "rss_kib": 2458436,
+        "cpu_percent": 224.70000000000002,
+        "processes": 25
+      },
+      "peak_rss_kib": 2791680,
+      "peak_cpu_percent": 414.79999999999995,
+      "residual_processes": 0
+    },
+    {
+      "mode": "electron-desktop",
+      "run": 5,
+      "editable_ms": 1862.2687499999884,
+      "edit_and_preview_ms": 409.3173750000424,
+      "html_ms": 8426.903625000035,
+      "pdf_ms": 10547.932874999999,
+      "idle_before": {
+        "rss_kib": 679552,
+        "cpu_percent": 19.200000000000003,
+        "processes": 4
+      },
+      "idle_after": {
+        "rss_kib": 884880,
+        "cpu_percent": 162.8,
+        "processes": 4
+      },
+      "peak_rss_kib": 1821360,
+      "peak_cpu_percent": 253.99999999999997,
+      "residual_processes": 0
+    },
+    {
+      "mode": "electron-browser",
+      "run": 5,
+      "editable_ms": 1794.373332999996,
+      "edit_and_preview_ms": 408.6343329999945,
+      "html_ms": 8077.248416999995,
+      "pdf_ms": 10584.383792000008,
+      "idle_before": {
+        "rss_kib": 1437696,
+        "cpu_percent": 19.700000000000003,
+        "processes": 13
+      },
+      "idle_after": {
+        "rss_kib": 1759664,
+        "cpu_percent": 142.7,
+        "processes": 16
+      },
+      "peak_rss_kib": 2719040,
+      "peak_cpu_percent": 317.7,
+      "residual_processes": 2
+    }
+  ],
+  "summary": {
+    "python-browser": {
+      "editable_ms": {
+        "median": 1701.2505000000237,
+        "max": 1744.6482500000275
+      },
+      "edit_and_preview_ms": {
+        "median": 486.28120899997884,
+        "max": 495.7843329999996
+      },
+      "html_ms": {
+        "median": 7254.363957999973,
+        "max": 7293.861875000002
+      },
+      "pdf_ms": {
+        "median": 9239.284624999971,
+        "max": 9245.638000000035
+      },
+      "peak_rss_kib": {
+        "median": 2801900,
+        "max": 2809948
+      }
+    },
+    "electron-desktop": {
+      "editable_ms": {
+        "median": 1936.7617500000051,
+        "max": 1989.6351670000004
+      },
+      "edit_and_preview_ms": {
+        "median": 407.97958400001517,
+        "max": 418.6624999999767
+      },
+      "html_ms": {
+        "median": 8391.384874999989,
+        "max": 8426.903625000035
+      },
+      "pdf_ms": {
+        "median": 10497.832999999984,
+        "max": 10563.535459000035
+      },
+      "peak_rss_kib": {
+        "median": 1821360,
+        "max": 1931328
+      }
+    },
+    "electron-browser": {
+      "editable_ms": {
+        "median": 1831.6051670000306,
+        "max": 2032.0634170000121
+      },
+      "edit_and_preview_ms": {
+        "median": 396.9192500000063,
+        "max": 446.6594580000383
+      },
+      "html_ms": {
+        "median": 8077.248416999995,
+        "max": 8253.093041
+      },
+      "pdf_ms": {
+        "median": 10517.848333000002,
+        "max": 10584.383792000008
+      },
+      "peak_rss_kib": {
+        "median": 2719040,
+        "max": 2828672
+      }
+    }
+  },
+  "environment": {
+    "legacy_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
+    "electron_runtime_commit": "ad743a664bac7956b6632442d0d0d6a44ccd0b3e",
+    "macos": "15.4",
+    "architecture": "arm64",
+    "electron_asar_sha256": "4acba82334cb16cbb55c46b8ed1a524b2552fd3c2a6ed10ebe32248adc6bddb0"
+  },
+  "limitations": [
+    "This is a measured comparison of actual modes, not identical browser-engine versions or a release performance guarantee. External Chrome was headless in both browser modes. Electron was instrumented through its main-process inspector.",
+    "All profiles/workspaces were fresh. Electron included opening/migrating a legacy workspace; OS file caches were not cleared.",
+    "RSS is summed across processes and can double-count shared memory; ps CPU is lifetime averaged.",
+    "Some external-browser processes were still exiting at the three-second residual snapshot; no desktop child remained. No benchmark workspace/profile references remained in process command lines after the batch.",
+    "AI inference performance was not benchmarked; actual Codex and Antigravity connectivity have separate evidence."
+  ],
+  "investigation": {
+    "threshold": "10% is an investigation threshold, not a pass/fail performance guarantee.",
+    "observations": [
+      "Desktop median first-editable latency 1937 ms versus legacy browser 1701 ms; the modes have different host/inspector startup and workspace migration paths.",
+      "Desktop median edit-to-preview latency 408 ms versus 486 ms; peak summed RSS 1821360 KiB versus 2801900 KiB.",
+      "Export was 11\u201316% slower in the pre-optimization Electron build. The renderer repositioned and waited for step zero twice per slide; redundant transitions were removed while retaining paint barriers on every actual step change."
+    ],
+    "followup": "Renderer before/after timings and screenshot identity are recorded separately. No claim that every startup/memory metric improved."
+  }
+}

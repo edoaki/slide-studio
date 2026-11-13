@@ -135,7 +135,7 @@
     "tests": 54,
     "status": "review repairs pass native tests; seven extra old render goldens find raw-tags/cover-authors differences queued for repair"
   },
-  "distribution_status": "Current arm64 DMG installed and checked; current Windows x64 NSIS built without runtime verification. Intel DMG remains older. Remote migration/electron branch is published; full feature migration is not claimed.",
+  "distribution_status": "All three installers rebuilt at runtime 39d5ae8. Current arm64 DMG installed and two focused installed-app workflows passed. Windows runtime deferred; Intel Rosetta evidence and external gates are recorded in the latest followup. Remote migration/electron source branch published.",
   "bridge_and_api_tests": {
     "tests": 23,
     "passed": 23,
@@ -852,5 +852,6 @@
   "current_verification": "current-feature-verification.json",
   "final_regression": "final-regression-2026-11-13.json",
   "final_delivery": "final-delivery-2026-11-13.json",
-  "historical_note": "Earlier sections retain chronological evidence and may describe superseded implementation/delivery states; current verification and final delivery records govern current claims."
+  "historical_note": "Earlier sections retain chronological evidence and may describe superseded implementation/delivery states; current verification and final delivery records govern current claims.",
+  "latest_followup": "autonomous-followup-2026-11-13.json"
 }

@@ -1,0 +1,117 @@
+{
+  "before": {
+    "label": "before",
+    "runs": [
+      {
+        "run": 1,
+        "screenshots": true,
+        "wall_ms": 18885.361916,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-yPWmp2/output-0"
+      },
+      {
+        "run": 2,
+        "screenshots": false,
+        "wall_ms": 6026.872417000002,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-yPWmp2/output-1"
+      },
+      {
+        "run": 3,
+        "screenshots": false,
+        "wall_ms": 6028.1761659999975,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-yPWmp2/output-2"
+      },
+      {
+        "run": 4,
+        "screenshots": false,
+        "wall_ms": 6088.5587499999965,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-yPWmp2/output-3"
+      },
+      {
+        "run": 5,
+        "screenshots": false,
+        "wall_ms": 6058.4516250000015,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-yPWmp2/output-4"
+      },
+      {
+        "run": 6,
+        "screenshots": false,
+        "wall_ms": 6022.1420419999995,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-yPWmp2/output-5"
+      }
+    ],
+    "median_ms": 6028.1761659999975
+  },
+  "after": {
+    "label": "after",
+    "runs": [
+      {
+        "run": 1,
+        "screenshots": true,
+        "wall_ms": 12011.792208,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-1rvjQx/output-0"
+      },
+      {
+        "run": 2,
+        "screenshots": false,
+        "wall_ms": 5301.149707999999,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-1rvjQx/output-1"
+      },
+      {
+        "run": 3,
+        "screenshots": false,
+        "wall_ms": 5298.481584000001,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-1rvjQx/output-2"
+      },
+      {
+        "run": 4,
+        "screenshots": false,
+        "wall_ms": 5327.669375000001,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-1rvjQx/output-3"
+      },
+      {
+        "run": 5,
+        "screenshots": false,
+        "wall_ms": 5304.134915999999,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-1rvjQx/output-4"
+      },
+      {
+        "run": 6,
+        "screenshots": false,
+        "wall_ms": 5300.238542000006,
+        "pages": 20,
+        "steps": 71,
+        "outputDir": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-render-perf-1rvjQx/output-5"
+      }
+    ],
+    "median_ms": 5301.149707999999
+  },
+  "all_step_png_comparison": {
+    "total": 71,
+    "identical": 71,
+    "different": []
+  },
+  "median_change_percent": -12.06,
+  "note": "Five no-screenshot timings per version plus one separate all-step screenshot run. Same Chromium, HTML and machine; cold renderer process each run. This isolates the renderer optimization, not total app export latency."
+}

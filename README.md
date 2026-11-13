@@ -5,9 +5,10 @@
 ## アプリ版
 
 - macOS（Apple Silicon）：`Slide-Studio-0.1.0-mac-arm64.dmg` を開き、`Slide Studio.app` を Applications にコピーします。
+- macOS（Intel）：`Slide-Studio-0.1.0-mac-x64.dmg` を使います。Intel実機での検証は未実施です。
 - Windows（x64）：`Slide-Studio-0.1.0-win-x64-Setup.exe` を実行します。
 
-インストーラーは下記のビルドコマンドで `release/` に生成します。従来画面を組み込んだDMGをこのMacにインストールし、発表作成、下書き保存、直接編集、プレビュー、HTML／PDF書き出しを確認しています。macOSはアドホック署名、Windowsは未署名です。Apple Developer ID・公証、Windows署名、正式Releaseでの配布は未対応です。Windowsでの実行確認とIntel Macの検証はまだ行っていません。
+インストーラーは下記のビルドコマンドで `release/` に生成します。従来画面を組み込んだDMGをこのMacにインストールし、発表作成、下書き保存、直接編集、プレビュー、HTML／PDF書き出しを確認しています。macOSはアドホック署名、Windowsは未署名です。Apple Developer ID・公証、Windows署名、正式Releaseでの配布は未対応です。WindowsとIntel Macの実機確認は未実施です。Intel版は、このApple Silicon MacのRosetta上で作成・編集・HTML／PDF出力を確認しました。
 
 アプリにはPandocを同梱します。利用者によるNode.js・Python・uv・Pandocのインストールは不要です。
 
@@ -46,10 +47,11 @@ npm run browser -- --root /absolute/path/to/workspace
 
 ```sh
 npm run dist:mac
+node scripts/package-desktop.mjs --mac --arch x64
 npm run dist:win
 ```
 
-`release/` にDMG／EXEと `SHA256SUMS` を生成します。OS別のPandocを自動で取得し、アプリに同梱します。これらのコマンドは公開やRelease作成を行いません。GitHub Actionsの `desktop-build` は手動実行用です。
+`release/` にDMG／EXEと `SHA256SUMS` を生成します。OS別のPandocを自動で取得し、アプリに同梱します。これらのコマンドは公開やRelease作成を行いません。GitHub Actionsの `desktop-build` は手動実行用で、Macの両CPU向けとWindows x64向けを生成します。`verify` はpush・PR時に型検査とテストを実行します。
 
 ## 検証とCLI
 

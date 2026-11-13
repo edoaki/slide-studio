@@ -1,0 +1,181 @@
+{
+  "date": "2026-11-13",
+  "live_ai": {
+    "agy": {
+      "result": "passed",
+      "workflow": {
+        "round": "r90d0fc6ffe",
+        "state": "done",
+        "error": null,
+        "model": "agy:gemini-4-argon",
+        "agents": [
+          {
+            "role": "draft",
+            "state": "complete",
+            "summary": "`decks/talk/memo.md` の末尾に「実AI接続確認済み。」を追加しました。"
+          },
+          {
+            "role": "review",
+            "state": "complete",
+            "summary": "指示どおりです。"
+          }
+        ],
+        "workspace": "/var/folders/g1/05008_0s0bv8sv_2r91zsjbw0000gn/T/studio-live-ai-pn0Kb8"
+      },
+      "log": "/tmp/slide-studio-desktop/live-agy-final.txt"
+    },
+    "codex": "Previously verified authenticated editing, review and restoration; request not repeated.",
+    "claude": {
+      "result": "blocked_login_required",
+      "checked": [
+        "application provider home",
+        "existing ~/.claude config"
+      ],
+      "credentials_copied": false
+    }
+  },
+  "intel": {
+    "build": "passed",
+    "architecture": "x86_64 executable and bundled Pandoc",
+    "ad_hoc_codesign_verification": "passed",
+    "dmg_sha256": "5a766ac743743079fabca4392ba47340f96c92542c61ac806282ab0fa886c82a",
+    "previous_translated_workflow": {
+      "environment": "Apple Silicon macOS 15.4 using Rosetta, not native Intel hardware",
+      "initial": "120-second test deadline exceeded",
+      "retry": "passed with 300-second deadline; duration 187872 ms",
+      "log": "/tmp/slide-studio-desktop/final-intel-rosetta-retry.txt"
+    },
+    "final_first_attempt": {
+      "result": "PDF response wait exceeded default 30000 ms after editing and HTML export",
+      "log": "/tmp/slide-studio-desktop/autonomous-intel-final.txt",
+      "test_fix": "8e4d6c3 exposes opt-in PDF response timeout; normal default unchanged"
+    },
+    "translated_workflow": {
+      "result": "passed",
+      "runtime_commit": "39d5ae839b5dc4b4db937da3c1e103af44181964",
+      "test_commit": "8e4d6c3",
+      "environment": "Apple Silicon macOS 15.4 using Rosetta; not native Intel hardware",
+      "duration_ms": 190573.383083,
+      "test_timeout_ms": 600000,
+      "pdf_response_timeout_ms": 120000,
+      "scope": "Creation, memo save/reopen, rename/undo, direct editing, figures, checks, drag to thumbnail, offline HTML, selected-step PDF and downloads",
+      "log": "/tmp/slide-studio-desktop/autonomous-intel-final-retry.txt"
+    }
+  },
+  "site": {
+    "path": "../slide-studio-web",
+    "state": "Local commit prepared; not pushed or published; pre-existing changes retained",
+    "checks": {
+      "prefix": "/slide-studio/",
+      "widths": [
+        1440,
+        390
+      ],
+      "no_page_overflow": true,
+      "copy_command": "passed",
+      "unpublished_links": "disabled",
+      "published_links": "fixed GitHub URLs validated with fixture only",
+      "network_failure": "static disabled state retained",
+      "page_errors": [],
+      "missing_local_resources": []
+    },
+    "release_links": "disabled until all three assets of a verified public release are configured",
+    "visual_acceptance": "pending",
+    "japanese_checks": [
+      "yomiyasu-check: executed via=verify run=20261113T103509Z-0581beee attempt=1 final=sha256:83f0432b0c2d mode=rewrite checks=lint,diff meaning_risk=5 replay=skipped",
+      "yomiyasu-check: executed via=verify run=20261113T103510Z-52b5d5fe attempt=1 final=sha256:cc13f448a245 mode=rewrite checks=lint,diff meaning_risk=1 replay=skipped"
+    ],
+    "check_review": "Reviewed additions against actual installer and source startup behavior; HTML restructuring and release-state wording are intentional.",
+    "commit": "a700778"
+  },
+  "ci": {
+    "result": "passed",
+    "commit": "6569cbde51ef9a85a6bdbf432e4544e4a6701290",
+    "url": "https://github.com/edoaki/slide-studio/actions/runs/43414888857/job/131850179838",
+    "tests": {
+      "total": 478,
+      "passed": 471,
+      "conditional_skips": 7,
+      "failed": 0
+    },
+    "correction": "Pinned Pandoc is provisioned before integration tests; initial missing-Pandoc failure resolved.",
+    "latest_source_check": {
+      "commit": "8e4d6c3",
+      "result": "success",
+      "url": "https://github.com/edoaki/slide-studio/actions/runs/43416532764/job/131855729123"
+    }
+  },
+  "performance": {
+    "ui": "ui-performance-2026-11-13.json",
+    "renderer": "render-optimization-2026-11-13.json",
+    "result": "Matched UI measurements completed. Investigated export regression and removed duplicate step-zero settling; isolated renderer median improved 12.06%, all 71 state PNGs byte-identical. No whole-app 12% improvement claim."
+  },
+  "regression": {
+    "core": {
+      "passed": 478,
+      "failed": 0,
+      "skipped": 0,
+      "log": "/tmp/slide-studio-desktop/autonomous-final-core.txt"
+    },
+    "gui": {
+      "total": 149,
+      "passed_initially": 147,
+      "failed_initially": 1,
+      "live_opt_in_skipped": 1,
+      "log": "/tmp/slide-studio-desktop/autonomous-final-ui.txt",
+      "failure": "Test setup attempted to back up a zero-MIME-type ClipboardItem before pasting.",
+      "fix_commit": "39d5ae8",
+      "targeted_recheck": {
+        "passed": 1,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/autonomous-clipboard-recheck.txt"
+      },
+      "conclusion": "All 148 non-live scenarios have passing evidence across the full run and targeted recheck; not a single clean full-suite run."
+    }
+  },
+  "installation": {
+    "runtime_commit": "39d5ae839b5dc4b4db937da3c1e103af44181964",
+    "installed": "/Users/aki/Applications/Slide Studio.app",
+    "backup": "/Users/aki/Applications/.slide-studio-backups/install-VlGh3P/previous.app",
+    "asar_sha256": "20de1e086e386eb748a9b41a30b9cf3d5f53f48e84fec5c83dd33892a05315ae",
+    "dmg_sha256": "e2342822cfc77c16e91a765b3b7436633559e67289e13c2618e5123664571b8f",
+    "verification": {
+      "passed": 2,
+      "failed": 0,
+      "scope": "Installed arm64 app: original editor, shared figures, all steps, offline HTML, selected-step PDF, native image paste, undo and reload",
+      "log": "/tmp/slide-studio-desktop/autonomous-installed-tests.txt"
+    }
+  },
+  "artifacts": [
+    {
+      "name": "Slide-Studio-0.1.0-mac-arm64.dmg",
+      "sha256": "e2342822cfc77c16e91a765b3b7436633559e67289e13c2618e5123664571b8f",
+      "bytes": 167731545,
+      "runtime_commit": "39d5ae839b5dc4b4db937da3c1e103af44181964"
+    },
+    {
+      "name": "Slide-Studio-0.1.0-mac-x64.dmg",
+      "sha256": "5a766ac743743079fabca4392ba47340f96c92542c61ac806282ab0fa886c82a",
+      "bytes": 156712299,
+      "runtime_commit": "39d5ae839b5dc4b4db937da3c1e103af44181964"
+    },
+    {
+      "name": "Slide-Studio-0.1.0-win-x64-Setup.exe",
+      "sha256": "c343e2acce6a0f6cbf2de86f3d4fbc1e464a1d09a3bbe5085c14dd89822968d9",
+      "bytes": 150710127,
+      "runtime_commit": "39d5ae839b5dc4b4db937da3c1e103af44181964"
+    }
+  ],
+  "readme_check": "yomiyasu-check: executed via=verify run=20261113T110316Z-87163c89 attempt=1 final=sha256:d236b681fdb0 mode=rewrite checks=lint,diff meaning_risk=2 replay=skipped",
+  "plan_documentation_check": {
+    "record": "yomiyasu-check: executed via=verify run=20261113T111817Z-5d858d7e attempt=1 final=sha256:73ab6493ab6c mode=rewrite checks=lint,diff meaning_risk=3 replay=skipped",
+    "review": "Updated status from actual 72-feature inventory and current test/install evidence. External gates remain explicit. Existing technical terms 版 and 入口 retained in established repository usage."
+  },
+  "artifact_checksum_verification": "All three installers and their blockmaps match release/SHA256SUMS",
+  "remaining": [
+    "User visual acceptance of app, PDF and prepared website",
+    "Claude live verification requires user login",
+    "Signing/notarization and formal public release require credentials not yet prepared",
+    "Native Intel verification requires hardware; Windows runtime explicitly deferred"
+  ]
+}

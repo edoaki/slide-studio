@@ -509,9 +509,10 @@
   ],
   "exceptions": [
     "Heading design controls intentionally removed at user request; direct text color retained.",
-    "Windows and Intel runtime tests deferred; signing and notarization unavailable.",
-    "Only authenticated Codex has live-service evidence; other providers use fixture protocol tests.",
-    "PDF technical review retains documented glyph/text-layer differences; user visual acceptance pending."
+    "Native Windows tests deferred and native Intel hardware unavailable; Rosetta evidence recorded separately. Signing and notarization unavailable.",
+    "Authenticated Codex and Antigravity have live-service evidence; Claude requires user login.",
+    "PDF technical review retains documented glyph/text-layer differences; user visual acceptance of app, PDF and website pending."
   ],
-  "delivery": "final-delivery-2026-11-13.json"
+  "delivery": "autonomous-followup-2026-11-13.json",
+  "latest_followup": "autonomous-followup-2026-11-13.json"
 }

@@ -1,7 +1,7 @@
 {
   "date": "2026-11-13",
   "milestone": "Full legacy UI / behavior parity migration; simplified desktop slice rejected",
-  "status": "in_progress_original_ui_integrated",
+  "status": "implementation_and_regression_complete_external_acceptance_pending",
   "baseline_commit": "ca1f148dced6d207dab3f69474bc848560ff738c",
   "python_code_commit": "186a68df8a8c6e20bf4ce495e70dd065f3c56eb8",
   "layout": {
@@ -18,7 +18,7 @@
     "node": "24.18.0",
     "pnpm": "10.34.6",
     "opencode": "2.2.7",
-    "pandoc_for_comparison": "3.9 (reuse exact version in M1; distribution packaging not yet verified)",
+    "pandoc_for_comparison": "3.9; bundled distribution verified on arm64 and Rosetta",
     "electron_chromium": "156.0.8078.96",
     "electron_embedded_node": "24.22.2"
   },
@@ -149,6 +149,12 @@
       "name": "action_flush_materials_followup_2026_11_13",
       "result": "Fixed unsaved new blocks reaching export/presentation when activated without pointerdown. Seven focused cases passed; materials folder/encoding/native-open parity checked separately. No full suite or installer rebuild.",
       "details": "full-parity-progress.json#action_flush_materials_followup_2026_11_13"
+    },
+    {
+      "name": "autonomous_followup_2026_11_13",
+      "runtime_commit": "39d5ae839b5dc4b4db937da3c1e103af44181964",
+      "result": "478 core tests passed; all 148 non-live GUI scenarios have passing evidence after one clipboard test-setup correction; 2 final installed-app checks passed. Real Antigravity edit/review/restore verified.",
+      "details": "autonomous-followup-2026-11-13.json"
     }
   ],
   "signing": {
@@ -165,14 +171,15 @@
     "restrictions": "Tools limited to source reads and owned file edits; tests run by integrator",
     "privacy_source": "https://opencode.ai/docs/console/models/#privacy",
     "privacy_observation": "Published default zero retention/no training, listed exceptions do not name DeepSeek Flash Free; no private decks or secrets supplied",
-    "fallback": "provider.free-limit confirmed; renderer switched to authorized deepseek/deepseek-flash. See agent-tasks.json"
+    "fallback": "provider.free-limit confirmed; renderer switched to authorized deepseek/deepseek-flash. See agent-tasks.json",
+    "historical_only": true,
+    "current_policy": "No delegated implementation agents; DeepSeek discontinued at user request."
   },
   "open_gates": [
-    "Windows runtime verification deferred by the user; Intel Mac runtime also untested.",
-    "Developer ID/notarization, Windows signing and binary GitHub Release publication are not complete.",
-    "Live authenticated Codex has evidence; Claude/Antigravity live account flows remain unverified.",
-    "PDF technical review completed with documented text-layer and small raster differences; user visual acceptance remains pending.",
-    "Matched legacy performance and aggregate process-memory comparison remain unmeasured."
+    "Native Windows runtime verification deferred by user; native Intel hardware unavailable (Rosetta evidence recorded separately).",
+    "Developer ID/notarization, Windows signing and formal binary GitHub Release publication await signing credentials.",
+    "Codex and Antigravity authenticated live editing/review/restoration verified; Claude requires user login.",
+    "PDF technical review completed; user visual acceptance of application, PDF and unpublished website remains pending."
   ],
   "artifacts": {
     "batch_manifest": "python-batch-baseline.json",
@@ -194,11 +201,11 @@
   },
   "toolchain_pinned": {
     "node": "24.18.0",
-    "pnpm": "10.34.6",
     "electron": "45.3.1",
     "typescript": "7.0.2",
     "pdf-lib": "1.17.1",
-    "@types/node": "24.19.2"
+    "@types/node": "24.19.2",
+    "npm": "11.16.0"
   },
   "prototype_contract": "../../packages/renderer/src/contracts.ts",
   "runtime_notes": [
@@ -231,9 +238,10 @@
     }
   ],
   "next_work": [
-    "Windows and Intel runtime verification when an environment is available.",
-    "Developer signing and notarization when credentials are available.",
-    "Optional live-provider verification beyond authenticated Codex and user visual acceptance of documented PDF differences."
+    "User visual acceptance of app, PDF and prepared website.",
+    "Claude live-service verification after user login.",
+    "Signing/notarization and formal release after credentials are available.",
+    "Native platform verification when environments are available; Windows explicitly deferred."
   ],
   "source_commits": {
     "renderer": "b53890b",
@@ -248,5 +256,6 @@
   "full_parity_progress": "full-parity-progress.json",
   "current_feature_verification": "current-feature-verification.json",
   "final_regression": "final-regression-2026-11-13.json",
-  "final_delivery": "final-delivery-2026-11-13.json"
+  "final_delivery": "final-delivery-2026-11-13.json",
+  "latest_followup": "autonomous-followup-2026-11-13.json"
 }
