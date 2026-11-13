@@ -179,7 +179,8 @@
     "Native Windows runtime verification deferred by user; native Intel hardware unavailable (Rosetta evidence recorded separately).",
     "Developer ID/notarization, Windows signing and formal binary GitHub Release publication await signing credentials.",
     "Codex and Antigravity authenticated live editing/review/restoration verified; Claude requires user login.",
-    "PDF technical review completed; user visual acceptance of application, PDF and unpublished website remains pending."
+    "PDF technical review completed; user visual acceptance of application, PDF and unpublished website remains pending.",
+    "Automatic update UI/download/restart and signed update delivery remain unimplemented; current packages support manual replacement only."
   ],
   "artifacts": {
     "batch_manifest": "python-batch-baseline.json",
@@ -241,7 +242,8 @@
     "User visual acceptance of app, PDF and prepared website.",
     "Claude live-service verification after user login.",
     "Signing/notarization and formal release after credentials are available.",
-    "Native platform verification when environments are available; Windows explicitly deferred."
+    "Native platform verification when environments are available; Windows explicitly deferred.",
+    "Implement and verify signed automatic updates for formal distribution; manual same-version reinstall is verified separately."
   ],
   "source_commits": {
     "renderer": "b53890b",
@@ -257,5 +259,6 @@
   "current_feature_verification": "current-feature-verification.json",
   "final_regression": "final-regression-2026-11-13.json",
   "final_delivery": "final-delivery-2026-11-13.json",
-  "latest_followup": "autonomous-followup-2026-11-13.json"
+  "latest_followup": "autonomous-followup-2026-11-13.json",
+  "manual_lifecycle": "manual-lifecycle-2026-11-13.json"
 }

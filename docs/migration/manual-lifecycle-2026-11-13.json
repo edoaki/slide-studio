@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-13",
+  "runtime_commit": "39d5ae839b5dc4b4db937da3c1e103af44181964",
+  "test": "tests/e2e/desktop-lifecycle.test.ts",
+  "command": "SLIDE_STUDIO_LIFECYCLE_APP='/Users/aki/Applications/Slide Studio.app' node --test dist/tests/e2e/desktop-lifecycle.test.js",
+  "result": {
+    "passed": 1,
+    "failed": 0,
+    "duration_ms": 21573.9495
+  },
+  "environment": "macOS arm64, installed packaged application copied into an isolated Japanese/space-containing application path; fresh profile and workspace; empty PATH; AI disabled",
+  "verified": [
+    "Immediate normal quit flushes edited memo",
+    "Manual replacement with another copy of the current app preserves authored files and saved workspace selection",
+    "App-only deletion leaves workspace and profile intact",
+    "Reinstall and launch without --root reopens the saved workspace",
+    "QMD, memo, binary asset, bibliography and custom CSS remain byte-identical"
+  ],
+  "limitations": [
+    "Same-version reinstall, not a cross-version schema migration",
+    "Manual app-only removal, not a third-party uninstaller or deletion of userData",
+    "Automatic update UI/download/restart and signed update transport are not implemented or verified; signing credentials alone do not complete that work",
+    "Windows remains explicitly deferred; native Intel hardware unavailable"
+  ],
+  "log": "/tmp/slide-studio-desktop/lifecycle-final.txt"
+}
