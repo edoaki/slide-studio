@@ -82,11 +82,12 @@
   },
   "delivery": {
     "status": "local_app_updated_remote_source_available_full_feature_migration_not_claimed",
-    "source_commit": "faefa61",
+    "source_commit": "cdc91ff",
     "installed_dmg": "/Users/aki/Applications/Slide Studio.app",
     "windows_exe": "release/Slide-Studio-0.1.0-win-x64-Setup.exe",
     "github_branch": "https://github.com/edoaki/slide-studio/tree/migration/electron",
-    "details": "delivery_followup_2026_11_13"
+    "details": "preview_resize_followup_2026_11_13 and delivery_followup_2026_11_13",
+    "windows_runtime_commit": "faefa61"
   },
   "integrated_foundation_tests": {
     "passed": 45,
@@ -797,7 +798,8 @@
         "/tmp/slide-studio-desktop/editor-spacing.json"
       ]
     },
-    "remaining": "Full feature migration continues; this is not final overall acceptance."
+    "remaining": "Full feature migration continues; this is not final overall acceptance.",
+    "macos_delivery": "Included in installed runtime cdc91ff; user visual acceptance remains pending."
   },
   "preview_resize_followup_2026_11_13": {
     "status": "fixed_feature_checks_passed",
@@ -818,6 +820,15 @@
         "scope": "Only the two existing render-golden groups affected by the player source change; all other player bytes remain compared."
       }
     },
-    "full_suite": "Not rerun; whole-product regression is deferred until feature migration completion."
+    "full_suite": "Not rerun; whole-product regression is deferred until feature migration completion.",
+    "macos_delivery": {
+      "runtime_commit": "cdc91ff",
+      "installed": "/Users/aki/Applications/Slide Studio.app",
+      "backup": "/Users/aki/Applications/.slide-studio-backups/install-afyrgin8/previous.app",
+      "asar_sha256": "d8d7a1a2d02f47d4973dc61f0137e6b603858e1e02fbb743e9acadd8a85841e0",
+      "dmg_sha256": "40ed7d0c8dd05b4cb7e4ac986f5880f10cecd1ad2ffb98465b3e7719a6b179d1",
+      "method": "Installed from the newly mounted DMG after normal autosaving quit. Verified ad-hoc code signature and app.asar equality; reopened the installed app. Previous app retained.",
+      "windows": "Windows EXE was not rebuilt in this followup; its runtime remains faefa61."
+    }
   }
 }

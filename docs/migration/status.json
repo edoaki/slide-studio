@@ -139,6 +139,11 @@
       "name": "delivery_followup_2026_11_13",
       "result": "Published migration/electron; fresh remote clone/npm install/npm start and presentation creation/autosave succeeded. Updated arm64 DMG installed; one installed workflow and three focused fix checks passed. Windows EXE rebuilt without runtime testing.",
       "details": "full-parity-progress.json#delivery_followup_2026_11_13"
+    },
+    {
+      "name": "navigation_spacing_resize_followup_2026_11_13",
+      "result": "Feature-scoped verification only: save-safe navigation and conversion recovery; symmetric editor margins at 390/600 px; immediate preview scaling and stale-size rejection. Current arm64 app installed from DMG and reopened, runtime cdc91ff. No whole-product suite rerun.",
+      "details": "full-parity-progress.json#preview_resize_followup_2026_11_13"
     }
   ],
   "signing": {
