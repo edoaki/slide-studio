@@ -414,5 +414,44 @@
       "win_x64": "release/Slide-Studio-0.1.0-win-x64-Setup.exe",
       "checksums": "release/SHA256SUMS; all six artifact/blockmap checks passed"
     }
+  },
+  "heading_ai_followup_2026_11_13": {
+    "status": "source_verified_installed_verification_pending",
+    "user_decision": "Heading design is AI-only; retain direct heading text color. Intentional exception to original UI parity.",
+    "changes": [
+      "Removed direct heading background/gradient/rule/font controls and the unused gradient panel from the theme tab. Body fonts and other theme colors remain available.",
+      "Heading selection points to text color; heading color changes preserve existing background, borders and typography.",
+      "Identical repeated theme saves no longer add empty undo entries.",
+      "Theme color caches refresh after a stylesheet swap."
+    ],
+    "validation": {
+      "regression": {
+        "passed": 433,
+        "skipped": 7,
+        "failed": 0
+      },
+      "source_ui": {
+        "passed": 21,
+        "failed": 0
+      },
+      "ai": "Memo and theme requests, review, restore and history verified using a native fixture process, not authenticated remote inference.",
+      "clipboard": "Trusted native image paste verified through pixel comparison, source placement, undo/redo and reload; existing clipboard is preserved and restored if unchanged by the user."
+    },
+    "logs": {
+      "regression": "/tmp/slide-studio-desktop/parity2-regression.txt",
+      "source_ui": "/tmp/slide-studio-desktop/parity2-ui-all.txt"
+    },
+    "pdf_followup": "pdf-text-followup-2026-11-13.json: 18/20 normalized text matches, remaining differences are listed, eight URI annotations match. Raster acceptance remains open.",
+    "ui_correspondences": {
+      "covered": 7,
+      "superseded_by_explicit_user_decision": 8,
+      "pending": 362
+    },
+    "remaining": [
+      "Complete remaining UI correspondences under the revised heading-design scope.",
+      "Finish PDF visual/text acceptance.",
+      "Authenticated provider inference and recovery remain unverified.",
+      "Windows runtime and official signing remain deferred."
+    ]
   }
 }

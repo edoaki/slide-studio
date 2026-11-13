@@ -52,7 +52,7 @@ export const S = {
       nowhere: name => `「${name}」はこのテーマの見本のどこにも使われていません（テーマの CSS が別の色を直接書いています）`, file: name => `themes/${name}.css`,
     },
     fillEditor: { horizontal: '左右', vertical: '上下', diagonal: '斜め', presets: '初期配置', backgroundOnly: '背景のみ', withContent: '内容も表示', original: 'テーマに戻す', done: 'グラデーションの編集を終了', color: '色', opacity: '濃さ', spread: '広がり', add: 'ポイントを追加', remove: 'ポイントを削除', hint: { '--header-fill': '全ページに反映されます', '--background-fill': 'タイトル・章以外のページに反映されます', '--section-fill': '章のページに反映されます', '--cover-fill': 'タイトルのページに反映されます' }, place: '背景をクリックして配置 · Escで中止', select: 'ポイントを選ぶと色を編集できます', point: n => `ポイント ${n}`, title: 'グラデーションの設定' },
-    controls: { background: 'スライドの背景', heading: '見出し', text: '本文とリンク', emphasis: '色分け', gradient: 'グラデーション' },
+    controls: { background: 'スライドの背景', heading: '見出し', headingHint: 'デザインの変更はAIチャットへ', text: '本文とリンク', emphasis: '色分け', gradient: 'グラデーション' },
     colorPicker: { edit: name => `${name}の色`, palette: '色見本', choose: color => `${color} を使う`, hue: '色相', plane: '色の濃さと明るさ（左右キーで濃さ、上下キーで明るさ）', invalid: 'カラーコードは # と3桁または6桁の16進数で入力してください' },
     background: { title: '背景色のグラデーション', tabs: ['ページ', '章', 'タイトル'], tabTips: ['タイトル・章以外のページの背景を編集', '章のページの背景を編集', 'タイトルのページの背景を編集'] },
     heading: { mode: '見出しの装飾', modes: ['テーマの設定', '色の帯', '罫線'], width: '線の太さ', length: '線の長さ', lengths: ['スライドの端まで', '本文の幅まで'], hex: 'カラーコード' },

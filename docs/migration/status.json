@@ -149,7 +149,8 @@
     "windows": "Environment undecided; proceed with Mac work first",
     "signing": "Apple Developer and Windows signing not yet prepared",
     "acceptance": "Windows/signing gates remain open; no claim of milestone completion",
-    "electron_only": "2026-11-12: user explicitly requested removing Python/uv files now, with old checkout retained; supersedes deferring removal until M5."
+    "electron_only": "2026-11-12: user explicitly requested removing Python/uv files now, with old checkout retained; supersedes deferring removal until M5.",
+    "heading_design": "2026-11-13: heading design is edited through AI, not direct background/gradient/rule/font controls. Keep direct heading text color editing. This supersedes exact UI parity for those controls."
   },
   "toolchain_pinned": {
     "node": "24.18.0",
@@ -185,8 +186,8 @@
     }
   ],
   "next_work": [
-    "Complete remaining original theme/gradient and clipboard behavior correspondences. Theme controls and live lint now use isolated-frame commands/events; this batch is recorded in full-parity-progress.json.",
-    "Finish the remaining original UI correspondences (3 of 377 individually mapped; broader integration coverage is recorded separately).",
+    "Finish remaining original UI correspondences with the heading-design AI-only exception. Real native clipboard paste is verified, including pixels, undo/redo and reload.",
+    "Continue individual UI mapping: 7 covered and 8 superseded by the heading-design decision; broader integration coverage remains separate.",
     "Finish PDF visual/text acceptance; browser-mode differences diagnosed in pdf-diagnosis-2026-11-13.json.",
     "Verify authenticated inference/recovery for every provider.",
     "Windows runtime is deferred by user. Intel runtime, Developer ID/notarization, Windows signing and public GitHub source/release are not completed."

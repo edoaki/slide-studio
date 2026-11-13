@@ -2241,9 +2241,8 @@
       "status": "pending_electron_parity",
       "replacement_test": null,
       "partial_electron_coverage": {
-        "source": "tests/e2e/legacy-authoring.test.ts; tests/bridge/protocol.test.ts",
-        "note": "Trusted bounded clipboard event transport implemented and protocol rejection tests added; native clipboard-to-save operation remains pending.",
-        "source_commit": "9903509"
+        "source": "tests/e2e/legacy-authoring.test.ts::native image paste inserts after the selected paragraph, preserves pixels and survives undo and reload",
+        "note": "Real trusted system-clipboard paste, source placement, pixel preservation, undo/redo and reload passed. The synthetic-event byte/filename assertions are not claimed as reproduced."
       }
     },
     {
@@ -2398,13 +2397,8 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null,
-      "partial_electron_coverage": {
-        "source": "tests/e2e/legacy-authoring.test.ts; tests/bridge/protocol.test.ts",
-        "note": "Live overflow, slide-strip mark, preview box and clearing after external CSS repair are covered; all toolbar/navigation assertions remain pending.",
-        "source_commit": "9903509"
-      }
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::layout warnings navigate to the affected page, mark its toolbar and react to live content"
     },
     {
       "id": "tests/e2e/test_layout_lint.py::test_layout_issues_follow_changes_in_slide",
@@ -2414,8 +2408,8 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::layout warnings navigate to the affected page, mark its toolbar and react to live content"
     },
     {
       "id": "tests/e2e/test_library.py::test_math_candidates_narrow_by_prefix_and_tab_fills",
@@ -3819,8 +3813,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::theme reset preserves a named copy, rejects duplicate names, cancels and undoes"
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_switch_theme_without_reloading_frame_and_undo",
@@ -3830,8 +3824,8 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::theme switch keeps the preview frame, commits after stylesheet loading and undoes"
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_theme_strip_lists_recently_chosen_first",
@@ -3874,8 +3868,9 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "superseded_by_user_decision",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::heading design is AI-only while direct heading text color preserves the design and supports undo",
+      "reason": "2026-11-13: user moved direct heading design editing to AI. Heading text color remains directly editable."
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_theme_tab_sample_marks_and_undo",
@@ -3945,13 +3940,9 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null,
-      "partial_electron_coverage": {
-        "source": "tests/e2e/legacy-authoring.test.ts; tests/bridge/protocol.test.ts",
-        "note": "Heading gradient opens and a preset saves after theme color undo; full reload/gradient undo sequence remains pending.",
-        "source_commit": "9903509"
-      }
+      "status": "superseded_by_user_decision",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::heading design is AI-only while direct heading text color preserves the design and supports undo",
+      "reason": "2026-11-13: user moved direct heading design editing to AI. Heading text color remains directly editable."
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_background_controls_are_removed_and_heading_toggle_still_opens",
@@ -3983,8 +3974,9 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "superseded_by_user_decision",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::heading design is AI-only while direct heading text color preserves the design and supports undo",
+      "reason": "2026-11-13: user moved direct heading design editing to AI. Heading text color remains directly editable."
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_gradient_drag_and_narrow_viewport",
@@ -3994,8 +3986,9 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "superseded_by_user_decision",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::heading design is AI-only while direct heading text color preserves the design and supports undo",
+      "reason": "2026-11-13: user moved direct heading design editing to AI. Heading text color remains directly editable."
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_heading_gradient_sample_fallback",
@@ -4005,8 +3998,9 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "superseded_by_user_decision",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::heading design is AI-only while direct heading text color preserves the design and supports undo",
+      "reason": "2026-11-13: user moved direct heading design editing to AI. Heading text color remains directly editable."
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_heading_colors_and_links_are_independent",
@@ -4027,8 +4021,9 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "superseded_by_user_decision",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::heading design is AI-only while direct heading text color preserves the design and supports undo",
+      "reason": "2026-11-13: user moved direct heading design editing to AI. Heading text color remains directly editable."
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_gradient_templates_preserve_points_and_drag_undo",
@@ -4038,8 +4033,9 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "superseded_by_user_decision",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::heading design is AI-only while direct heading text color preserves the design and supports undo",
+      "reason": "2026-11-13: user moved direct heading design editing to AI. Heading text color remains directly editable."
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_gradient_hidden_heading_preserves_ink_and_single_color_returns",
@@ -4049,8 +4045,9 @@
         "gui"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "superseded_by_user_decision",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts::heading design is AI-only while direct heading text color preserves the design and supports undo",
+      "reason": "2026-11-13: user moved direct heading design editing to AI. Heading text color remains directly editable."
     },
     {
       "id": "tests/e2e/test_theme_controls.py::test_theme_change_restores_cover_positions_and_undo",
@@ -4253,5 +4250,5 @@
       "replacement_test": null
     }
   ],
-  "coverage_note": "Only individually checked correspondences are marked covered. Broader integration tests do not imply all 377 legacy functions are equivalent."
+  "coverage_note": "Individual correspondence is recorded separately from broad integration coverage. superseded_by_user_decision is an intentional scope change, not a passing legacy test."
 }

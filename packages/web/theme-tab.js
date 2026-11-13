@@ -1,6 +1,5 @@
 import { THEME_KEYS } from './bridge/theme-contract.js';
 import { colorPicker } from './color-picker.js';
-import { gradientEditor } from './gradient-editor.js';
 // 左の欄の［テーマ］タブ（設計書 §10.10）。今のテーマの色・フォントを直す。
 // - 欄を動かしている間は見本・スライドの :root に直接当て、確定したらすぐ themes/<テーマ>.css に書く（1回の確定を ⌘Z の1回に）
 // - 実スライドを絞り込み、該当がない表現だけ見本に自動で切り替える
@@ -42,9 +41,8 @@ export function makeThemeTab(ctx) {
   const panel = ctx.root.querySelector('#editor'), stage = ctx.root.querySelector('#stage');
   let alive = true, name = null, version = null, vars = {}, fonts = [], modified = null, shown = false, mode = 'real';
   let focusKey = null, markedAt = null, sample = null;
-  let pendingFill = null, sampleReady = null;
+  let sampleReady = null;
   const remoteColors = new WeakMap();
-  const openToggles = new Set();
   const live = new Map(); // 確定前・書き込み中の値（見本とスライドの :root に当てる）
 
   const view = document.createElement('div');
@@ -86,7 +84,7 @@ export function makeThemeTab(ctx) {
     resetTheme(name, saveAs => {
       const task = saving.then(async () => {
         if (locked || name !== targetName) throw new Error(S.locked);
-        fillEditor.close(); live.clear();
+        live.clear();
         await put({ reset: true, ...(saveAs ? { save_as: saveAs } : {}) }, [], r => ctx.recordHistory({ undo: () => put({ css: r.before }, []), redo: () => put({ css: r.css }, []) }));
         if (saveAs) await loadThemes(false);
       });
@@ -135,12 +133,12 @@ export function makeThemeTab(ctx) {
     if (sampleOn() && !sample && name) {
       sample = new Preview(box, null, {
         url: () => `${SAMPLE_URL}?theme=${encodeURIComponent(name)}`,
-        onLoad: async () => { attachClicks(sample); paint(); if (focusKey) await show(focusKey); if (pendingFill && shown) { fillEditor.open(pendingFill); pendingFill = null; } },
+        onLoad: () => { attachClicks(sample); paint(); if (focusKey) show(focusKey); },
         onChange: d => { if (d.index !== markedAt) clearMarks(); },
       });
       sampleReady = sample.load();
     }
-    if (!shown) { pendingFill = null; clearMarks(); fillEditor.close(); }
+    if (!shown) { clearMarks(); }
     else if (focusKey && !wasShown) show(focusKey);
   }
 
@@ -148,13 +146,6 @@ export function makeThemeTab(ctx) {
   // ------------------------------------------------------------ 値を当てる・書く
   const previews = () => [sample, ctx.preview].filter(p => p?.client);
   function previewValue(key, value) {
-    // 帯のないテーマで背景を初めて設定するときは、表示中の文字色を保つ。
-    if ((key === '--header' || key === FILL && value !== 'theme') && vars[FILL] === 'theme' && !live.has('--header-ink')) {
-      live.set('--header-ink', remoteColors.get(target())?.['--header-ink'] || hexOf('--header-ink'));
-    }
-    if (key === '--header' || key === FILL && value !== 'theme') live.set('--heading-mode', 'fill');
-    if (key === FILL && value === 'theme') live.set('--heading-mode', 'theme');
-    if (key === '--rule') live.set('--heading-mode', 'rule');
     live.set(key, value); paint();
   }
   function paint() {
@@ -183,7 +174,7 @@ export function makeThemeTab(ctx) {
     const r = await api(`/api/themes/${encodeURIComponent(name)}`, { method: 'PUT', body: { ...body, base: version } });
     edits++;
     version = r.version; vars = r.vars; modified = r.modified;
-    saved?.(r);
+    if (r.before !== r.css) saved?.(r);
     await reloadCss(keys); fill();
     return r;
   }
@@ -201,7 +192,7 @@ export function makeThemeTab(ctx) {
       const updates = { [key]: value, ...extra };
       if (live.has('--heading-mode')) updates['--heading-mode'] = live.get('--heading-mode');
       if ((key === '--header' || key === FILL) && live.has('--header-ink')) updates['--header-ink'] = live.get('--header-ink');
-      const at = n => async () => { await put({ css: n }, []); if (!fillEditor.isOpen()) show(key === FILL ? '--header' : key === BGS[0] ? '--paper' : key); };
+      const at = n => async () => { await put({ css: n }, []); show(key === FILL ? '--header' : key === BGS[0] ? '--paper' : key); };
       await put({ vars: updates }, Object.entries(updates), r => ctx.recordHistory({ undo: at(r.before), redo: at(r.css) }));
     } catch (e) { failed = true; live.delete(key); paint(); fill(); toast(e.message); }
   }
@@ -209,24 +200,8 @@ export function makeThemeTab(ctx) {
   // テーマ標準では変数と描画色が一致しないことがある。単色の欄は実際の色に合わせる。
   const contentColor = key => live.get(key) ?? remoteColors.get(target())?.[key] ?? hexOf(key);
   const headingColor = contentColor;
-  async function openFill(key) {
-    view.querySelector('.tv-inline-color')?.remove(); pendingFill = key;
-    await show(key === FILL ? '--header' : key);
-    if (pendingFill === key && target()?.client) { fillEditor.open(key); pendingFill = null; }
-  }
-
-  // ------------------------------------------------------------ 欄
-  function optionField(key, title, values, names = values) {
-    const label = document.createElement('label'); label.dataset.key = key;
-    const text = document.createElement('span'); text.textContent = title;
-    const select = document.createElement('select'); select.name = key; select.setAttribute('aria-label', title);
-    values.forEach((v, i) => select.add(new Option(names[i], v)));
-    select.onchange = () => saveField(key, select.value);
-    label.append(text, select); return label;
-  }
   function openColor(key, input) {
     view.querySelector('.tv-inline-color')?.remove();
-    fillEditor.close();
     const box = colorPicker({
       title: S.themes.vars[key], value: input.value,
       palette: ['--paper', '--ink', '--accent', '--header', '--good', '--warn'].map(hexOf),
@@ -244,7 +219,7 @@ export function makeThemeTab(ctx) {
 
     colors.replaceChildren(); faces.replaceChildren();
     for (const [key, value] of Object.entries(vars)) {
-      if (key === '--paper' || key === '--mark-line' || FILLS.includes(key) || key.startsWith('--block-') || key.startsWith('--heading-')) continue;
+      if (['--paper','--header','--rule','--font-head'].includes(key) || key === '--mark-line' || FILLS.includes(key) || key.startsWith('--block-') || key.startsWith('--heading-')) continue;
       const label = document.createElement('label'); label.dataset.tip = T.field(S.themes.vars[key]);
       label.dataset.key = key;
       const text = document.createElement('span'); text.textContent = S.themes.vars[key];
@@ -277,62 +252,18 @@ export function makeThemeTab(ctx) {
       label.addEventListener('pointerdown', () => show(key));
       input.addEventListener('focus', () => show(key));
     }
-    for (const [field, key] of [['--header', FILL]]) {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'ibtn tv-fill-open';
-      tip(button, S.themes.gradient.title);
-      button.innerHTML = '<i class="tv-fill-icon" aria-hidden="true"></i>';
-      const caption = document.createElement('span'); caption.textContent = S.themes.controls.gradient; button.append(caption);
-      button.addEventListener('pointerdown', e => e.stopPropagation());
-      button.onclick = e => { e.preventDefault(); e.stopPropagation(); openFill(key); };
-      colors.querySelector(`[data-key="${field}"]`).append(button);
-    }
-    const heading = colors.querySelector('[data-key="--header"]');
-    const group = document.createElement('div'); group.className = 'tv-heading-colors';
-    heading.before(group); group.append(heading, colors.querySelector('[data-key="--header-ink"]'));
-    const mode = document.createElement('div'); mode.className = 'tv-heading-modes';
-    mode.setAttribute('role', 'group'); mode.setAttribute('aria-label', S.themes.heading.mode);
-    ['theme', 'fill', 'rule'].forEach((value, i) => {
-      const button = document.createElement('button'); button.type = 'button'; button.dataset.headingMode = value;
-      tip(button, S.themes.heading.modes[i]);
-      const sample = document.createElement('i'); sample.className = 'tv-heading-example'; sample.setAttribute('aria-hidden', 'true');
-      sample.textContent = S.themes.controls.heading;
-      const caption = document.createElement('span'); caption.textContent = S.themes.heading.modes[i];
-      button.append(sample, caption);
-      button.onclick = () => { view.querySelector('.tv-inline-color')?.remove(); saveField('--heading-mode', value); fill(); show('--header-ink'); };
-      mode.append(button);
-    });
-    group.prepend(mode);
-    const rules = document.createElement('div'); rules.className = 'tv-heading-rule';
-    rules.append(colors.querySelector('[data-key="--rule"]'));
-    rules.append(optionField('--heading-rule-style', S.decoration.style, ['solid','dashed','dotted','double'], ['solid','dashed','dotted','double'].map(k => S.decoration[k])), optionField('--heading-rule-width', S.themes.heading.width, ['1px','2px','3px','4px','5px','6px']), optionField('--heading-rule-inset', S.themes.heading.length, ['0px','44px'], S.themes.heading.lengths));
-    group.append(rules);
     function section(title, nodes) {
       const section = document.createElement('section'); section.className = 'tv-section';
       const heading = document.createElement('h3'); heading.textContent = title;
       section.append(heading, ...nodes); colors.append(section); return section;
     }
-    // 見出しは下に置き、開閉できるようにする（スライドで選んだときは開く。テーマを替えても開閉は保つ）
-    function toggle(title, nodes) {
-      const details = document.createElement('details'); details.className = 'tv-section-toggle';
-      details.open = openToggles.has(title);
-      details.ontoggle = () => { if (details.open) openToggles.add(title); else openToggles.delete(title); };
-      const summary = document.createElement('summary'); summary.textContent = title;
-      const body = document.createElement('div'); body.className = 'tv-section';
-      body.append(...nodes); details.append(summary, body); colors.append(details); return details;
-    }
     section(S.themes.controls.text, ['--ink', '--muted', '--accent', '--link'].map(k => colors.querySelector(`[data-key="${k}"]`)));
     section(S.themes.controls.emphasis, ['--good', '--warn', '--mark', '--mark-ink', ...Object.keys(CONTENT)].map(k => colors.querySelector(`[data-key="${k}"]`)));
-    toggle(S.themes.controls.heading, [group]);
+    const heading = section(S.themes.controls.heading, [colors.querySelector('[data-key="--header-ink"]')]);
+    const hint = document.createElement('p'); hint.className = 'hint'; hint.textContent = S.themes.controls.headingHint; heading.append(hint);
     fill();
   }
   function fill() {
-    const mode = live.get('--heading-mode') ?? vars['--heading-mode'];
-    const rules = view.querySelector('.tv-heading-rule');
-    if (rules) rules.hidden = mode !== 'rule';
-    view.querySelectorAll('[data-heading-mode]').forEach(b => { b.disabled = locked; b.setAttribute('aria-pressed', String(b.dataset.headingMode === mode)); });
-    const headingField = view.querySelector('[data-key="--header"]');
-    if (headingField) headingField.hidden = mode === 'rule';
-    fillEditor.refresh();
     view.querySelector('.where').textContent = T.file(name);
     defaultButton.disabled = !modified || locked;
     tip(defaultButton, modified ? S.themes.reset(name) : modified === false ? S.themes.resetNone(name) : S.themes.resetMissing(name));
@@ -353,13 +284,6 @@ export function makeThemeTab(ctx) {
     previewValue(key, value);
     const task = commit(key, value); pending.add(task); task.finally(() => pending.delete(task));
   }
-  const fillEditor = gradientEditor({
-    root: ctx.root, host: view, target, read: key => live.get(key) ?? vars[key],
-    color: key => live.get(key) ?? hexOf(key),
-    palette: () => ['--paper', '--ink', '--accent', '--header', '--good', '--warn'].map(hexOf),
-    preview: previewValue,
-    save: saveField, locked: () => locked,
-  });
   async function load() {
     const want = ctx.structure?.meta.theme || 'default', asked = edits;
     try {
@@ -368,7 +292,7 @@ export function makeThemeTab(ctx) {
       if (!fonts.length) await loadThemes(!order.length);
       const changed = name !== want;
       name = want; locked = t.locked; version = t.version; vars = t.vars; modified = t.modified;
-      if (changed) { fillEditor.close(); live.clear(); focusKey = null; matches = null; mode = 'real'; clearMarks(); sample?.load(); }
+      if (changed) { live.clear(); focusKey = null; matches = null; mode = 'real'; clearMarks(); sample?.load(); }
       build(); paint(); if (themes.length) drawThemes();
       if (shown) sync();
     } catch (e) { toast(e.message); }
@@ -380,9 +304,8 @@ export function makeThemeTab(ctx) {
     const client=p?.client;if(!client||clickClients.get(p)?.client===client)return;
     clickClients.get(p)?.off();
     const off=client.on('theme.select',event=>{
-      if(!shown||p.client!==client||event.sourceVersion!==p.sourceVersion)return;
+      if(!shown||p.client!==client||event.sourceVersion!==p.sourceVersion||!view.querySelector(`label[data-key="${event.key}"]`))return;
       ++selection;focusKey=event.key;matches=null;filter();fill();reveal(focusKey);markedAt=p.index;
-      if(focusKey==='--header'&&sampleOn())fillEditor.open(FILL);
     });
     clickClients.set(p,{client,off});
     client.request('theme.configure',{shown,sample:p===sample}).catch(()=>{});
@@ -432,7 +355,7 @@ export function makeThemeTab(ctx) {
     },
     previewLoaded() { attachClicks(ctx.preview); paint(); if (name) fill(); if (focusKey && shown && matches !== null) show(focusKey); },
     // 欄の色は描いた見出しから読む（default の見出しはグラデーションなど）。テーマの CSS が替わったら読み直す
-    previewThemed() { if (name) fill(); },
+    previewThemed() { paint(); if (name) fill(); },
     stripRendered() { filter(); },
     slideChanged(d) { if (shown && focusKey && !KIND[focusKey] && !sampleOn() && d.index !== markedAt) {
       clearMarks();ctx.preview.client?.request('theme.mark',{key:focusKey}).catch(()=>{});markedAt=d.index;
@@ -456,6 +379,6 @@ export function makeThemeTab(ctx) {
         }).catch(() => {});
       }
     },
-    destroy() { for(const p of previews())p.client.request('theme.configure',{shown:false,sample:p===sample}).catch(()=>{});fillEditor.destroy();alive=false;for(const {off} of clickClients.values())off();clickClients.clear();clearMarks();sample?.destroy();bar.remove();box.remove();view.remove(); },
+    destroy() { for(const p of previews())p.client.request('theme.configure',{shown:false,sample:p===sample}).catch(()=>{});alive=false;for(const {off} of clickClients.values())off();clickClients.clear();clearMarks();sample?.destroy();bar.remove();box.remove();view.remove(); },
   };
 }

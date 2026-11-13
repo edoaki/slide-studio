@@ -1,0 +1,135 @@
+{
+  "status": "additional_diagnosis_not_full_visual_acceptance",
+  "input_artifacts": {
+    "legacy": "/Users/aki/code/slide-studio-migration-artifacts/m0-python-batch/機械学習を使った組み合わせ最適化.pdf",
+    "electron": "/tmp/slide-studio-pdf-parity-CGNflc/electron/nco-intro.pdf",
+    "legacy_sha256": "9a33feb606ba60bb5af8e07028b6faeec260f83610d0911d7a87964291da673c",
+    "electron_sha256": "74cc0d4264fb43656e5f17b739f4982bc689c7dcc44ec9fe23151ee456938a87"
+  },
+  "normalization": "Remove whitespace and U+0000-U+001F control characters; no other text normalization.",
+  "equal_pages": 18,
+  "total_pages": 20,
+  "pages": [
+    {
+      "page": 1,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 2,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 3,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 4,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 5,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 6,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 7,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 8,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 9,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 10,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 11,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 12,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 13,
+      "normalized_text_equal": false,
+      "differences": [
+        {
+          "kind": "delete",
+          "legacy": "座標(x,y)",
+          "electron": ""
+        },
+        {
+          "kind": "delete",
+          "legacy": "(0.12,0.50)(0.68,0.10)(0.65,0.88)(0.30,0.15)(0.28,0.82)(0.90,0.45)",
+          "electron": ""
+        }
+      ]
+    },
+    {
+      "page": 14,
+      "normalized_text_equal": false,
+      "differences": [
+        {
+          "kind": "delete",
+          "legacy": "0%0%0%0%100%0%",
+          "electron": ""
+        }
+      ]
+    },
+    {
+      "page": 15,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 16,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 17,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 18,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 19,
+      "normalized_text_equal": true,
+      "differences": []
+    },
+    {
+      "page": 20,
+      "normalized_text_equal": true,
+      "differences": []
+    }
+  ],
+  "external_links_equal_including_duplicates": true,
+  "external_link_count": 8,
+  "poppler_unexpected_control_characters": {},
+  "interpretation": "Pages 13 and 14 differ only in the listed SVG coordinate/probability text. Their raster images were identical in the previous 72 dpi comparison. Pypdf adds control characters in Electron text extraction, while Poppler does not. This does not resolve the remaining raster position differences."
+}

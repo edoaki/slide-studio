@@ -265,7 +265,7 @@ export function createFrameTheme(win, doc, {sendEvent,getSourceVersion}) {
   candidates.sort((a,b)=>a==='--mark'?-1:b==='--mark'?1:0);
   const choices=candidates.map(key=>({key,parts:partsOf(win,slide,key)}));let chosen,node;
   for(let at=el;at&&!chosen;at=at===slide?null:at.parentElement)for(const c of choices){node=c.parts.find(n=>(n.nodeType===3?n.parentElement:n.host||n)===at);if(node){chosen=c.key;break;}}
-  if(el.closest('h2')){chosen='--header';node=el.closest('h2');}
+  if(el.closest('h2')){chosen='--header-ink';node=el.closest('h2');}
   else if(el.closest('.math, math')){chosen='--math-ink';node=el.closest('.math, math');}
   else if(el.closest('th')){chosen='--table-header-bg';node=el.closest('th');}
   else if(el.closest('td')){chosen='--table-ink';node=el.closest('td');}

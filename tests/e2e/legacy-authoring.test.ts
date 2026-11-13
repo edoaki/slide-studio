@@ -14,11 +14,11 @@ async function setup(t:TestContext,source:string,bib=''){
  const env:Record<string,string>=Object.fromEntries(Object.entries(process.env).filter((e):e is [string,string]=>e[1]!==undefined));delete env.ELECTRON_RUN_AS_NODE;env.SLIDE_STUDIO_ELECTRON_HOME=join(temp,'profile');
  const installed=process.env.SLIDE_STUDIO_TEST_APP,executablePath=installed?.endsWith('.app')?join(installed,'Contents/MacOS/Slide Studio'):installed||require('electron');
  const app=await _electron.launch({executablePath,args:[...(installed?[]:[join(process.cwd(),'dist/apps/desktop/main.js')]),'--root',ws.root],env});
- t.after(async()=>{await app.close();await rm(temp,{recursive:true,force:true});});
+ t.after(async()=>{try{await app.evaluate(async()=>{await (globalThis as any).__restoreParityClipboard?.();});}finally{await app.close();await rm(temp,{recursive:true,force:true});}});
  const page=await app.firstWindow(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.waitForFunction(()=>!!sessionStorage.getItem('slide-studio:admin-token'));
  const url=new URL('/deck/talk',page.url()).href;await page.goto(url);await page.locator('#stage[data-blocks=ready]').waitFor();
- return {ws,page,url,errors};
+ return {ws,page,url,errors,app};
 }
 async function saved(ws:Workspace,text:string){for(let i=0;i<100;i++){if((await readFile(ws.qmd('talk'),'utf8')).includes(text))return;await new Promise(r=>setTimeout(r,50));}assert.match(await readFile(ws.qmd('talk'),'utf8'),new RegExp(text));}
 
@@ -69,7 +69,7 @@ test('original presentation starts at current page, advances and restores editor
 });
 
 
-test('original theme controls preview, save, undo, edit gradients and keep text editable',{timeout:90000},async t=>{
+test('original theme controls preview, save, undo and keep text editable',{timeout:90000},async t=>{
  const {ws,page,errors}=await setup(t,'## テーマの確認 {#theme}\n\n編集できる本文。\n');
  const path=join(ws.themes,'default.css'),original=await readFile(path,'utf8');
  await page.getByRole('tab',{name:'テーマ',exact:true}).click();
@@ -81,11 +81,6 @@ test('original theme controls preview, save, undo, edit gradients and keep text 
  assert.equal(await frame.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--ink').trim()),'#112233');
  await page.locator('#undo').click();
  for(let i=0;i<100;i++){if(await readFile(path,'utf8')===original)break;await page.waitForTimeout(50);}assert.equal(await readFile(path,'utf8'),original);
- await page.locator('.tv-section-toggle > summary').click();await page.locator('.tv-fill-open').click();
- await page.locator('.gradient-editor').waitFor();await page.locator('.gradient-presets [data-preset=diagonal]').click();
- for(let i=0;i<100;i++){if((await readFile(path,'utf8')).includes('radial-gradient'))break;await page.waitForTimeout(50);}assert.match(await readFile(path,'utf8'),/radial-gradient/);
- await page.locator('.gradient-done').click();await page.locator('.gradient-editor').waitFor({state:'hidden'});
- await page.locator('.theme-stagebar .tv-reset').click();
  const paragraph=frame.locator('.slide.active [data-slide-studio]').filter({hasText:'編集できる本文。'}).first();await paragraph.click();await paragraph.click();
  await frame.locator('.slide-studio-editing').fill('テーマ編集中も編集できる本文。');await page.keyboard.press('Escape');await saved(ws,'テーマ編集中も編集できる本文。');
  assert.equal(await page.getByRole('tab',{name:'テーマ',exact:true}).getAttribute('aria-selected'),'true');assert.deepEqual(errors,[]);
@@ -117,4 +112,98 @@ test('theme sample fallback selects missing table styles and returns to the edit
  const paragraph=frame.locator('.slide.active [data-slide-studio]').filter({hasText:'見本から戻って編集する本文。'}).first();await paragraph.click();await frame.locator('.slide-studio-selected').first().waitFor();await paragraph.click();
  await frame.locator('.slide-studio-editing').fill('見本から戻った後の本文。');await page.keyboard.press('Escape');await saved(ws,'見本から戻った後の本文。');
  assert.deepEqual(errors,[]);
+});
+
+async function waitCss(path:string,predicate:(css:string)=>boolean){
+ for(let i=0;i<150;i++){const css=await readFile(path,'utf8');if(predicate(css))return css;await new Promise(r=>setTimeout(r,50));}
+ assert.ok(predicate(await readFile(path,'utf8')),'theme file did not reach expected state');return await readFile(path,'utf8');
+}
+test('theme reset preserves a named copy, rejects duplicate names, cancels and undoes',{timeout:90000},async t=>{
+ const {ws,page,errors}=await setup(t,'## テーマ保存 {#one}\n\n本文。\n');const path=join(ws.themes,'default.css'),original=await readFile(path,'utf8');
+ await page.getByRole('tab',{name:'テーマ',exact:true}).click();const reset=page.locator('.tv-default');
+ await page.locator('.theme-fields input[name="--ink"]').evaluate((el:HTMLInputElement)=>{el.value='#112233';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));});
+ const edited=await waitCss(path,s=>s.includes('#112233'));
+ await reset.click();await page.getByRole('button',{name:'やめる',exact:true}).click();assert.equal(await readFile(path,'utf8'),edited);
+ await reset.click();const dialog=page.getByRole('dialog');await dialog.getByLabel('テーマ名（英小文字・数字・ハイフン）',{exact:true}).fill('default');await dialog.getByRole('button',{name:'保存して戻す',exact:true}).click();
+ await dialog.getByRole('alert').filter({hasText:'同じ名前のテーマがあります'}).waitFor();assert.equal(await readFile(path,'utf8'),edited);
+ await dialog.getByLabel('テーマ名（英小文字・数字・ハイフン）',{exact:true}).fill('mine');await dialog.getByRole('button',{name:'保存して戻す',exact:true}).click();await dialog.waitFor({state:'detached'});
+ await waitCss(path,s=>s===original);assert.equal(await readFile(join(ws.themes,'mine.css'),'utf8'),edited);await page.locator('.tv-themes [data-theme="mine"]').waitFor();assert.match(await readFile(ws.qmd('talk'),'utf8'),/theme: default/);
+ await page.locator('#undo').click();await waitCss(path,s=>s===edited);assert.equal(await readFile(join(ws.themes,'mine.css'),'utf8'),edited);
+ await reset.click();await page.getByRole('button',{name:'保存せずに戻す',exact:true}).click();await waitCss(path,s=>s===original);assert.equal(await page.locator('.tv-themes .theme-remove').count(),0);assert.deepEqual(errors,[]);
+});
+
+test('theme switch keeps the preview frame, commits after stylesheet loading and undoes',{timeout:90000},async t=>{
+ const {ws,page,errors}=await setup(t,'## テーマ切替 {#one}\n\n本文。\n');const frame=page.frameLocator('#slideBox > iframe:not(.loading)');
+ await frame.locator('html').evaluate(el=>el.setAttribute('data-parity-marker','retained'));
+ const color=()=>frame.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--ink').trim());const before=await color();
+ await page.getByRole('tab',{name:'テーマ',exact:true}).click();
+ let release!:()=>void;const hold=new Promise<void>(resolve=>release=resolve);
+ await page.route('**/theme/night.css?*',async route=>{await hold;await route.continue();});t.after(()=>release());
+ await page.getByRole('button',{name:'「night」を選ぶ',exact:true}).click();await frame.locator('link[media="not all"]').waitFor({state:'attached'});assert.equal(await color(),before);release();
+ await page.locator('.tv-themes [data-theme="night"][aria-pressed=true]').waitFor();
+ for(let i=0;i<100&&await color()===before;i++)await page.waitForTimeout(50);assert.notEqual(await color(),before);
+ assert.equal(await frame.locator('html').getAttribute('data-parity-marker'),'retained');assert.match(await readFile(ws.qmd('talk'),'utf8'),/theme: night/);
+ await page.locator('#undo').click();await page.locator('.tv-themes [data-theme="default"][aria-pressed=true]').waitFor();
+ for(let i=0;i<100&&await color()!==before;i++)await page.waitForTimeout(50);assert.equal(await color(),before);assert.match(await readFile(ws.qmd('talk'),'utf8'),/theme: default/);assert.deepEqual(errors,[]);
+});
+
+test('theme fonts retain the content page, show three samples and restore unfiltered navigation',{timeout:90000},async t=>{
+ const {page,errors}=await setup(t,'## 本文 {#one}\n\n最初の段落。\n\n## 次 {#two}\n\n**次の段落。**\n');
+ await page.getByRole('tab',{name:'テーマ',exact:true}).click();const choices=page.getByRole('group',{name:'本文のフォント',exact:true});await choices.waitFor();
+ assert.equal(await choices.locator('.tv-font-sample').count(),3);assert.deepEqual([...new Set(await choices.locator('.tv-font-sample').allTextContents())],['ひらがな 漢字 100 English']);
+ const fonts=await choices.locator('.tv-font-sample').evaluateAll(els=>els.map(el=>(el as HTMLElement).style.fontFamily));assert.equal(new Set(fonts).size,3);
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');const index=await frame.locator('body').evaluate(()=>(window as any).deck.index);
+ await choices.locator('button').nth(1).click();await page.waitForFunction(()=>document.querySelector('[role=group][aria-label="本文のフォント"] button:nth-child(2)')?.getAttribute('aria-pressed')==='true');
+ assert.equal(await frame.locator('body').evaluate(()=>(window as any).deck.index),index);
+ await page.locator('label[data-key="--ink"]').dispatchEvent('pointerdown');
+ await page.waitForFunction(()=>!!document.querySelector('#slide-studio-theme-marks')||!!document.querySelector('.theme-fields label[data-key="--ink"].on'));
+ const indices=await page.locator('#pagestrip button[data-index]:visible').evaluateAll(els=>els.map(el=>Number((el as HTMLElement).dataset.index)));assert.ok(indices.length>0);
+ for(let i=0;i<indices.length+1;i++){await page.locator('#stage').click({position:{x:10,y:10}});await page.keyboard.press('ArrowDown');assert.ok(indices.includes(await frame.locator('body').evaluate(()=>(window as any).deck.index)));}
+ await page.getByRole('tab',{name:'スライド',exact:true}).click();assert.equal(await page.locator('#pagestrip button[data-index]:visible').count(),await page.locator('#pagestrip button[data-index]').count());
+ await page.getByRole('tab',{name:'テーマ',exact:true}).click();assert.equal(await page.locator('#slideBox').isVisible(),true);assert.deepEqual(errors,[]);
+});
+
+test('layout warnings navigate to the affected page, mark its toolbar and react to live content',{timeout:90000},async t=>{
+ const {ws,page,errors}=await setup(t,'## はみ出し {#low}\n\n::: {.low}\n下の段落。\n:::\n\n## 次 {#next}\n\n本文。\n');
+ const styles=join(ws.deck_dir('talk'),'styles');await mkdir(styles,{recursive:true});await writeFile(join(styles,'slides.css'),'#stage .low p {position:absolute;left:64px;top:700px;margin:0}');
+ const badge=page.locator('.lint-badge');await badge.waitFor();await page.locator('#pagestrip button[data-index="1"]').click();await badge.click();
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');await frame.locator('.slide.active#low').waitFor();assert.match(await badge.getAttribute('data-tip')??'',/レイアウトの問題 1件/);
+ assert.equal(await page.locator('#pagestrip button[data-index="1"] .mark').count(),0);await frame.locator('.slide-studio-lint-box').waitFor();assert.match(await frame.locator('.slide-studio-lint-tab').innerText(),/^↓ \d+px$/);
+ await frame.locator('.low p').click({position:{x:10,y:6}});await page.locator('#blockTools .lint-flag').waitFor();assert.match(await page.locator('#blockTools .lint-flag').getAttribute('data-tip')??'',/スライドの下に \d+px はみ出す/);
+ await page.locator('#pagestrip button[data-index="1"]').click();await frame.locator('.slide.active#next').waitFor();assert.equal(await frame.locator('#slide-studio-lint > *').count(),0);
+ await frame.locator('#next p').evaluate(el=>{el.textContent='長い文。'.repeat(180);});await page.locator('#pagestrip button[data-index="1"] .mark.warning').waitFor();
+ await frame.locator('#next p').evaluate(el=>{el.textContent='本文。';});await page.locator('#pagestrip button[data-index="1"] .mark').waitFor({state:'detached'});assert.deepEqual(errors,[]);
+});
+
+test('native image paste inserts after the selected paragraph, preserves pixels and survives undo and reload',{timeout:90000},async t=>{
+ const {ws,page,errors,app}=await setup(t,'## 貼り付け {#one}\n\n最初の段落。\n\n次の段落。\n');const original=await readFile(ws.qmd('talk'),'utf8');
+ const png='iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAIAAADwyuo0AAAAEElEQVR4nGP4z8AARwzIHABvqgf5gNwAKAAAAABJRU5ErkJggg==';
+ await app.evaluate(async({clipboard,ClipboardItem},png)=>{
+   const backup=await Promise.all((await clipboard.read()).map(async item=>new ClipboardItem(Object.fromEntries(await Promise.all(item.types.map(async type=>[type,await item.getType(type)]))))));
+   await clipboard.write([new ClipboardItem({'image/png':new Blob([Buffer.from(png,'base64')],{type:'image/png'})})]);
+   const signature=async()=>Promise.all((await clipboard.read()).map(async item=>Promise.all(item.types.map(async type=>{const data=await item.getType(type);return [type,data instanceof Blob?Buffer.from(await data.arrayBuffer()).toString('base64'):JSON.stringify(data)];}))));
+   const written=JSON.stringify(await signature());
+   (globalThis as any).__restoreParityClipboard=async()=>{if(JSON.stringify(await signature())===written){if(backup.length)await clipboard.write(backup);else clipboard.clear();}delete (globalThis as any).__restoreParityClipboard;};
+ },png);
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');const paragraph=frame.locator('[data-slide-studio="p0/0"]');await paragraph.click();await frame.locator('.slide-studio-selected').waitFor();await page.keyboard.press('Meta+v');await saved(ws,'![](images/');
+ const text=await readFile(ws.qmd('talk'),'utf8'),match=text.match(/!\[\]\((images\/[^)]+\.png)\)\{width=4 fig-align="center"\}/);assert.ok(match,text);assert.equal(text,original.replace('最初の段落。','最初の段落。\n\n'+match[0]));
+ const image=await readFile(join(ws.asset_root('talk'),match[1]!));assert.equal(await app.evaluate(({nativeImage},data)=>nativeImage.createFromBuffer(Buffer.from(data.actual,'base64')).toBitmap().equals(nativeImage.createFromBuffer(Buffer.from(data.expected,'base64')).toBitmap()),{actual:image.toString('base64'),expected:png}),true);
+ await page.locator('#undo').click();await waitCss(ws.qmd('talk'),s=>s===original);assert.deepEqual(await readFile(join(ws.asset_root('talk'),match[1]!)),image);
+ await page.locator('#redo').click();await waitCss(ws.qmd('talk'),s=>s===text);await page.reload();await page.locator('#stage[data-blocks=ready]').waitFor();await frame.locator('.slide.active img').waitFor();assert.equal(await readFile(ws.qmd('talk'),'utf8'),text);assert.deepEqual(errors,[]);
+});
+
+
+test('heading design is AI-only while direct heading text color preserves the design and supports undo',{timeout:90000},async t=>{
+ const {ws,page,errors}=await setup(t,'## 見出しの文字色 {#one}\n\n本文。\n');const path=join(ws.themes,'default.css');
+ // This is the same CSS file updated by the theme AI; no direct design controls are needed.
+ const designed=(await readFile(path,'utf8'))+'\n#stage .slide > h2 {background:linear-gradient(90deg,#ccddee,#eeeeff);border-bottom:3px dashed #123456;border-radius:12px}\n';await writeFile(path,designed);
+ await page.getByRole('tab',{name:'テーマ',exact:true}).click();const color=page.getByLabel('見出しの文字',{exact:true});await color.waitFor();
+ assert.equal(await page.locator('.tv-fill-open,.gradient-editor,.tv-heading-modes,.tv-heading-rule,input[name="--header"],label[data-key="--font-head"],input[name="--rule"]').count(),0);await page.getByText('デザインの変更はAIチャットへ',{exact:true}).waitFor();
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');const h=frame.locator('.slide.active h2');
+ for(let i=0;i<100;i++){if(await h.evaluate(el=>getComputedStyle(el).borderBottomStyle==='dashed'))break;await page.waitForTimeout(50);}
+ const design=()=>h.evaluate(el=>{const s=getComputedStyle(el);return [s.backgroundImage,s.borderBottom,s.borderRadius,s.fontFamily,s.fontSize];});const beforeDesign=await design();
+ await color.click();const code=page.getByLabel('カラーコード',{exact:true});await code.fill('#123abc');await code.press('Enter');await waitCss(path,s=>s.includes('#123abc'));
+ for(let i=0;i<100;i++){if(await h.evaluate(el=>getComputedStyle(el).color==='rgb(18, 58, 188)'))break;await page.waitForTimeout(50);}assert.equal(await h.evaluate(el=>getComputedStyle(el).color),'rgb(18, 58, 188)');assert.deepEqual(await design(),beforeDesign);
+ await code.press('Escape');await page.locator('#undo').click();await waitCss(path,s=>s===designed);await page.locator('#redo').click();await waitCss(path,s=>s.includes('#123abc'));await page.reload();await page.getByRole('tab',{name:'テーマ',exact:true}).click();await color.waitFor();assert.equal(await color.inputValue(),'#123abc');assert.deepEqual(await design(),beforeDesign);assert.deepEqual(errors,[]);
+ if(process.env.SLIDE_STUDIO_TEST_SCREENSHOT){await color.scrollIntoViewIfNeeded();await page.screenshot({path:process.env.SLIDE_STUDIO_TEST_SCREENSHOT});}
 });
