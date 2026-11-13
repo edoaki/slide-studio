@@ -105,6 +105,13 @@
       "result": "433 regression tests passed, 7 skipped; 33 Electron bridge tests passed; 14 source UI tests passed; 13 installed application tests passed after DMG reinstall. Final theme cleanup rechecked with 3 passing UI tests.",
       "distribution": "All three DMG/EXE artifacts regenerated and checksums verified. Installed arm64 app.asar matches packaged app. Intel/Windows runtime remains untested.",
       "details": "full-parity-progress.json#theme_lint_followup_2026_11_13"
+    },
+    {
+      "name": "heading_ai_only_and_extended_parity_2026_11_13",
+      "source_commit": "467a43d",
+      "result": "433 regression tests passed, 7 skipped; 33 bridge tests passed; 21 source UI and 20 installed-app tests passed at functional commit 9bf0302. Final guidance-layout change 467a43d reinstalled and heading color/undo scenario passed with visual inspection.",
+      "scope": "Direct heading design controls intentionally removed per user instruction; text color retained. Native clipboard and theme AI fixture coverage expanded.",
+      "details": "full-parity-progress.json#heading_ai_followup_2026_11_13"
     }
   ],
   "signing": {
@@ -183,6 +190,11 @@
       "file": "README.md",
       "verification": "yomiyasu-check: executed via=verify run=20261112T100220Z-6efb3e66 attempt=1 final=sha256:159b6295bb47 mode=rewrite checks=lint,diff meaning_risk=0 replay=skipped",
       "disposition": "Reviewed additions against implementation and user decisions. Existing technical terms 版 and 入口 retained in their established meanings."
+    },
+    {
+      "file": "docs/electron-migration-plan.md",
+      "result": "yomiyasu-check: executed via=verify run=20261113T035034Z-c8babac4 attempt=1 final=sha256:ff9d0391759a mode=rewrite checks=lint,diff meaning_risk=0 replay=skipped",
+      "review": "Added only the explicit heading-design scope exception. Existing technical terms retained; no unrelated prose rewritten."
     }
   ],
   "next_work": [

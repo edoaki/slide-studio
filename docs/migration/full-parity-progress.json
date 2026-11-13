@@ -416,7 +416,7 @@
     }
   },
   "heading_ai_followup_2026_11_13": {
-    "status": "source_verified_installed_verification_pending",
+    "status": "implemented_packaged_and_reinstalled_full_migration_not_complete",
     "user_decision": "Heading design is AI-only; retain direct heading text color. Intentional exception to original UI parity.",
     "changes": [
       "Removed direct heading background/gradient/rule/font controls and the unused gradient panel from the theme tab. Body fonts and other theme colors remain available.",
@@ -435,11 +435,42 @@
         "failed": 0
       },
       "ai": "Memo and theme requests, review, restore and history verified using a native fixture process, not authenticated remote inference.",
-      "clipboard": "Trusted native image paste verified through pixel comparison, source placement, undo/redo and reload; existing clipboard is preserved and restored if unchanged by the user."
+      "clipboard": "Trusted native image paste verified through pixel comparison, source placement, undo/redo and reload; existing clipboard is preserved and restored if unchanged by the user.",
+      "electron_bridge": {
+        "passed": 33,
+        "failed": 0
+      },
+      "installed_application": {
+        "functional_commit": "9bf0302",
+        "passed": 20,
+        "failed": 0,
+        "final_visual_commit": "467a43d",
+        "final_heading_color_scenario_passed": true,
+        "screenshot": "/tmp/slide-studio-desktop/parity2-heading-ai-only-final.png",
+        "visual_review": "Heading text color stays directly editable. AI guidance is a full-width text row; no background, gradient, rule or heading-font controls are displayed.",
+        "app_asar_sha256": "d4b29711df1d1cfe3bc0ef0c871f8edbd4ac8093bfed1cd8ee5b315c9433cb9a",
+        "codesign_integrity": "passed; ad-hoc signature only"
+      },
+      "clean_clone": {
+        "functional_commit": "9bf0302",
+        "latest_checkout": "467a43d",
+        "npm_install": "passed",
+        "build": "passed",
+        "protocol_and_html_tests": 18,
+        "npm_start_cli_help": "passed; npm start -- --studio-cli --help",
+        "scope": "Local Git clone; no new claim of public GitHub publication or authenticated provider inference."
+      }
     },
     "logs": {
       "regression": "/tmp/slide-studio-desktop/parity2-regression.txt",
-      "source_ui": "/tmp/slide-studio-desktop/parity2-ui-all.txt"
+      "source_ui": "/tmp/slide-studio-desktop/parity2-ui-all.txt",
+      "installed": "/tmp/slide-studio-desktop/parity2-installed.txt",
+      "installed_visual": "/tmp/slide-studio-desktop/parity2-installed-visual.txt",
+      "bridge": "/tmp/slide-studio-desktop/parity2-bridge.txt",
+      "clone_start": "/tmp/slide-studio-desktop/parity2-clone-start.txt",
+      "package_arm64": "/tmp/slide-studio-desktop/parity2-package-arm64-final.txt",
+      "package_x64": "/tmp/slide-studio-desktop/parity2-package-x64-final.txt",
+      "package_win": "/tmp/slide-studio-desktop/parity2-package-win-final.txt"
     },
     "pdf_followup": "pdf-text-followup-2026-11-13.json: 18/20 normalized text matches, remaining differences are listed, eight URI annotations match. Raster acceptance remains open.",
     "ui_correspondences": {
@@ -452,6 +483,15 @@
       "Finish PDF visual/text acceptance.",
       "Authenticated provider inference and recovery remain unverified.",
       "Windows runtime and official signing remain deferred."
-    ]
+    ],
+    "source_commit": "467a43d",
+    "artifacts": {
+      "mac_arm64": "release/Slide-Studio-0.1.0-mac-arm64.dmg",
+      "mac_x64": "release/Slide-Studio-0.1.0-mac-x64.dmg",
+      "win_x64": "release/Slide-Studio-0.1.0-win-x64-Setup.exe",
+      "installed": "/Users/aki/Applications/Slide Studio.app",
+      "checksums": "All six DMG/EXE/blockmap checks passed against release/SHA256SUMS",
+      "runtime": "Apple Silicon Mac verified. Intel Mac and Windows runtime not verified."
+    }
   }
 }
