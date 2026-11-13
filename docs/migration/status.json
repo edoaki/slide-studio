@@ -118,6 +118,12 @@
       "source_commit": "7981dcc52ec28713f01c70b5c8271362b66296f2",
       "result": "433 regression tests passed, 7 conditional skips; 33 bridge tests passed; 32 source UI tests passed before five test-only additions; all 36 final installed Electron UI tests passed, including all 16 presentation scenarios. All three installers rebuilt, arm64 DMG installed and tested.",
       "details": "full-parity-progress.json#presentation_followup_2026_11_13"
+    },
+    {
+      "name": "step_editing_followup_2026_11_13",
+      "source_commit": "efb1a565b893fe14842c2f12eb438b78bbb63b7d",
+      "result": "AI/workspace tests 50 passed; regression 434 passed and 7 conditional skips before navigation-only frontend fix; final bridge 33 passed. Final source UI run 44/45 passed; the remaining alignment assertion was corrected to wait for async UI updates and passed its targeted rerun. No installer rebuild or reinstallation.",
+      "details": "full-parity-progress.json#step_editing_followup_2026_11_13"
     }
   ],
   "signing": {
@@ -163,7 +169,9 @@
     "signing": "Apple Developer and Windows signing not yet prepared",
     "acceptance": "Windows/signing gates remain open; no claim of milestone completion",
     "electron_only": "2026-11-12: user explicitly requested removing Python/uv files now, with old checkout retained; supersedes deferring removal until M5.",
-    "heading_design": "2026-11-13: heading design is edited through AI, not direct background/gradient/rule/font controls. Keep direct heading text color editing. This supersedes exact UI parity for those controls."
+    "heading_design": "2026-11-13: heading design is edited through AI, not direct background/gradient/rule/font controls. Keep direct heading text color editing. This supersedes exact UI parity for those controls.",
+    "verification_order": "Complete source-level legacy operation parity, fixes and PDF acceptance before rebuilding installers and performing final installed-app verification.",
+    "html_step_message": "When editing HTML through AI chat, each step should generally contain one main-message sentence in one block, excluding element names and concept explanations."
   },
   "toolchain_pinned": {
     "node": "24.18.0",
@@ -205,7 +213,7 @@
   ],
   "next_work": [
     "Finish remaining original UI correspondences with the heading-design AI-only exception. Real native clipboard paste is verified, including pixels, undo/redo and reload.",
-    "Continue individual UI mapping: 19 covered, 8 superseded by the heading-design decision, 350 pending; all 13 original presentation tests now have Electron correspondences.",
+    "Continue individual UI mapping: 25 covered, 8 superseded by the heading-design decision, 344 pending. Do not rebuild or reinstall distribution artifacts until the full legacy operation review is complete.",
     "Finish PDF visual/text acceptance; browser-mode differences diagnosed in pdf-diagnosis-2026-11-13.json.",
     "Verify authenticated inference/recovery for every provider.",
     "Windows runtime is deferred by user. Intel runtime, Developer ID/notarization, Windows signing and public GitHub source/release are not completed."

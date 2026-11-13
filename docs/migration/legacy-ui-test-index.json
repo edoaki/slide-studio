@@ -3464,8 +3464,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "coverage_note": "Source Electron UI: step counter geometry, paragraph grouping/peer markers, alignment and undo, incremental visibility across editing/presentation, PDF step marks with Unicode offsets. Installers intentionally not rebuilt until full legacy parity review."
     },
     {
       "id": "tests/e2e/test_step.py::test_wrapper_options_and_padding",
@@ -3508,8 +3509,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "coverage_note": "Source Electron UI: step counter geometry, paragraph grouping/peer markers, alignment and undo, incremental visibility across editing/presentation, PDF step marks with Unicode offsets. Installers intentionally not rebuilt until full legacy parity review."
     },
     {
       "id": "tests/e2e/test_step.py::test_figure_step_ui",
@@ -3530,8 +3532,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "coverage_note": "Source Electron UI: step counter geometry, paragraph grouping/peer markers, alignment and undo, incremental visibility across editing/presentation, PDF step marks with Unicode offsets. Installers intentionally not rebuilt until full legacy parity review."
     },
     {
       "id": "tests/e2e/test_step.py::test_alignment_cycles_without_menu",
@@ -3541,8 +3544,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "coverage_note": "Source Electron UI: step counter geometry, paragraph grouping/peer markers, alignment and undo, incremental visibility across editing/presentation, PDF step marks with Unicode offsets. Installers intentionally not rebuilt until full legacy parity review."
     },
     {
       "id": "tests/e2e/test_step.py::test_list_incremental_menu",
@@ -3552,8 +3556,9 @@
         "page"
       ],
       "parameterized": false,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "coverage_note": "Source Electron UI: step counter geometry, paragraph grouping/peer markers, alignment and undo, incremental visibility across editing/presentation, PDF step marks with Unicode offsets. Installers intentionally not rebuilt until full legacy parity review."
     },
     {
       "id": "tests/e2e/test_step.py::test_badge_shape_state_and_click",
@@ -3619,8 +3624,9 @@
         "prefix"
       ],
       "parameterized": true,
-      "status": "pending_electron_parity",
-      "replacement_test": null
+      "status": "covered_by_electron_test",
+      "replacement_test": "tests/e2e/legacy-authoring.test.ts",
+      "coverage_note": "Source Electron UI: step counter geometry, paragraph grouping/peer markers, alignment and undo, incremental visibility across editing/presentation, PDF step marks with Unicode offsets. Installers intentionally not rebuilt until full legacy parity review."
     },
     {
       "id": "tests/e2e/test_step.py::test_pdf_step_keeps_marks_after_edit_before_preview_refresh",

@@ -557,5 +557,66 @@
       "Authenticated provider inference/recovery remains unverified.",
       "Windows runtime deferred by user; Intel runtime, public source/release publishing and distribution signing remain incomplete."
     ]
+  },
+  "step_editing_followup_2026_11_13": {
+    "status": "source_verified_installers_deferred_until_full_legacy_review",
+    "source_commit": "efb1a565b893fe14842c2f12eb438b78bbb63b7d",
+    "user_rule": "For HTML editing through AI chat, each step should generally use one main-message sentence in one block, excluding element names and concept explanations. This is guidance, not an automatic text-deletion rule.",
+    "rule_delivery": [
+      "The slides editing prompt carries the rule for whole-deck, page and figure-step requests, including existing workspaces.",
+      "The bundled slide-studio-slides skill carries the same rule. Memo, theme and discussion-only prompts are not given this editing instruction."
+    ],
+    "fixes": [
+      "Append editing CSS after normal document styles, while preserving first-head trusted bootstrap order. Pending-step text remains visible at reduced opacity in the editor and hidden in presentation mode.",
+      "Track pending preview navigation commands and wait for them before swapping frames. Reapply the latest destination after moves that overlap a render. Toolbar and keyboard move/jump commands now participate."
+    ],
+    "validation": {
+      "build": "npm run build passed after the final changes.",
+      "ai_and_workspace": {
+        "passed": 50,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/steps-context.txt"
+      },
+      "regression": {
+        "passed": 434,
+        "skipped": 7,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/steps-regression.txt",
+        "scope": "After rule/CSS changes, before the navigation-only frontend fix."
+      },
+      "bridge": {
+        "passed": 33,
+        "failed": 0,
+        "log": "/tmp/slide-studio-desktop/steps-bridge-final.txt",
+        "scope": "After navigation fix."
+      },
+      "source_ui": {
+        "total": 45,
+        "full_run_passed": 44,
+        "full_run_failed": 1,
+        "log": "/tmp/slide-studio-desktop/steps-ui-final.txt",
+        "failure": "Direct text alignment test read the attribute synchronously before the asynchronous UI update; actual left, expected center. Ported the original test wait semantics.",
+        "corrected_test_passed": 1,
+        "corrected_test_log": "/tmp/slide-studio-desktop/steps-alignment-final.txt",
+        "note": "All 45 scenarios have successful final coverage across the full run and corrected targeted rerun; do not describe this as one clean 45-test run."
+      },
+      "navigation_race": "An explicit delayed old-frame move overlapped with a new preview load; the old frame was retained and the destination survived the swap.",
+      "screenshot": "/tmp/slide-studio-desktop/steps-edit-visible.png",
+      "visual_scope": "Verified pending incremental text remains visible at reduced opacity in the editing preview. Not a claim of complete UI visual acceptance.",
+      "japanese_rule_review": "yomiyasu-check: executed via=verify run=20261113T050858Z-a6bb0523 attempt=1 final=sha256:668f8d7306a4 mode=rewrite checks=lint,diff meaning_risk=0 replay=skipped"
+    },
+    "legacy_mapping": {
+      "covered": 25,
+      "superseded_by_user_decision": 8,
+      "pending": 344,
+      "total": 377
+    },
+    "distribution": "No package or installation operation in this followup. Installed app and release artifacts still contain runtime 7981dcc, not these source changes.",
+    "remaining": [
+      "Complete the remaining legacy-operation correspondences before packaging.",
+      "Complete PDF visual/text acceptance.",
+      "Authenticated AI inference behaviour remains unverified; prompt delivery is tested without paid inference.",
+      "Windows runtime remains deferred by user."
+    ]
   }
 }
