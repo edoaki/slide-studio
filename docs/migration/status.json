@@ -168,17 +168,11 @@
     "fallback": "provider.free-limit confirmed; renderer switched to authorized deepseek/deepseek-flash. See agent-tasks.json"
   },
   "open_gates": [
-    "Complete request/response, SSE ordering and cross-origin iframe contracts; current inventory is a reviewed draft",
-    "AI CLI x OS x role restrictions, tested rather than assumed",
-    "Windows and Intel runtime checks unavailable in this macOS arm64 session",
-    "M1 macOS spike proceeds only against fixed batch fixture and RenderJob; full API/SSE/iframe contracts remain incomplete",
-    "Supported OS minimums and packaging compatibility remain unverified",
-    "M1 cross-origin editor/CLI host integration and signed updates remain unimplemented",
-    "PDF quality: canonical text differs, including spaces and SVG text; 48 dpi raster comparison: 9 of 20 pages exact, remaining differences need diagnosis/acceptance",
-    "Matched performance baseline, GUI startup and aggregate process memory remain unmeasured",
-    "Retina screenshot path validated; pre-load deviceScaleFactor and canvas startup behavior need additional fixture coverage",
-    "WebRTC/STUN and DNS policy not verified by packet observation",
-    "Agent orchestration helper design/implementation remains pending"
+    "Windows runtime verification deferred by the user; Intel Mac runtime also untested.",
+    "Developer ID/notarization, Windows signing and binary GitHub Release publication are not complete.",
+    "Live authenticated Codex has evidence; Claude/Antigravity live account flows remain unverified.",
+    "PDF technical review completed with documented text-layer and small raster differences; user visual acceptance remains pending.",
+    "Matched legacy performance and aggregate process-memory comparison remain unmeasured."
   ],
   "artifacts": {
     "batch_manifest": "python-batch-baseline.json",
@@ -211,9 +205,9 @@
     "macOS outer sandbox-exec conflicts with Electron own sandbox; realElectron runs used internal sandbox with contextIsolation and nodeIntegration disabled",
     "NativeImage capture used Retina backing pixels; CDP captureScreenshot with PNG dimension verification fixes 1280x720 output",
     "ESM top-level await app.whenReady deadlocked bootstrap; asynchronous main now lets module evaluation complete",
-    "Renderer owns its JS layout asset and frozen HTML fixture; no Python or sibling checkout needed at runtime. Editor, host/CLI and packaging remain unimplemented."
+    "Historical M1 note superseded: renderer, legacy editor, host/CLI and packaging are now implemented."
   ],
-  "pdf_quality": "Not accepted. Opus review identifies text-layer regressions; investigate raw pages, cross-merge, font ToUnicode and hidden SVG text before any M1 quality approval.",
+  "pdf_quality": "Technical review completed: no newly missing/clipped visible content in the 20-page fixture, with documented text-layer/raster differences. User visual acceptance pending; see pdf-review-2026-11-13.json.",
   "documentation_checks": [
     {
       "file": "docs/electron-migration-plan.md",
@@ -237,11 +231,9 @@
     }
   ],
   "next_work": [
-    "Preserve the full legacy feature migration scope. For each feature, compare old behavior, implement missing behavior, then run only its relevant tests. Run the whole suite once all features are migrated.",
-    "Use the 102 covered / 8 superseded / 267 pending legacy-function mapping as supplementary evidence, not as a missing-feature count or a requirement to port every test before delivery.",
-    "Continue unresolved PDF text/visual equivalence review; technical findings are in pdf-review-2026-11-13.json.",
-    "Installed-app AI login and providers beyond the authenticated Codex connection remain to be verified.",
-    "Windows runtime is deferred. Intel installer is older; signing/notarization and binary GitHub Releases remain incomplete."
+    "Windows and Intel runtime verification when an environment is available.",
+    "Developer signing and notarization when credentials are available.",
+    "Optional live-provider verification beyond authenticated Codex and user visual acceptance of documented PDF differences."
   ],
   "source_commits": {
     "renderer": "b53890b",
@@ -249,9 +241,12 @@
     "harness": "698d6e1",
     "inventory": "2cea5ca"
   },
-  "checkout_layout": "Electron-only source tree. Legacy Python implementation and tests preserved in ../slide-studio-old and Git history; migration is not feature-complete.",
+  "checkout_layout": "Electron-only source tree. Legacy Python preserved in ../slide-studio-old and Git history. All 72 inventory feature IDs mapped to current implementations and regression evidence; external acceptance gates remain.",
   "historical_evidence": "Python test results, manifests and old artifact paths are historical baseline evidence; source/test citations refer to the reference checkout or recorded Git commit.",
   "electron_only_checkout": "electron-only.json",
-  "current_scope": "Original UI and TypeScript/Electron host are connected across desktop, browser and CLI. Whole-workflow integration and installed-DMG verification are required; individual features do not constitute completion.",
-  "full_parity_progress": "full-parity-progress.json"
+  "current_scope": "All 72 inventory feature IDs mapped to implementations and regression evidence. Source whole-product regression, installed arm64 DMG workflow, portable workspace rebuild, and fresh GitHub clone npm install/start verified. External acceptance gates remain.",
+  "full_parity_progress": "full-parity-progress.json",
+  "current_feature_verification": "current-feature-verification.json",
+  "final_regression": "final-regression-2026-11-13.json",
+  "final_delivery": "final-delivery-2026-11-13.json"
 }

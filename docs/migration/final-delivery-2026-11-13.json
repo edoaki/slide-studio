@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-13",
+  "runtime_commit": "8c16294a6d5b19a30e8338e4026a3ea3f248f51c",
+  "install": {
+    "runtime_commit": "8c16294a6d5b19a30e8338e4026a3ea3f248f51c",
+    "installed": "/Users/aki/Applications/Slide Studio.app",
+    "backup": "/Users/aki/Applications/.slide-studio-backups/install-em0L8z/previous.app",
+    "asar_sha256": "bb402a4d7fc9610abdc071ecb2a798bf8d0105d33947dd50691d3d29dabbf33c",
+    "dmg_sha256": "a47c228a84498362ab9cb1e737a53818c8d67c66a0d8c3a9a0aff61ae6b75d7f"
+  },
+  "installed_checks": {
+    "passed": 5,
+    "failed": 0,
+    "log": "/tmp/slide-studio-desktop/final-installed-tests.txt",
+    "scope": [
+      "create, memo/source edit, preview, save/reopen, image resizing, shared figure, offline HTML and selected-step PDF",
+      "page template insertion and placeholder editing",
+      "overview shortcut from preview iframe",
+      "agent instructions normal close and failed-save retry"
+    ],
+    "screenshot": "/tmp/slide-studio-desktop/original-editor-installed.png"
+  },
+  "fresh_github_clone": {
+    "clone": "/tmp/slide-studio-final-clone-AlEuV7/repo",
+    "npm_install": "passed",
+    "npm_start": "passed",
+    "creation_and_autosave": "passed"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/aki/code/slide-studio/release/Slide-Studio-0.1.0-mac-arm64.dmg",
+      "sha256": "a47c228a84498362ab9cb1e737a53818c8d67c66a0d8c3a9a0aff61ae6b75d7f",
+      "bytes": 167731312
+    },
+    {
+      "path": "/Users/aki/code/slide-studio/release/Slide-Studio-0.1.0-win-x64-Setup.exe",
+      "sha256": "f8a1fc79391ee288f2bbb07621bd580a302f5850c39e27e195bedae03e2b85e5",
+      "bytes": 150709933
+    }
+  ],
+  "limits": [
+    "Windows x64 EXE generated, runtime verification deferred by user.",
+    "macOS arm64 installed and verified; existing macOS x64 DMG is older and not part of this delivery.",
+    "No Developer ID/notarization or Windows signing credentials.",
+    "Live-service proof is existing authenticated Codex evidence; other providers verified with protocol fixtures.",
+    "72 inventory feature IDs have implementation and test evidence. This does not assert all 377 legacy E2E functions were ported or universal pixel identity.",
+    "Documented PDF glyph/text-layer differences and user visual acceptance remain."
+  ]
+}

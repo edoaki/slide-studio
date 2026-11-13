@@ -2,7 +2,7 @@
   "date": "2026-11-13",
   "scope": "All feature IDs from the original M0 inventory, grouped by user workflow. Does not assert that every legacy E2E function was ported or executed.",
   "feature_count": 72,
-  "status": "final_regression_in_progress",
+  "status": "implementation_and_regression_complete_external_acceptance_pending",
   "groups": [
     {
       "name": "workspace_and_launch",
@@ -26,7 +26,7 @@
         "tests/desktop/legacy-server.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "home_and_topic",
@@ -45,7 +45,7 @@
         "tests/core/legacy-importer.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "source_and_direct_edit",
@@ -64,7 +64,7 @@
         "tests/core/legacy-block-ops.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "memo",
@@ -78,7 +78,7 @@
         "tests/e2e/legacy-ai.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "themes_and_style",
@@ -93,7 +93,7 @@
         "tests/core/legacy-theme-edit.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "materials_and_assets",
@@ -109,7 +109,7 @@
         "tests/core/legacy-assets.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "library_and_bibliography",
@@ -127,7 +127,7 @@
         "tests/core/legacy-bibliography.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "figures",
@@ -141,7 +141,7 @@
         "tests/core/legacy-figures.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "preview_and_presentation",
@@ -157,7 +157,7 @@
         "tests/e2e/legacy-composition.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "checks_and_export",
@@ -177,7 +177,7 @@
         "tests/desktop/legacy-checks.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "ai_runtime_and_roles",
@@ -198,7 +198,7 @@
         "tests/core/legacy-ai-roles.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "chat_and_history",
@@ -217,7 +217,7 @@
         "tests/core/legacy-snapshot.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "audit",
@@ -233,7 +233,7 @@
         "tests/ai/launcher.test.ts"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     },
     {
       "name": "portable",
@@ -246,7 +246,7 @@
         "portable-delivery-2026-11-13.json"
       ],
       "implementation": "present",
-      "validation": "existing and focused checks; final regression pending"
+      "validation": "feature checks and whole-product regression completed; see final-regression-2026-11-13.json"
     }
   ],
   "legacy_web_files": [
@@ -512,5 +512,6 @@
     "Windows and Intel runtime tests deferred; signing and notarization unavailable.",
     "Only authenticated Codex has live-service evidence; other providers use fixture protocol tests.",
     "PDF technical review retains documented glyph/text-layer differences; user visual acceptance pending."
-  ]
+  ],
+  "delivery": "final-delivery-2026-11-13.json"
 }

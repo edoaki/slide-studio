@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-13",
+  "runtime_commit": "9690337",
+  "test_commit": "8c16294",
+  "core": {
+    "passed": 476,
+    "failed": 0,
+    "skipped": 1,
+    "log": "/tmp/slide-studio-desktop/final-all-core.txt",
+    "additional_real_pandoc": {
+      "passed": 1,
+      "failed": 0,
+      "log": "/tmp/slide-studio-desktop/final-pandoc.txt"
+    }
+  },
+  "gui": {
+    "initial_passed": 143,
+    "initial_failed": 4,
+    "skipped": 1,
+    "log": "/tmp/slide-studio-desktop/final-all-ui.txt",
+    "targeted_recheck": {
+      "passed": 4,
+      "failed": 0,
+      "log": "/tmp/slide-studio-desktop/final-ui-recheck.txt"
+    },
+    "disposition": [
+      "AI memo/theme DOM click tests now await enabled Send button before clicking.",
+      "Step grouping test now awaits the rendered first-step element before selecting the next paragraph.",
+      "Tooltip timed out while a separate GUI rerun was launched; passed with no concurrent GUI test. No runtime change made."
+    ],
+    "result": "All 147 non-live GUI cases have passing evidence; initial full run had four failures resolved by targeted rechecks, not a second full run.",
+    "live_skip": "Real authenticated Codex was previously checked; live request intentionally not repeated."
+  },
+  "portable": "portable-delivery-2026-11-13.json",
+  "pdf": "pdf-review-2026-11-13.json",
+  "features": "current-feature-verification.json"
+}

@@ -1,5 +1,5 @@
 {
-  "status": "in_progress_integrated_original_ui",
+  "status": "current_inventory_implemented_regression_and_mac_delivery_verified_external_acceptance_pending",
   "reference": "ca1f148dced6d207dab3f69474bc848560ff738c",
   "source": {
     "commit": "5d80176",
@@ -848,5 +848,9 @@
     },
     "delivery": "Source changes only. Installed arm64 runtime remains cdc91ff. Windows runtime remains deferred.",
     "remaining": "Full operation parity is still in progress; these cases are not whole-product acceptance."
-  }
+  },
+  "current_verification": "current-feature-verification.json",
+  "final_regression": "final-regression-2026-11-13.json",
+  "final_delivery": "final-delivery-2026-11-13.json",
+  "historical_note": "Earlier sections retain chronological evidence and may describe superseded implementation/delivery states; current verification and final delivery records govern current claims."
 }
