@@ -38,7 +38,7 @@ export function mountAgents(root) {
   }
   function draw() {
     if (!alive || !data) return;
-    nav.innerHTML = data.roles.map(r => `<div class="agent-role ${selected === r.id ? 'on' : ''}"><button class="ibtn" data-role="${r.id}" aria-current="${selected === r.id ? 'page' : 'false'}">${svg('eye')}</button><div>${esc(name(r.id))}<span>${esc(T.kinds[r.id] || (r.readonly ? T.specialist : T.conversation))}</span></div></div>`).join('');
+    nav.innerHTML = data.roles.map(r => `<button type="button" class="agent-role ${selected === r.id ? 'on' : ''}" data-role="${r.id}" aria-current="${selected === r.id ? 'page' : 'false'}"><span class="ibtn" aria-hidden="true">${svg('eye')}</span><span class="agent-role-label">${esc(name(r.id))}<span>${esc(T.kinds[r.id] || (r.readonly ? T.specialist : T.conversation))}</span></span></button>`).join('');
     nav.querySelectorAll('button').forEach(b => { tip(b, T.show(name(b.dataset.role))); b.onclick = async () => { if (!await save() || !alive) return; selected = b.dataset.role; draw(); }; });
     const role = data.roles.find(r => r.id === selected), max = data.extra_limit;
     detail.innerHTML = `<div class="agent-heading"><h2>${esc(name(role.id))}</h2></div><p>${esc(T.descriptions[role.id])}</p>

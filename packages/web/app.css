@@ -1586,9 +1586,10 @@ button.lib:hover { background: var(--hover); }
 .agent-home-card b { font-size:var(--fs-ui); font-weight:600; }.agent-home-card small { color:var(--muted); font-size:var(--fs-sm); }
 .agents-layout { display:grid; grid-template-columns:210px minmax(0,1fr); gap:32px; margin-top:30px; }
 .agents-nav { display:flex; flex-direction:column; gap:6px; align-self:start; position:sticky; top:78px; }
-.agent-role { display:flex; align-items:center; gap:10px; padding:10px 14px; text-align:left; background:transparent; color:inherit; border:1px solid transparent; border-radius:var(--r-element); cursor:pointer; transition:background var(--dur-fast) var(--ease); }
+.agent-role { font:inherit; display:flex; align-items:center; gap:10px; padding:10px 14px; text-align:left; background:transparent; color:inherit; border:1px solid transparent; border-radius:var(--r-element); cursor:pointer; transition:background var(--dur-fast) var(--ease); }
+.agent-role:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
 .agent-role:hover { background:var(--hover); }
-.agent-role span { display:block; font-size:var(--fs-caption); color:var(--muted); margin-top:2px; }
+.agent-role-label > span { display:block; font-size:var(--fs-caption); color:var(--muted); margin-top:2px; }
 .agent-role.on { background:var(--primary-soft); border-color:color-mix(in srgb, var(--primary) 35%, transparent); }
 .agent-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }.agent-heading h2 { margin:0; }
 .agent-hint { font-size:var(--fs-ui); color:var(--muted); margin:0 0 12px; }.agent-detail h3 { font-size:var(--fs-body); margin:24px 0 12px; }

@@ -88,6 +88,19 @@ test('composition agent prompts retain mandatory text and save each role indepen
  await page.locator('[data-role=theme]').click();await page.locator('.agent-extra').fill('テーマへの追加指示');await page.locator('[data-role=chat]').click();await page.locator('[data-role=chat][aria-current=page]').waitFor();assert.equal(await page.locator('.agent-extra').inputValue(),'');await page.reload();await page.locator('[data-role=theme]').click();await page.locator('[data-role=theme][aria-current=page]').waitFor();assert.equal(await page.locator('.agent-extra').inputValue(),'テーマへの追加指示');assert.deepEqual(errors,[]);
 });
 
+test('composition role labels and keyboard reveal each mandatory system prompt',{timeout:60000},async t=>{
+ const {ws,page,errors}=await setup(t,DOC);await page.goto(new URL('/agents',page.url()).href);await page.locator('.agent-extra').waitFor();
+ for(const [id,label,skill] of [['theme','テーマ編集','theme'],['review','確認','review'],['draft','下書き','memo'],['consult','相談役',''],['chat','チャット','slides']]){
+  await page.locator(`.agent-role:is([data-role="${id}"], :has([data-role="${id}"]))`).getByText(label!).first().click();await page.locator(`[data-role="${id}"][aria-current=page]`).waitFor({timeout:3000});
+  assert.equal(await page.locator('.agent-heading h2').innerText(),label);
+  const paths=['AGENTS.md',...(skill?[`.agents/skills/slide-studio-${skill}/SKILL.md`]:[])];
+  assert.equal(await page.locator('.agent-prompt').count(),paths.length);
+  for(let i=0;i<paths.length;i++){const text=await readFile(join(ws.root,paths[i]!),'utf8');assert.ok(text.trim().length>0);assert.equal(await page.locator('.agent-prompt').nth(i).textContent(),text);}
+ }
+ await page.locator('[data-role=theme]').focus();await page.keyboard.press('Enter');await page.locator('[data-role=theme][aria-current=page]').waitFor();
+ await page.locator('[data-role=review]').focus();await page.keyboard.press('Space');await page.locator('[data-role=review][aria-current=page]').waitFor();assert.deepEqual(errors,[]);
+});
+
 for(const failFirst of [false,true])test(`composition agent extra waits for native autosave and retries failure ${failFirst}`,{timeout:60000},async t=>{
  const {ws,page,app}=await setup(t,DOC);await page.getByRole('link',{name:'ホーム',exact:true}).click();await page.getByRole('link',{name:'担当ごとのプロンプトを見る・追加指示を書く'}).click();await page.locator('.agent-extra').waitFor();let fail=failFirst;
  await page.route('**/api/ai/roles/chat/extra',async route=>{await new Promise(r=>setTimeout(r,500));if(fail)await route.fulfill({status:503,json:{error:'save unavailable'}});else await route.continue();});await page.locator('.agent-extra').fill('終了直前の追加指示');const window=await app.browserWindow(page);
