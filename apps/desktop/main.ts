@@ -307,7 +307,7 @@ function installWindowPolicy(window: BrowserWindow): void {
       const current = contents.getURL();
       // Authored content runs in a different origin. Never execute this
       // trusted UI call in an authored frame or an external document.
-      if (mainNavigationAllowed(current) && new URL(current).pathname.startsWith('/deck/')) {
+      if (mainNavigationAllowed(current) && /^\/(?:deck\/|agents$)/u.test(new URL(current).pathname)) {
         const saved: unknown = await contents.executeJavaScript(
           "import('/web/app.js').then(module => module.flushBeforeLeave())", true,
         );

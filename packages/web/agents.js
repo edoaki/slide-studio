@@ -10,27 +10,36 @@ export function mountAgents(root) {
   document.body.className = 'home-page';
   root.innerHTML = `<div class="home agents-home"><header class="home-bar"><a class="ibtn" href="/" data-nav>${svg('chevL')}</a><span class="grow"></span><span>${S.appName}</span></header>
     <main class="home-main"><h1>${T.title}</h1><p class="muted">${T.intro}</p><div class="agents-layout"><nav class="agents-nav" aria-label="${T.roles}"></nav><section class="agent-detail" aria-live="polite"><p>${S.status.loading}</p></section></div></main></div>`;
-  let alive = true, data, selected = 'chat', timer = 0, pending = null;
+  let alive = true, data, selected = 'chat', timer = 0, saving = null;
+  const pending = new Map();
   const nav = root.querySelector('.agents-nav'), detail = root.querySelector('.agent-detail');
   tip(root.querySelector('[data-nav]'), T.home);
   const name = id => T.names[id] || id;
   // 追加指示は書くと少し待って保存する。担当を移る・画面を離れるときは待たずに保存する。
-  async function save() {
+  function save() {
     clearTimeout(timer);
-    const job = pending;
-    pending = null;
-    if (!job) return;
-    const { role, text, status } = job;
-    status.textContent = T.extraSaving;
-    try {
-      role.extra = (await api(`/api/ai/roles/${role.id}/extra`, { method: 'PUT', body: { text } })).extra;
-      if (alive && !pending) status.textContent = T.extraSaved;
-    } catch (e) { status.textContent = e.message; }
+    if (saving) return saving;
+    saving = (async () => {
+      while (pending.size) {
+        const [id, job] = pending.entries().next().value;
+        const { role, text, status } = job;
+        status.textContent = T.extraSaving;
+        try {
+          const result = await api(`/api/ai/roles/${id}/extra`, { method: 'PUT', body: { text } });
+          if (pending.get(id) === job) {
+            pending.delete(id); role.extra = result.extra;
+            if (alive) status.textContent = T.extraSaved;
+          }
+        } catch (e) { status.textContent = e.message; return false; }
+      }
+      return true;
+    })().finally(() => { saving = null; });
+    return saving;
   }
   function draw() {
     if (!alive || !data) return;
     nav.innerHTML = data.roles.map(r => `<div class="agent-role ${selected === r.id ? 'on' : ''}"><button class="ibtn" data-role="${r.id}" aria-current="${selected === r.id ? 'page' : 'false'}">${svg('eye')}</button><div>${esc(name(r.id))}<span>${esc(T.kinds[r.id] || (r.readonly ? T.specialist : T.conversation))}</span></div></div>`).join('');
-    nav.querySelectorAll('button').forEach(b => { tip(b, T.show(name(b.dataset.role))); b.onclick = () => { save(); selected = b.dataset.role; draw(); }; });
+    nav.querySelectorAll('button').forEach(b => { tip(b, T.show(name(b.dataset.role))); b.onclick = async () => { if (!await save() || !alive) return; selected = b.dataset.role; draw(); }; });
     const role = data.roles.find(r => r.id === selected), max = data.extra_limit;
     detail.innerHTML = `<div class="agent-heading"><h2>${esc(name(role.id))}</h2></div><p>${esc(T.descriptions[role.id])}</p>
       <p class="agent-native">${esc(T.native(role.skill))}${role.readonly ? ` ${esc(T.readonlyWork)}` : ''}</p>
@@ -44,7 +53,8 @@ export function mountAgents(root) {
     counted();
     box.oninput = () => {
       counted();
-      pending = { role, text: box.value, status };
+      role.extra = box.value;
+      pending.set(role.id, { role, text: box.value, status });
       status.textContent = '';
       clearTimeout(timer);
       timer = setTimeout(save, 700);
@@ -52,5 +62,7 @@ export function mountAgents(root) {
     box.onblur = save;
   }
   api('/api/ai/roles').then(result => { if (alive) { data = result; draw(); } }).catch(e => { if (alive) detail.textContent = e.message; });
-  return () => { save(); alive = false; };
+  const cleanup = () => { clearTimeout(timer); alive = false; };
+  cleanup.flush = save;
+  return cleanup;
 }

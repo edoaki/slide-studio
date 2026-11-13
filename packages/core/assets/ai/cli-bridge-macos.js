@@ -38,7 +38,7 @@ function run(argv) {
     for (var i = 0; i < argv.length; i++) {
       var arg = argv[i];
       if (arg === '--json') { opts.json = true; continue; }
-      if (arg === '--root' || arg === '--page' || arg === '--figure' || arg === '--tab') {
+      if (arg === '--root' || arg === '--page' || arg === '--figure' || arg === '--tab' || arg === '--file') {
         if (++i >= argv.length) throw Error(arg + ' の値がありません');
         opts[arg.slice(2)] = argv[i]; continue;
       }
@@ -53,7 +53,11 @@ function run(argv) {
     else if (command === 'consult') body = {operation: 'consult', tab: opts.tab, question: pos[1] === '-' ? input() : pos[1]};
     else if (command === 'audit' && ['tools', 'run', 'status', 'review'].indexOf(pos[1]) >= 0) {
       body = {operation: 'audit_' + pos[1], deck: pos[2], audit_id: pos[3]};
-      if (pos[1] === 'review') body.review = JSON.parse(pos[4] === '-' ? input() : read(pos[4], 1024 * 1024));
+      if (pos[1] === 'review') {
+        var reviewFile = opts.file || pos[4];
+        if (!reviewFile) throw Error('確認結果のJSONを指定してください');
+        body.review = JSON.parse(reviewFile === '-' ? input() : read(reviewFile, 1024 * 1024));
+      }
     } else throw Error('AI から利用できるコマンドは check・consult・audit です');
     var dir = root + '/.slide-studio/requests'; safe(dir, root);
     if (!fm.fileExistsAtPath($(dir))) throw Error('アプリを開いてから実行してください');

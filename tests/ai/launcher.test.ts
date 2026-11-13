@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { prepareLauncher } from '../../apps/cli/launcher.js';
@@ -24,4 +24,9 @@ test('macOS sandbox launcher preserves Japanese arguments, JSON, stdout and exit
   const invalid = await run(['build', 'talk']);
   assert.equal(invalid.code, 1); assert.match(invalid.stderr, /check・consult・audit/);
   assert.equal(received.length, 1);
+  const review={reviewer:'確認者',states:[],decisions:[],visual_issues:[]};
+  const file=join(root,'確認 結果.json');await writeFile(file,JSON.stringify(review));
+  const reviewed=await run(['audit','review','発表','audit-1','--file',file]);
+  assert.equal(reviewed.code,1,reviewed.stderr); // fixture result is not complete
+  assert.deepEqual(received[1],{operation:'audit_review',deck:'発表',audit_id:'audit-1',review});
 });

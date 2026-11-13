@@ -206,6 +206,10 @@ export class Preview {
     this.failureReloads = 0;
     this.failureReloadAt = 0;
     try { this.onLoad(this.win); } catch (error) { this.error = error; }
+    // Page insertion may navigate from onLoad. Do not publish the old frame
+    // position while that move is pending: it would blur the new page's input.
+    await this.settleNavigation();
+    if (this.destroyed || this.client !== client) return;
     this._notifyChange({ index: client.api.index, step: client.api.step, maxStep: client.api.maxStep() });
   }
 

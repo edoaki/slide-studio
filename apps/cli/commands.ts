@@ -21,7 +21,8 @@ export const HELP = `Slide Studio
   slide-studio check --figure <トピック/図>
   slide-studio build <発表> [--html-only] [--force]
   slide-studio consult --tab <タブID> <質問>
-  slide-studio audit tools|run|status|review [発表] [監査ID] [確認JSON]
+  slide-studio audit tools|run|status [発表] [監査ID]
+  slide-studio audit review <発表> <監査ID> --file <確認JSON|->
   slide-studio doctor
 
 --root の代わりに SLIDE_STUDIO_HOME も使用できます。
@@ -32,6 +33,7 @@ export function argumentsOf(args: string[]) {
     shelf: {type: 'string'}, deck: {type: 'string'}, title: {type: 'string'}, page: {type: 'string'}, figure: {type: 'string'}, tab: {type: 'string'},
     force: {type: 'boolean'}, 'html-only': {type: 'boolean'}, json: {type: 'boolean'}, help: {type: 'boolean', short: 'h'},
     port: {type: 'string'}, 'no-browser': {type: 'boolean'}, browser: {type: 'boolean'},
+    file: {type: 'string'},
   }});
 }
 export type Arguments = ReturnType<typeof argumentsOf>;
@@ -41,7 +43,7 @@ export function earlyCommand(args: Arguments): boolean {
   return false;
 }
 const reviewInputs = new WeakMap<Arguments, unknown>();
-function reviewInput(args: Arguments) { if (!reviewInputs.has(args)) reviewInputs.set(args, readReview(args.positionals[4])); return reviewInputs.get(args); }
+function reviewInput(args: Arguments) { if (!reviewInputs.has(args)) reviewInputs.set(args, readReview(args.values.file ?? args.positionals[4])); return reviewInputs.get(args); }
 const required = (value: string | undefined, label: string) => { if (!value) throw Error(`${label}を指定してください`); return value; };
 const print = (value: unknown) => process.stdout.write(typeof value === 'string' ? value + '\n' : JSON.stringify(value, null, 2) + '\n');
 

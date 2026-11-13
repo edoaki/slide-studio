@@ -25,7 +25,8 @@ const PAD_ICON = { inner: 'padInner', outer: 'padOuter', gap: 'padGap' };
 // The frame consumes only these explicit shortcuts. Their validated intents
 // return to the parent, which owns source writes and presentation/export UI.
 const BRIDGE_KEYMAP = Object.freeze([
- ...['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','KeyP','Escape','Enter','Delete','Backspace'].map(code=>({code,shift:false,alt:false,ctrl:false,meta:false,preventDefault:true})),
+ ...['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','KeyP','KeyO','KeyC','Slash','Digit0','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Escape','Enter','Delete','Backspace'].map(code=>({code,shift:false,alt:false,ctrl:false,meta:false,preventDefault:true})),
+ ...['KeyC','Digit1','Digit2','Digit3'].map(code=>({code,shift:false,alt:true,ctrl:false,meta:false,preventDefault:true})),
  {code:'KeyF',shift:true,alt:false,ctrl:false,meta:false,preventDefault:true},
  ...['KeyW','KeyA','KeyS','KeyD'].flatMap(code=>[{code,shift:true,alt:false,ctrl:false,meta:false,preventDefault:true},{code,shift:false,alt:true,ctrl:false,meta:false,preventDefault:true}]),
  ...[true,false].flatMap(shift=>[{code:'KeyZ',shift,alt:false,ctrl:false,meta:true,preventDefault:true},{code:'KeyZ',shift,alt:false,ctrl:true,meta:false,preventDefault:true}]),
@@ -209,7 +210,7 @@ export function makeBlocks(ctx) {
     if(intent.type==='keyup'){holdKey(event);return;}
     // Presentation/export shortcuts also work when focus is inside the isolated
     // preview. Keep F reserved for padding while a block is selected.
-    if (!editing && (intent.code === 'KeyP' || (intent.code === 'KeyF' && !selected))) {
+    if (!editing && (['KeyP','KeyO','KeyC','Slash','Digit0','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6'].includes(intent.code) || (intent.code === 'KeyF' && !selected))) {
       ctx.plugins.some(plugin => plugin.keydown?.(event));
       return;
     }

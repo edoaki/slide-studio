@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { Workspace } from '../../packages/core/src/legacy-workspace.js';
 import { LegacyOutput } from '../../apps/server/legacy-output.js';
 import * as audit from '../../apps/server/legacy-audit.js';
+import {argumentsOf, runCommand} from '../../apps/cli/commands.js';
 
 async function fixture(t: TestContext, error = false) {
   const root = await mkdtemp(join(tmpdir(), 'studio-audit-')); t.after(() => rm(root, {recursive: true, force: true}));
@@ -31,4 +32,12 @@ test('audit cannot approve machine errors or accept changed image bytes', async 
   await writeFile(report.states[0]!.image, 'changed');
   assert.equal(audit.status(ws, 'talk', report.audit_id).status, 'stale');
   assert.throws(() => audit.status(ws, 'talk', '../escape'), /ID/);
+});
+
+test('legacy audit review --file reads review JSON and completes the stored audit', async t => {
+  const {ws, report, review} = await fixture(t);
+  const file=join(ws.root,'review.json');await writeFile(file,JSON.stringify(review));
+  const args=argumentsOf(['audit','review','talk',report.audit_id,'--file',file]);
+  assert.equal(await runCommand(ws,args,{pandocPath:'unused',inspect:async()=>{throw Error('Unexpected render');},diagnostics:async()=>[]}),0);
+  assert.equal(audit.status(ws,'talk',report.audit_id).complete,true);
 });
