@@ -54,12 +54,26 @@ html, body { overscroll-behavior-x: none; }
 .slide.cover,.slide.section-slide {padding-top:190px} .cover h2 {border:0; font-size:48px; line-height:1.55} .cover p {color:var(--muted)} .section-slide {background:#e9f2f1} .section-slide h1::before {content:''; display:block; width:70px; height:6px; background:var(--accent); margin-bottom:32px}
 iframe {width:100%; height:350px; border:0; display:block; margin:12px 0; pointer-events:none} .columns {display:flex; gap:48px}.column {flex:1; min-width:0} table {border-collapse:collapse; width:auto; max-width:100%; font-size:.85em; margin:24px 0} th,td {padding:15px 8px; border-bottom:1px solid #b9c9cd; text-align:left} th {background:#e9f2f1} a {color:inherit} .citation {font-size:.65em; color:var(--muted)}
 .citations {position:absolute; bottom:24px; left:64px; right:90px; font-size:12px; line-height:1.45; color:#53616a; border-top:1px solid #c8d2d4; padding-top:8px}.citations p {font-size:inherit; line-height:inherit; margin:0}.small p,.small {font-size:21px} .page-number {position:absolute; right:30px; bottom:25px; font-size:14px; color:#53616a}
-#toolbar {position:fixed; right:0; top:0; padding:12px; display:flex; gap:6px; z-index:5} button {font:inherit; cursor:pointer; border:1px solid #c1cbcf; background:#fff; color:#182b3a; border-radius:6px; padding:10px 14px} button:focus-visible {outline:3px solid #00a2af} #overview {position:fixed; inset:0; z-index:10; overflow:auto; padding:25px; background:#e7ecee} #overview[hidden] {display:none} #overview h2 {font-size:24px; border:0; margin:22px 0 12px} .overview-row {display:flex; gap:12px; overflow-x:auto; padding:6px 2px 14px}.overview-grid {display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px}.thumb {display:flex; flex-direction:column; justify-content:flex-start; text-align:left; min-width:220px; flex:0 0 260px; padding:8px 8px 10px; font-size:15px; line-height:1.4; border-top:5px solid var(--accent)} .thumb-caption {white-space:nowrap; overflow:hidden; text-overflow:ellipsis} .thumb span {font-size:12px; color:#53616a; margin-right:8px}.thumb[aria-current=true] {background:#d7eeeb}
-[data-step].pending {visibility:hidden} #help {color:#53616a; font-size:14px} @media(max-width:600px) {#toolbar button {padding:9px 12px} #overview {padding:16px}.overview-grid {grid-template-columns:repeat(4,220px);overflow:auto} .thumb{flex-basis:220px}}
+#toolbar {position:fixed; right:0; top:0; padding:12px; display:flex; gap:6px; z-index:5}
+button {font:inherit; cursor:pointer; border:1px solid #c1cbcf; background:#fff; color:#182b3a; border-radius:6px; padding:10px 14px}
+button:focus-visible {outline:3px solid #00a2af}
+body #overview {position:fixed; inset:0; z-index:10; overflow:auto; padding:0 16px 16px; background:#f5f5f3; color:#454541; font:13px system-ui,sans-serif}
+#overview[hidden] {display:none}
+#overview .overview-controls {position:sticky; top:0; z-index:3; display:flex; justify-content:flex-end; align-items:center; gap:8px; min-height:44px; margin:0 -16px 4px; padding:6px 8px; background:#f5f5f3}
+#overview .overview-close-hint {font:11px system-ui,sans-serif; color:#777773}
+#overview #close {display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:4px; background:transparent; color:#555550}
+#overview #close:hover {background:#00000008}
+#overview #close:focus-visible {outline:1px solid #777773; outline-offset:-2px}
+#overview :is(.overview-row,.overview-grid) {display:grid; grid-template-columns:repeat(auto-fill,minmax(min(140px,100%),1fr)); gap:12px; padding:6px 2px 14px}
+#overview .thumb {display:block; min-width:0; width:100%; max-width:220px; padding:0; border:0; border-radius:3px; background:transparent; box-shadow:0 0 0 1px #0003; overflow:hidden; aspect-ratio:16/9}
+#overview .thumb[aria-current=true] {outline:2px solid #1f63d6; outline-offset:2px; background:transparent; box-shadow:none}
+#overview .thumb:hover {box-shadow:0 0 0 1px #777773}
+#overview .thumb:focus-visible {outline:2px solid #1f63d6; outline-offset:2px}
+[data-step].pending {visibility:hidden}
 /* 操作のボタンはカーソルを合わせたとき（キーボードでは選んだとき）だけ出す。触る画面では常に出す */
 @media(hover:hover) {#toolbar {opacity:0; transition:opacity .15s} #toolbar:hover, #toolbar:has(:focus-visible) {opacity:1}}
 /* 一覧の縮小画像（player.js が 1280×720 のページの複製を幅に合わせて縮める） */
-.thumb-view {position:relative; aspect-ratio:16/9; overflow:hidden; margin-bottom:8px; background:var(--paper); outline:1px solid #0000001a; pointer-events:none}
+.thumb-view {position:relative; aspect-ratio:16/9; overflow:hidden; margin-bottom:0; background:var(--paper); pointer-events:none}
 .thumb-steps {position:absolute; left:4px; right:4px; bottom:4px; z-index:1; display:flex; gap:2px; opacity:0; transition:opacity .15s}
 .thumb:hover .thumb-steps, .thumb:focus-visible .thumb-steps, .thumb[aria-current=true] .thumb-steps {opacity:1}
 .thumb-steps i {flex:1; height:3px; border-radius:2px; background:#ffffffe6; box-shadow:0 0 0 .5px #1e243c59}
@@ -351,8 +365,8 @@ body.export .highlight{transition:none}
 /* 目次：見出し・余白・背景はテーマの通常ページのまま。一覧だけここで決める。 */
 #stage .toc-slide .toc-list {list-style:none;margin:20px 0 0;padding:0 var(--text-pad);display:grid;grid-template-columns:minmax(0,1fr);column-gap:48px}
 #stage .toc-slide.toc-columns .toc-list {grid-template-columns:repeat(2,minmax(0,1fr))}
-#stage .toc-slide .toc-list li {display:flex;gap:24px;align-items:baseline;margin:0;padding:16px 0;border-bottom:1px solid var(--rule);font-size:30px;line-height:1.4;break-inside:avoid}
-#stage .toc-slide .toc-number {color:var(--accent);font-size:24px;font-variant-numeric:tabular-nums}
+#stage .toc-slide .toc-list li {display:flex;gap:24px;align-items:baseline;margin:0;padding:var(--toc-padding,16px) 0;border-bottom:1px solid var(--rule);color:var(--toc-color,var(--ink));font-size:var(--toc-size,30px);line-height:1.4;break-inside:avoid}
+#stage .toc-slide .toc-number {color:var(--toc-color,var(--accent));font-size:.8em;font-variant-numeric:tabular-nums}
 #stage .toc-slide .toc-label {overflow-wrap:anywhere}
 
 /* 表紙の名前・所属で指定した書式。未指定ならテーマに従う。 */
@@ -366,3 +380,8 @@ body.export .highlight{transition:none}
 #stage .slide.cover .cover-authors[data-aff-font="mono"] :is(.cover-affiliation,.cover-affiliations) { font-family:"Menlo",monospace; }
 #stage .slide.cover .cover-authors[data-aff-bold="true"] :is(.cover-affiliation,.cover-affiliations) { font-weight:700; }
 #stage .slide.cover .cover-authors[data-aff-bold="false"] :is(.cover-affiliation,.cover-affiliations) { font-weight:400; }
+
+#overview .overview-grid .thumb { min-width:0; width:100%; }
+#overview .thumb-view { width:100%; flex:none; }
+
+#stage .toc-slide .toc-list[style] .toc-number {font-size:.8em;width:2em;height:2em;min-width:2em;flex:0 0 2em}

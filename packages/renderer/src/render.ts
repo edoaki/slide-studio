@@ -469,6 +469,7 @@ export async function renderDeck(
     };
 
     for (let slide = 0; slide < count; slide++) {
+      const skipped = await deadline.race(contents.executeJavaScript(`Boolean(deck.slides[${slide}]?.classList.contains("studio-skip"))`, true));
       if (errors.size > 0 || blocked.size > 0) break;
       await deadline.race(contents.executeJavaScript(`deck.go(${slide}, 0, false)`, true));
       await deadline.race(contents.executeJavaScript(SETTLE_EXPRESSION, true));
@@ -532,7 +533,7 @@ export async function renderDeck(
           screenshotFiles.push(relative);
         }
 
-        if (job.pdf !== false && selected.includes(step)) pdfPages.push(await deadline.race(contents.printToPDF({
+        if (job.pdf !== false && !skipped && selected.includes(step)) pdfPages.push(await deadline.race(contents.printToPDF({
           printBackground: true,
           pageSize: { width: PDF_WIDTH_INCHES, height: PDF_HEIGHT_INCHES },
           margins: { top: 0, bottom: 0, left: 0, right: 0 },

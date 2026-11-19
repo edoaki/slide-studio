@@ -68,3 +68,26 @@ test('release selection requires a platform-specific asset and published digest'
   assert.equal(release.version, '1.2.3'); assert.equal(release.archive, true);
   await assert.rejects(latestRelease('codex', async () => Response.json({tag_name:'rust-v1.2.3',assets:[]}), undefined, 'darwin', 'arm64'), /配布ファイル/);
 });
+
+test('runtime reads terminal CLI versions, refreshes its cache, and reports failures without inventing a version', {skip: process.platform === 'win32'}, async t => {
+  const f = await fixture(t);
+  for (const [id, output] of [['codex', 'codex-cli 0.160.0'], ['claude', '2.1.322 (Claude Code)'], ['agy', '1.5.4']] as const) {
+    const binary = join(f.root, id), response = join(f.root, `${id}.txt`);
+    await writeFile(response, output);
+    await writeFile(binary, `#!${process.execPath}\nif (process.argv[2] !== '--version') process.exit(2);\nprocess.stdout.write(require('node:fs').readFileSync(${JSON.stringify(response)}));\n`, {mode: 0o700});
+    const providers = new Providers(join(f.root, 'ai'), {...process.env, [`SLIDE_STUDIO_${id.toUpperCase()}`]: binary});
+    const runtime = new Runtime(providers, id);
+    const info = await runtime.info();
+    assert.equal(info.version, output.match(/\d+\.\d+\.\d+/u)![0]);
+    assert.equal(info.terminal, true);
+    await writeFile(response, 'no version available');
+    assert.equal((await runtime.info()).version, info.version);
+    assert.equal((await runtime.info(true)).version, null);
+    await writeFile(binary, `#!${process.execPath}\nconsole.error('9.9.9'); process.exit(1);\n`);
+    assert.equal((await runtime.info()).version, null);
+    await writeFile(binary, `#!${process.execPath}\nconsole.error('v1.2.3-beta.1');\n`);
+    assert.equal((await runtime.info()).version, '1.2.3-beta.1');
+    await rm(binary);
+    assert.equal((await runtime.info()).version, null);
+  }
+});

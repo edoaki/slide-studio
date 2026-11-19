@@ -8,6 +8,7 @@ import {
   dialog,
   Menu,
   protocol,
+  screen,
   session,
   shell,
   type OpenDialogOptions,
@@ -20,10 +21,10 @@ import type {
   CoreErrorCode,
   PreviewDocument,
 } from "../../packages/contracts/src/desktop.js";
-import type { LegacyExportDocumentInput } from "../server/legacy.js";
-import { close_pandoc } from "../../packages/core/src/legacy-pandoc.js";
-import { render_text } from "../../packages/core/src/legacy-render.js";
-import { default_root } from "../../packages/core/src/legacy-workspace.js";
+import type { LegacyExportDocumentInput } from "../server/index.js";
+import { close_pandoc } from "../../packages/core/src/pandoc.js";
+import { render_text } from "../../packages/core/src/render.js";
+import { default_root } from "../../packages/core/src/workspace.js";
 import { argumentsOf, runCommand, throughBridge, earlyCommand } from "../cli/commands.js";
 import { prepareLauncher } from "../cli/launcher.js";
 import { atomicWriteFile } from "../../packages/renderer/src/output.js";
@@ -34,11 +35,17 @@ import {
   type LegacyDiagnosticItem,
   type LegacyHost,
   type LegacyWorkspace,
-} from "../server/legacy.js";
+} from "../server/index.js";
 import {
   openLegacyWorkspace,
   type LegacyWorkspaceService,
-} from "../server/legacy-workspace-service.js";
+} from "../server/workspace-service.js";
+
+import updaterPackage from 'electron-updater';
+import { DesktopUpdates } from './updates.js';
+
+let desktopUpdates: DesktopUpdates | undefined;
+let manualUpdateInstall = false;
 
 type ExportFormat = "html" | "pdf";
 
@@ -123,14 +130,20 @@ function canonicalPath(path: string): string {
 }
 
 function installApplicationMenu(): void {
-  if (process.platform === "darwin") {
-    Menu.setApplicationMenu(Menu.buildFromTemplate([
-      { role: "appMenu" },
-      { role: "editMenu" },
-    ]));
-  } else {
-    Menu.setApplicationMenu(null);
-  }
+  const command = (name: string) => { void mainWindow?.webContents.executeJavaScript(
+    `window.dispatchEvent(new CustomEvent('studio-settings-command', {detail: ${JSON.stringify(name)}}))`
+  ).catch(error => console.error('[settings]', error)); };
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
+    { role: 'editMenu' },
+    { label: '表示', submenu: [
+      { label: '設定…', accelerator: 'CmdOrCtrl+,', click: () => command('open') },
+      { type: 'separator' },
+      { label: '拡大', accelerator: 'CmdOrCtrl+Plus', click: () => command('in') },
+      { label: '縮小', accelerator: 'CmdOrCtrl+-', click: () => command('out') },
+      { label: '実際のサイズ', accelerator: 'CmdOrCtrl+0', click: () => command('reset') },
+    ] },
+  ]));
 }
 
 async function sweepPdfTemporaryDirectories(): Promise<void> {
@@ -323,8 +336,20 @@ function installWindowPolicy(window: BrowserWindow): void {
     leaveAfterSave(() => { completingClose = true; window.close(); });
   });
   contents.setWindowOpenHandler(({ url }) => {
+    if (window === mainWindow && mainNavigationAllowed(url) && new URL(url).pathname === '/web/projection.html') {
+      const area = screen.getDisplayMatching(window.getBounds()).workArea;
+      const width = Math.floor(area.width / 2), height = Math.floor(area.height / 2);
+      return { action: 'allow', overrideBrowserWindowOptions: {
+        x:area.x + area.width - width, y:area.y + area.height - height,
+        width, height, title:'投影用スライド',
+        webPreferences:{session:uiSession!,sandbox:true,contextIsolation:true,nodeIntegration:false,nodeIntegrationInSubFrames:false,webviewTag:false,spellcheck:false} } };
+    }
     console.error(`[desktop] blocked window.open: ${redactCredential(url)}`);
     return { action: "deny" };
+  });
+  contents.on('did-create-window', child => {
+    installWindowPolicy(child);
+    window.once('closed', () => { if (!child.isDestroyed()) child.destroy(); });
   });
   contents.on("will-attach-webview", (event) => {
     event.preventDefault();
@@ -391,12 +416,17 @@ function installWindowPolicy(window: BrowserWindow): void {
 function createMainWindow(adminOrigin: string, token: string, deck?: string): void {
   credentialToken = token;
   bootstrapUrl = `${adminOrigin}${deck ? '/deck/' + encodeURIComponent(deck) : '/'}#token=${encodeURIComponent(token)}`;
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const width = Math.min(area.width, Math.max(900, Math.round(area.width * 0.94)));
+  const height = Math.min(area.height, Math.max(600, Math.round(area.height * 0.94)));
   mainWindow = new BrowserWindow({
     show: !hiddenWindow,
-    width: 1280,
-    height: 860,
-    minWidth: 900,
-    minHeight: 600,
+    x: area.x + Math.round((area.width - width) / 2),
+    y: area.y + Math.round((area.height - height) / 2),
+    width,
+    height,
+    minWidth: Math.min(900, area.width),
+    minHeight: Math.min(600, area.height),
     title: "Slide Studio",
     autoHideMenuBar: process.platform !== "darwin",
     webPreferences: {
@@ -747,7 +777,31 @@ async function start(): Promise<void> {
       return;
     }
 
+    // Only release builds contain the updater feed configuration.
+    const resources = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+    const updateDriver = !browserMode && app.isPackaged && resources && existsSync(join(resources, 'app-update.yml'))
+      ? updaterPackage.autoUpdater : undefined;
+    updateDriver?.on('error', error => {
+      if (!shuttingDown) return;
+      dialog.showErrorBox('アプリを更新できませんでした', error.message);
+      app.exit(1);
+    });
+    desktopUpdates = new DesktopUpdates(updateDriver, join(app.getPath('userData'), 'updates.json'), app.getVersion());
+    await desktopUpdates.initialize();
     desktopHost = await startLegacyHost({
+      settingsPath: join(userData, 'ui-settings.json'),
+      applyUiZoom: browserMode ? undefined : percent => { mainWindow?.webContents.setZoomFactor(percent / 100); },
+      updates: {
+        state: () => desktopUpdates!.snapshot(),
+        check: () => desktopUpdates!.check(),
+        download: () => desktopUpdates!.download(),
+        automatic: value => desktopUpdates!.setAutomatic(value),
+        install: () => {
+          if (!desktopUpdates!.canInstall()) throw new Error('更新のダウンロードが完了していません');
+          // Return the HTTP response before the ordinary save-and-close path drains it.
+          setTimeout(() => { manualUpdateInstall = true; mainWindow?.close(); }, 250);
+        },
+      },
       workspace: workspaceService.workspace,
       uiDirectory,
       pandocPath,
@@ -796,6 +850,7 @@ async function start(): Promise<void> {
       return;
     }
 
+    desktopUpdates.start();
     installSessionPolicy();
     createMainWindow(desktopHost.adminOrigin, desktopHost.token, cli?.positionals[0] === "open" ? cli.positionals[1] : argumentValue(process.argv, "deck"));
   } catch (error) {
@@ -814,10 +869,13 @@ async function start(): Promise<void> {
 async function shutdown(exitCode = 0): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  desktopUpdates?.stop();
+  let updateSafe = true;
   activePdfDeadline?.abort("quit requested");
   try {
     await desktopHost?.close();
   } catch (error) {
+    updateSafe = false;
     console.error("[desktop] cannot close the desktop host", error);
   }
   desktopHost = undefined;
@@ -846,10 +904,12 @@ async function shutdown(exitCode = 0): Promise<void> {
     try {
       await service.close();
     } catch (error) {
+      updateSafe = false;
       console.error("[desktop] cannot release the workspace lock", error);
     }
   }
   forceQuit = true;
+  if (exitCode === 0 && updateSafe && desktopUpdates?.installOnQuit(manualUpdateInstall)) return;
   app.exit(exitCode);
 }
 

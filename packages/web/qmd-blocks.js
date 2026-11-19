@@ -3,6 +3,7 @@
 // 下に分割・右に分割・列の幅・削除。文字はカードを押して直接書く。書き換えは対象の範囲だけ（block-ops.js）。
 // 選択はスライドと共有する（blocks.js の ctx.blocks）。
 import { api, toast } from './api.js';
+import { isPresentationNote } from './presentation-model.js';
 import { qInline } from './qmd-editor.js';
 import { svg } from './icons.js';
 import { S } from './strings.js';
@@ -225,6 +226,7 @@ export function makeQmdBlocks(ctx) {
   }
   // 箱は中身が1つでも親子を表示し、枠の内外それぞれへ移動できるようにする。
   function fill(el, owner, kids, depth, page, dormant) {
+    kids = kids.filter(c => !isPresentationNote(c));
     const root = !owner, row = owner?.kind === 'columns', pend = dormant ? null : preview?.pending || pending;
     const here = pend && (pend.owner ?? null) === (owner?.key ?? null) && (root ? pend.page === page.index : true);
     if (root && page.level === 1 && !kids.length && !here) return; // 章扉は見出しだけで足りるので、空の本文欄を出さない
@@ -240,7 +242,7 @@ export function makeQmdBlocks(ctx) {
     if (root) el.append(gap());
   }
   function summary(p) {
-    const words = cs => cs.flatMap(c => c.children.length ? words(c.children) : [source.slice(c.start, c.end)]);
+    const words = cs => cs.filter(c => !isPresentationNote(c)).flatMap(c => c.children.length ? words(c.children) : [source.slice(c.start, c.end)]);
     return words(p.chunks).map(w => w.replace(/^#+\s+|^[-*+]\s+|^\d+\.\s+/gm, '').replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' / ');
   }
   // 目次の行。自動生成なので番号・名前と設定だけを出す。OFF（p が無いときも）はスライドが無いので番号を出さず、移動もしない

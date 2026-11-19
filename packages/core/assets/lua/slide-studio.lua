@@ -166,6 +166,8 @@ local function apply_table_style(t, style)
 end
 
 function Div(el)
+  -- Speaker notes must never enter projection or exported HTML/PDF.
+  if el.classes:includes("note") or el.classes:includes("notes") then return {} end
   -- HTML writer は column の width を別の style 属性として追加する。
   -- 既存の余白などと合わせてから width 属性を除き、重複と幅の欠落を防ぐ。
   local width = el.attributes.width

@@ -57,7 +57,7 @@ export async function loginAi(id, onRecheck) {
     for (;;) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       const r = await api(url);
-      if (r.status === 'ready') { state('', false, false); await onRecheck(); return; }
+      if (r.status === 'ready') { state(T.installDone, false, false); await onRecheck(); toast(T.installDone); return; }
       if (r.status === 'completed') { await onRecheck(); state('', false, false); toast(T.onboard[id].done); return; }
       if (r.status === 'failed' || r.status === 'idle') throw new Error(r.error || T.loginFailed);
       state(r.status === 'pending' ? T.loginPending : r.progress?.total ? T.loginDownloading(Math.round(r.progress.done / r.progress.total * 100)) : T.loginPreparing, false, !r.retry);

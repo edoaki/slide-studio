@@ -16,6 +16,8 @@ import { alignButton, stepTools } from './text-tools.js';
 import { tableTools, clampSize } from './table-tools.js';
 import { syncTitle } from './cover-form.js';
 import { makeCoverAuthors } from './cover-authors.js';
+import { blockContextActions } from './block-context-model.js';
+import { makeBlockContextMenu } from './block-context-menu.js';
 
 const SYNC_DELAY = 300; // スライドで文字を打つ手が止まってから原稿へ反映するまで（ms）
 const RUN = 1500; // この間隔で続けた並べ替えは ⌘Z の1回分にまとめる（ms）
@@ -29,6 +31,7 @@ const BRIDGE_KEYMAP = Object.freeze([
  ...['KeyC','Digit1','Digit2','Digit3'].map(code=>({code,shift:false,alt:true,ctrl:false,meta:false,preventDefault:true})),
  {code:'KeyF',shift:true,alt:false,ctrl:false,meta:false,preventDefault:true},
  ...['KeyW','KeyA','KeyS','KeyD'].flatMap(code=>[{code,shift:true,alt:false,ctrl:false,meta:false,preventDefault:true},{code,shift:false,alt:true,ctrl:false,meta:false,preventDefault:true}]),
+ ...['KeyF','KeyH'].flatMap(code=>[{code,shift:false,alt:false,ctrl:false,meta:true,preventDefault:true},{code,shift:false,alt:false,ctrl:true,meta:false,preventDefault:true}]),
  ...[true,false].flatMap(shift=>[{code:'KeyZ',shift,alt:false,ctrl:false,meta:true,preventDefault:true},{code:'KeyZ',shift,alt:false,ctrl:true,meta:false,preventDefault:true}]),
 ]);
 
@@ -45,6 +48,8 @@ export function makeBlocks(ctx) {
   let session = null;
   // armed：スライドでクリックして選んだ表。次のクリックでセルを直す（ほかの操作で選ばれたままの表は、まず表の選択に戻す）
   let armed = null;
+  // pointX：ブロックを押して選んだときのカーソルの横位置（スライドの iframe の中の座標）
+  let pointX = null;
   // hold：押している R・F の余白（§10.4）。peek：カーソルを合わせている余白のボタン
   let padSide = 'outer', padMode = false, padDone = null, hold = null, peek = null, writing = false, run = null, chain = Promise.resolve(), queued = 0;
   // avoid：装飾のメニューを重ねない所（選んだブロックとツールバー。親画面の座標）。changed：開け閉めしたとき
@@ -208,6 +213,7 @@ export function makeBlocks(ctx) {
     if(!intent.trusted||intent.isComposing||intent.sourceVersion!==frameSourceVersion())return;
     const event={...intent,shiftKey:intent.mods.shift,altKey:intent.mods.alt,ctrlKey:intent.mods.ctrl,metaKey:intent.mods.meta,target:document.body,preventDefault(){},stopImmediatePropagation(){}};
     if(intent.type==='keyup'){holdKey(event);return;}
+    if ((intent.mods.meta || intent.mods.ctrl) && !intent.mods.alt && ['KeyF','KeyH'].includes(intent.code)) { ctx.search?.open(intent.code === 'KeyH'); return; }
     // Presentation/export shortcuts also work when focus is inside the isolated
     // preview. Keep F reserved for padding while a block is selected.
     if (!editing && (['KeyP','KeyO','KeyC','Slash','Digit0','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6'].includes(intent.code) || (intent.code === 'KeyF' && !selected))) {
@@ -268,6 +274,7 @@ export function makeBlocks(ctx) {
       if(event.kind==='gesture')blockGesture=event.active;
       if(event.kind==='outside')outsideDrop(event);
       if(event.kind==='select'&&knownKey(event.key))select(event.key);
+      if(event.kind==='context'&&knownKey(event.key)){const frame=ctx.preview.frame?.getBoundingClientRect();if(frame)openContext(event.key,frame.left+event.point.x,frame.top+event.point.y);}
       if(event.kind==='operation'&&validOperation(event.name,event.key,event.value))write(op[event.name](ctx.text,st,event.key,event.value));
       if(event.kind==='padded')padded(event.padKind,event.value);
       if(event.kind==='layout')place();
@@ -372,12 +379,17 @@ export function makeBlocks(ctx) {
   }
   // text：文字の上をクリック。again：選択済みの段落を再クリック。クリック位置から編集する
   // keep：書いたあとに同じブロックを選び直すとき（［すべてに］を残す）
+  function resetSpacing() {
+    padMode = false; padDone = null; hold = null; peek = null;
+  }
   function select(key, { again = false, text = false, point = null, keep = false } = {}) {
     if (key) coverAuthors.clear();
     if (readOnly) key = null;
     if (editing) return;
     const c = key && fresh() ? op.find(st, key)?.chunk : null;
     if (c && op.isPadWrap(c)) key = c.children[0].key;
+    // 保存後の再選択では続けるが、本文や別の場所を押したら余白操作を終える。
+    if (!keep && (key !== selected || again || text || point)) resetSpacing();
     if ((text || point?.lineEnd) && again && key && key === selected && c?.kind === 'text') {
       const info = data?.chunks[key];
       if (info?.cells ? armed === key && point : info?.direct) { start(key, point); return; }
@@ -386,6 +398,8 @@ export function makeBlocks(ctx) {
     // 描き直したあとに選び直す予定（follow）より、押して選んだブロックを優先する
     if (key !== selected && !keep) { decorationState.open = null; decorationState.colorOpen = null; padDone = null; padMode = false; follow = null; }
     if (key !== selected) armed = null;
+    // ツールバーを押した位置の近くに出すため、選んだときのカーソルの横位置を覚える（キーで選んだときは使わない）
+    if (point && key) pointX = point.x; else if (key !== selected) pointX = null;
     selected = key;
     if (point && key) armed = key;
     if (key && fresh()) for (let k = key, p = nav.upKey(st, k); p; k = p, p = nav.upKey(st, p)) memory.set(p, k);
@@ -424,6 +438,7 @@ export function makeBlocks(ctx) {
   }
   function start(key = selected, point = null) {
     if (editing || !live()) return;
+    resetSpacing();
     select(key);
     if (data.chunks[key]?.cells) { startCell(key, point); return; }
     if (!data.chunks[key]?.direct) { ctx.qmdBlocks?.editCover(key); return; }
@@ -617,6 +632,33 @@ export function makeBlocks(ctx) {
     addEventListener('pointerdown', outside, true);
     draw();
   }
+  let contextTarget = null;
+  const contextMenu = makeBlockContextMenu({ root: ctx.root,
+    apply: name => {
+      const target = contextTarget;
+      if (!target || target.text !== ctx.text || !fresh() || ctx.locked || ctx.conflict || readOnly) return;
+      const actions = blockContextActions(ctx.text, st, target.key);
+      if (actions) write(actions[name]);
+    },
+    movePage: page => {
+      const target = contextTarget;
+      if (!target || target.text !== ctx.text || !fresh() || ctx.locked || ctx.conflict || readOnly) return;
+      if (op.moves(ctx.text, st, target.key, { pageEnd: page })) write(op.move(ctx.text, st, target.key, { pageEnd: page }));
+    },
+  });
+  function openContext(key, x, y, anchor) {
+    if (!fresh() || editing || busy || readOnly || ctx.locked || ctx.conflict) return;
+    const actions = blockContextActions(ctx.text, st, key); if (!actions) return;
+    select(key); contextTarget = { key, text: ctx.text };
+    contextMenu.open({ x, y, actions, anchor });
+  }
+  const manuscriptContext = e => {
+    const host = e.target.closest?.('#qblocks'); if (!host) return;
+    const key = e.target.closest('[data-keys]')?.dataset.keys.split(' ')[0] || e.target.closest('[data-key]')?.dataset.key;
+    if (!key || !fresh() || editing || e.target.closest('textarea,input,[contenteditable=true]')) return;
+    e.preventDefault(); openContext(key, e.clientX, e.clientY, e.target.closest('[tabindex]'));
+  };
+  ctx.root.addEventListener('contextmenu', manuscriptContext);
   function removeSelected() {
     const f = found(); if (!f) return;
     const o = op.outer(f.chunk), sibs = (o.parent ? o.parent.children : f.page.chunks).filter(x => x.kind !== 'def'), i = sibs.indexOf(o);
@@ -631,6 +673,7 @@ export function makeBlocks(ctx) {
     if (child && f.chunk.children.length) select(child); else start();
   }
   function keydown(e) {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && ['f','h'].includes(e.key.toLowerCase())) { e.preventDefault(); ctx.search?.open(e.key.toLowerCase() === 'h'); return true; }
     if (readOnly) return false;
     holdKey(e);
     if (drag.dragging && e.key === 'Escape') { e.preventDefault(); drag.cancel(); return true; }
@@ -871,15 +914,17 @@ export function makeBlocks(ctx) {
     if (!r || !frame) { bar.hidden = true; handles.clear(); return; }
     bar.hidden = !editing && (padMode || !!hold || handles.dragging);
     if (bar.hidden) { drawHandles(); return; }
-    const vr = viewport.getBoundingClientRect(), fr = frame.getBoundingClientRect();
-    const top = fr.top - vr.top + Math.max(r.top, 0), bottom = fr.top - vr.top + Math.min(r.bottom, fr.height);
-    const left = fr.left - vr.left + Math.max(r.left, 0);
-    const h = bar.offsetHeight, wd = bar.offsetWidth;
-    let y = top - h - 10;
-    if (y < 4) y = Math.min(bottom + 10, vr.height - h - 4);
+    // 選んだブロックのすぐ上（入らなければ下）。ブロック自体には被せない。横は押した位置の近く、ブロックの幅の中
+    const vr = viewport.getBoundingClientRect(), fr = frame.getBoundingClientRect(), ox = fr.left - vr.left, oy = fr.top - vr.top;
+    const top = oy + Math.max(r.top, 0), bottom = oy + Math.min(r.bottom, fr.height);
+    const lx = ox + Math.max(r.left, 0) - 4, rx = ox + Math.min(r.right, fr.width) + 4;
+    const h = bar.offsetHeight, wd = bar.offsetWidth, GAP = 12;
+    let y = top - h - GAP;
+    if (y < 4) y = Math.min(bottom + GAP, vr.height - h - 4);
     bar.style.top = `${Math.max(4, y)}px`;
     bar.dataset.tipSide = y + h <= top ? 'above' : 'below';
-    bar.style.left = `${Math.max(4, Math.min(left - 4, vr.width - wd - 4))}px`;
+    const x = pointX == null ? lx : Math.max(lx, Math.min(ox + pointX - wd / 2, rx - wd));
+    bar.style.left = `${Math.max(4, Math.min(x, vr.width - wd - 4))}px`;
     for (const box of bar.querySelectorAll('.decoration-tool')) box.positionMenu?.();
     drawHandles();
   }
@@ -887,7 +932,7 @@ export function makeBlocks(ctx) {
   // 原稿・ブロックの操作から離れたら、両側の選択枠とツールバーを閉じる。
   const keepsSelection = e => {
     const inside = selector => e.composedPath().some(node => node.matches?.(selector));
-    if (inside('#editor, #blockTools, #undo, #redo, .bh-layer, .crumbs, dialog, [role="dialog"]')) return true;
+    if (inside('#editor, #blockTools, #undo, #redo, .bh-layer, .crumbs, .overview-shade, .block-context-menu, dialog, [role="dialog"]')) return true;
     // HTML 図への指示入力と step の確認中は、チャットの対象図を保持する。
     return !!figOf(found()?.chunk) && inside('#chat, #chatToggle, #stepPrev, #stepNext');
   };
@@ -915,6 +960,7 @@ export function makeBlocks(ctx) {
     finish: () => legacyEdit()?.finish?.(),
     setReadOnly(value) {
       readOnly = value;
+      if (value) contextMenu.close();
       if (!value) { configureFrame(); return; }
       drag.cancel(); format.close(); coverAuthors.clear();
       follow = null; want = null; padDone = null; padMode = false;
@@ -953,11 +999,13 @@ export function makeBlocks(ctx) {
     },
     // 別のページへ移ったら選択を外す。同じページの step の移動では選んだまま、位置だけ合わせる
     slideChanged() {
+      contextMenu.close();
       coverAuthors.refresh();
       if (editing) { legacyEdit()?.finish?.(); return; }
       if (found()?.page.index !== ctx.preview.pageOfSlide(ctx.preview.index)) select(null); else place();
     },
     textChanged() {
+      contextMenu.close();
       refresh();
       if (writing) return;
       follow = null; want = null; run = null;
@@ -984,6 +1032,7 @@ export function makeBlocks(ctx) {
       select(c ? op.inner(c).key : null);
     }, keydown,
     destroy() {
+      contextMenu.destroy(); ctx.root.removeEventListener('contextmenu', manuscriptContext);
       offText?.(); dead = true; clearTimeout(session?.timer); removeEventListener('pointerdown', outside, true);
       removeEventListener('keydown', onKey, true); removeEventListener('keyup', onKey, true); removeEventListener('blur', onBlur);
       removeEventListener('pointerdown', rememberPress, true); removeEventListener('pointercancel', cancelPress, true);

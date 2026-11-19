@@ -134,6 +134,7 @@ export function homeManage(root, reload) {
   };
   addEventListener('keydown', keydown);
   return {
+    clearUndo() { token = null; notice.hidden = true; },
     card(card, deck) {
       const wrap = document.createElement('div'); wrap.className = 'deck-card-wrap'; wrap.dataset.deck = deck.deck;
       wrap.append(card);

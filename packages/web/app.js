@@ -1,3 +1,6 @@
+import { installSettings } from './settings.js';
+import { loadPreferences } from './preferences.js';
+import { toast } from './api.js';
 import { installExternalLinks } from './external-links.js';
 import { forwardWheel } from './bridge/agent-client.js';
 // 画面の切り替え：/ はホーム、/deck/<名前> は発表の編集画面。
@@ -60,6 +63,7 @@ addEventListener('popstate', async event => {
 });
 // iframe の外でも横スワイプは表示中のスライドへ渡す。
 addEventListener('wheel', e => {
+  if (document.querySelector('dialog[open]')) return;
   const frame = document.querySelector('.present-screen iframe') || document.querySelector('#slideBox iframe:not(.loading)');
   if (frame) forwardWheel(frame, e);
 }, { passive: false, capture: true });
@@ -68,4 +72,6 @@ document.addEventListener('click', e => {
   const a = e.target.closest('a[data-nav]');
   if (a && !e.metaKey && !e.ctrlKey) { e.preventDefault(); navigate(a.getAttribute('href')); }
 });
+installSettings();
+await loadPreferences().catch(e => toast(e.message));
 route();

@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm, mkdir, writeFile, realpath } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import test from 'node:test';
+import { _electron, type ElectronApplication } from 'playwright-core';
+import { Workspace } from '../../packages/core/src/workspace.js';
+const require=createRequire(import.meta.url);
+test('original location screen creates and switches workspaces and remembers the choice after restart',{timeout:60000},async t=>{
+ const temp=await mkdtemp(join(tmpdir(),'studio-location-')),ws=Workspace.open(join(temp,'original'));ws.new_deck('talk','test');const before=await readFile(ws.qmd('talk'));
+ const env:Record<string,string>=Object.fromEntries(Object.entries(process.env).filter((e):e is [string,string]=>e[1]!==undefined));env.SLIDE_STUDIO_ELECTRON_HOME=join(temp,'profile');delete env.ELECTRON_RUN_AS_NODE;delete env.SLIDE_STUDIO_HOME;
+ const installed=process.env.SLIDE_STUDIO_TEST_APP;
+ let app:ElectronApplication|undefined;const launch=async(root?:string)=>_electron.launch({executablePath:installed?.endsWith('.app')?join(installed,'Contents/MacOS/Slide Studio'):installed||require('electron'),args:[...(installed?[]:[join(process.cwd(),'dist/apps/desktop/main.js')]),...(root?['--root',root]:[])],env});
+ t.after(async()=>{await app?.close();await rm(temp,{recursive:true,force:true});});app=await launch(ws.root);let page=await app.firstWindow();await page.waitForFunction(()=>!!sessionStorage.getItem('slide-studio:admin-token'));await page.route('**/api/location',async route=>{if(route.request().method()==='GET')await new Promise(resolve=>setTimeout(resolve,300));await route.continue();});await page.locator('[data-act=location]').click();
+ const modal=page.locator('dialog.location-dialog');await modal.waitFor();assert.equal(new URL(page.url()).pathname,'/');
+ await page.keyboard.press('Escape');await modal.waitFor({state:'detached'});await page.locator('[data-act=location]:focus').waitFor();
+ await page.locator('[data-act=location]').click();await modal.locator('[data-close]').click();await modal.waitFor({state:'detached'});
+ assert.equal(await page.locator('.env-root').count(),0);
+ await page.locator('[data-act=location]').click();
+ const chosen=join(temp,'日本語の保管場所');await page.locator('input[name=path]').fill(chosen);const created=page.waitForRequest(r=>new URL(r.url()).pathname==='/api/location'&&r.method()==='POST');const switched=page.waitForEvent('framenavigated',frame=>frame===page.mainFrame());await page.locator('button[type=submit]').click();assert.deepEqual((await created).postDataJSON(),{mode:'new',path:chosen});await switched;await page.waitForURL(url=>url.pathname==='/');
+ const location=JSON.parse(await readFile(join(temp,'profile/workspaces.json'),'utf8'));assert.equal(location.current,await realpath(chosen));
+ await page.goto(new URL('/location',page.url()).href);await page.locator('[data-mode=existing]').click();
+ const unrelated=join(temp,'unrelated');await mkdir(unrelated);await writeFile(join(unrelated,'keep.txt'),'keep');await page.locator('input[name=path]').fill(unrelated);await page.locator('button[type=submit]').click();await page.locator('.error').filter({hasText:'空のフォルダか'}).waitFor();assert.equal(await readFile(join(unrelated,'keep.txt'),'utf8'),'keep');
+ await app.close();app=await launch();page=await app.firstWindow();await page.waitForFunction(()=>!!sessionStorage.getItem('slide-studio:admin-token'));await page.goto(new URL('/location',page.url()).href);await page.locator('input[name=path]:enabled').waitFor();assert.equal(await page.locator('.location-current').count(),0);assert.equal(await page.locator('body').innerText().then(text=>text.includes(chosen)),false);assert.equal((await page.evaluate(async()=>{const {api}=await import('/web/api.js' as string);return api('/api/location');})).current,await realpath(chosen));
+ await page.locator('button[data-path]').filter({hasText:ws.root}).click();await page.waitForURL(url=>url.pathname==='/');await page.locator('.deck-card-wrap[data-deck=talk]').waitFor();assert.deepEqual(await readFile(ws.qmd('talk')),before);
+});

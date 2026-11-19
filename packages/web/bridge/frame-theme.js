@@ -153,7 +153,7 @@ export function createFrameTheme(win, doc, {sendEvent,getSourceVersion}) {
     return hexOf(key);
   }
 
- function colors(){return Object.fromEntries(keys().filter(k=>!k.startsWith('--font-')&&!k.startsWith('--block-')&&!k.startsWith('--heading-')&&!FILLS.includes(k)).map(k=>[k,CONTENT[k]?contentColor(k):['--header','--header-ink'].includes(k)?headingColor(k):hexOf(k)]));}
+ function colors(){return Object.fromEntries(keys().filter(k=>!k.startsWith('--page-number-')&&!k.startsWith('--font-')&&!k.startsWith('--block-')&&!k.startsWith('--heading-')&&!FILLS.includes(k)).map(k=>[k,CONTENT[k]?contentColor(k):['--header','--header-ink'].includes(k)?headingColor(k):hexOf(k)]));}
  function inspect(key){return {colors:colors(),matches:key?slides().flatMap((slide,i)=>(KIND[key]?KIND[key](slide):partsOf(win,slide,key).length)?[i]:[]):[],index:win.deck?.index??0};}
  function paint(){
       const root = w.document.documentElement;
@@ -185,6 +185,17 @@ export function createFrameTheme(win, doc, {sendEvent,getSourceVersion}) {
           style.textContent = `#stage ${selector}${prop === 'color' ? `, #stage ${selector} *` : ''} { ${prop}:var(${key}); }`;
         } else style?.remove();
       }
+      let pageNumbers = w.document.getElementById('theme-live-page-number');
+      if ([...live.keys()].some(k => k.startsWith('--page-number-'))) {
+        if (!pageNumbers) { pageNumbers = w.document.createElement('style'); pageNumbers.id = 'theme-live-page-number'; w.document.head.append(pageNumbers); }
+        const value = k => live.get('--page-number-' + k) ?? vars['--page-number-' + k];
+        const position = value('position'), format = value('format'), size = value('size');
+        const selector = '#stage .slide .page-number';
+        pageNumbers.textContent = (position !== 'theme' ? `${selector} {top:${position === 'top-right' ? '24px' : 'auto'};bottom:${position === 'top-right' ? 'auto' : '24px'};left:${position === 'bottom-left' ? '30px' : 'auto'};right:${position === 'bottom-left' ? 'auto' : '30px'};height:auto;color:var(--muted)}` : '')
+          + (size !== 'theme' ? `${selector} {font-size:${size}}` : '')
+          + (format === 'hidden' ? `${selector} {display:none}` : '')
+          + (format === 'number' ? `${selector} .page-number-total {display:none}` : '');
+      } else pageNumbers?.remove();
       root.classList.toggle('slide-studio-theme-preview', shown);
       for (const k of Object.keys(vars)) if (!live.has(k)) { if (k.startsWith('--heading-')) root.style.setProperty(k, vars[k]); else root.style.removeProperty(k); }
       live.forEach((v, k) => root.style.setProperty(k, v));
@@ -261,7 +272,7 @@ export function createFrameTheme(win, doc, {sendEvent,getSourceVersion}) {
   if(!el||el.closest('[contenteditable="true"]'))return;
   if(sample){e.preventDefault();e.stopImmediatePropagation();}
   if(e.type!=='click')return;
-  const slide=el.closest('.slide'),candidates=keys().filter(k=>!k.startsWith('--font-')&&!FILLS.includes(k)&&k!=='--mark-line'&&k!=='--paper');
+  const slide=el.closest('.slide'),candidates=keys().filter(k=>!k.startsWith('--page-number-')&&!k.startsWith('--font-')&&!FILLS.includes(k)&&k!=='--mark-line'&&k!=='--paper');
   candidates.sort((a,b)=>a==='--mark'?-1:b==='--mark'?1:0);
   const choices=candidates.map(key=>({key,parts:partsOf(win,slide,key)}));let chosen,node;
   for(let at=el;at&&!chosen;at=at===slide?null:at.parentElement)for(const c of choices){node=c.parts.find(n=>(n.nodeType===3?n.parentElement:n.host||n)===at);if(node){chosen=c.key;break;}}

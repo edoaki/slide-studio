@@ -1,4 +1,5 @@
-// 一覧：全ページを # ごとの横の列に並べる。縮小画像は帯と同じで、カーソルで step をめくり、押すとそのページの最初へ移る。
+// 一覧：編集画面の上に重ねるウィンドウ。全ページを # ごとの横の列に並べる。縮小画像は帯と同じで、カーソルで step をめくり、押すとそのページの最初へ移る。
+import { slideInsertionPositions } from './slide-insertion.js';
 import { svg } from './icons.js';
 import { S } from './strings.js';
 import { tip } from './tip.js';
@@ -9,12 +10,16 @@ const plain = e => !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.is
 const isKey = e => e.code === `Key${OPEN_KEY}` && plain(e);
 
 // shots()：ページごとの画像の URL。changed()：見えているページが変わった（撮影の順番を伝える）
-export function makeOverview(ctx, { shots, changed, reorder }) {
+export function makeOverview(ctx, { shots, changed, reorder, actions }) {
   const trigger = tip(Object.assign(document.createElement('button'), { type: 'button', className: 'ibtn', innerHTML: svg('grid') }), S.overview.open, OPEN_KEY);
   trigger.onclick = () => open();
   ctx.root.querySelector('#stripTools').append(trigger);
-  let box = null, thumbs = null, returnTo = null, wasInert = false;
-  let stopReorder = null;
+  let box = null, shade = null, thumbs = null, returnTo = null, wasInert = false;
+  let stopReorder = null, stopActions = null, insertion = null;
+  ctx.chooseSlideInsertion = done => {
+    if (box || sampleOn()) {done(null); return;}
+    insertion = done; open();
+  };
   const sampleOn = () => ctx.root.querySelector('#stage').classList.contains('theme-sample-on');
 
   function group(title) {
@@ -23,6 +28,18 @@ export function makeOverview(ctx, { shots, changed, reorder }) {
     const row = document.createElement('div'); row.className = title == null ? 'pagestrip wrap' : 'pagestrip';
     section.append(row);
     return { section, row };
+  }
+  function gap(before) {
+    const b = tip(Object.assign(document.createElement('button'), {type: 'button', className: 'overview-insert', innerHTML: svg('plus')}), before < ctx.structure.pages.length ? S.slideLibrary.before(before + 1) : S.slideLibrary.end);
+    b.dataset.before = before;
+    b.disabled = ctx.locked || ctx.allLocked || !!ctx.lock.pages?.length;
+    b.onclick = () => {
+      if (b.disabled) return;
+      const target = {before, text: ctx.text}, done = insertion;
+      insertion = null; close();
+      if (done) done(target); else ctx.openSlideLibrary?.(target);
+    };
+    return b;
   }
   function makeThumb() {
     const b = document.createElement('button'); b.type = 'button';
@@ -36,6 +53,8 @@ export function makeOverview(ctx, { shots, changed, reorder }) {
     const lefts = [...box.querySelectorAll('.pagestrip')].map(r => r.scrollLeft);
     const inStrip = ctx.root.querySelectorAll('#pagestrip button[data-index]');
     const slides = [...inStrip].map(b => ctx.preview.slides[+b.dataset.index]), grouped = slides.some(s => s.sectionStart), groups = [];
+    let lastRow = null;
+    const inserted = new Set(), positions = new Set(slideInsertionPositions(ctx.structure));
     slides.forEach((s, i) => {
       if (!groups.length || s.sectionStart) groups.push(group(grouped ? s.group || S.overview.cover : null));
       const b = old.get(s.index) || makeThumb();
@@ -45,50 +64,66 @@ export function makeOverview(ctx, { shots, changed, reorder }) {
       b.querySelector('.num').textContent = i + 1;
       b.setAttribute('aria-current', String(s.index === ctx.preview.index));
       b.hidden = !!inStrip[i]?.hidden; // テーマのタブで絞り込んでいるページだけを出す
-      groups.at(-1).row.append(b);
+      const row = groups.at(-1).row, page = ctx.structure?.pages.find(p => p.index === s.page);
+      if (insertion && !b.hidden && page && positions.has(page.index) && !inserted.has(page.index)) {
+        row.append(gap(page.index)); inserted.add(page.index); lastRow = row;
+      }
+      row.append(b);
     });
+    if (lastRow && positions.has(ctx.structure.pages.length)) lastRow.append(gap(ctx.structure.pages.length));
+    else if (insertion && positions.has(ctx.structure.pages.length) && !lastRow) {
+      if (!groups.length) groups.push(group(null));
+      groups.at(-1).row.append(gap(ctx.structure.pages.length));
+    }
     groups.forEach(g => { g.section.hidden = [...g.row.children].every(b => b.hidden); });
-    box.replaceChildren(box.querySelector('.overview-close'), ...groups.map(g => g.section));
+    box.replaceChildren(box.querySelector('.overview-head'), ...groups.map(g => g.section));
     box.querySelectorAll('.pagestrip').forEach((r, i) => { r.scrollLeft = lefts[i] || 0; });
     box.scrollTop = top;
     thumbs.decorate();
-    reorder?.decorate(box);
+    if (!insertion) { reorder?.decorate(box); actions?.decorate(box); }
+    else box.querySelectorAll('button[data-index]').forEach(b => b.draggable = false);
     changed();
   }
   function open() {
-    if (box || sampleOn() || !ctx.preview.slides.length) return;
+    if (box || sampleOn() || (!insertion && !ctx.preview.slides.length)) return;
     returnTo = document.activeElement; wasInert = ctx.root.inert;
     box = document.createElement('div'); box.className = 'overview-screen';
     box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', S.overview.title);
     const closer = tip(Object.assign(document.createElement('button'), { type: 'button', className: 'ibtn overview-close', innerHTML: svg('x') }), S.overview.close, OPEN_KEY);
     closer.onclick = close;
-    box.append(closer);
+    const head = document.createElement('header'); head.className = 'overview-head';
+    head.append(Object.assign(document.createElement('h1'), { textContent: insertion ? S.slideLibrary.choosePosition : S.overview.title }), closer);
+    box.append(head);
+    // まわりの暗い所を押すと閉じる
+    shade = document.createElement('div'); shade.className = 'overview-shade';
+    shade.addEventListener('click', e => { if (e.target === shade) close(); });
     // カーソルが乗っていないときは最後の step（そのページの全部）を出す
     thumbs = shotThumbs(box, shots, () => Infinity);
-    stopReorder = reorder?.attach(box);
+    if (!insertion) { stopReorder = reorder?.attach(box); stopActions = actions?.attach(box); }
     box.addEventListener('click', e => {
       const b = e.target.closest('button[data-index]');
-      if (!b) return;
+      if (!b || insertion) return;
       ctx.preview.go(+b.dataset.index);
       close();
     });
     box.addEventListener('scroll', changed, { capture: true, passive: true });
-    document.body.append(box); ctx.root.inert = true;
+    shade.append(box); document.body.append(shade); ctx.root.inert = true;
     render();
     closer.focus();
     box.querySelector('button[aria-current="true"]')?.scrollIntoView({ block: 'center', inline: 'center' });
   }
   function close() {
     if (!box) return;
-    stopReorder?.(); stopReorder = null;
-    box.remove(); box = null; thumbs = null; ctx.root.inert = wasInert;
+    stopReorder?.(); stopReorder = null; stopActions?.(); stopActions = null;
+    shade.remove(); shade = null; box = null; thumbs = null; ctx.root.inert = wasInert;
     if (returnTo?.isConnected) returnTo.focus({ preventScroll: true });
     returnTo = null;
     changed();
+    const done = insertion; insertion = null; done?.(null);
   }
   // 開いている間は編集画面のキーを動かさない
   const keys = e => {
-    if (!box) return;
+    if (!box || document.querySelector(".page-actions-dialog[open]")) return;
     if (e.key === 'Escape' || isKey(e)) { e.preventDefault(); close(); }
     e.stopImmediatePropagation();
   };
@@ -104,6 +139,6 @@ export function makeOverview(ctx, { shots, changed, reorder }) {
       e.preventDefault(); open();
       return true;
     },
-    destroy() { close(); trigger.remove(); removeEventListener('keydown', keys, true); },
+    destroy() { close(); delete ctx.chooseSlideInsertion; trigger.remove(); removeEventListener('keydown', keys, true); },
   };
 }

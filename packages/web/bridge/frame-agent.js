@@ -1,3 +1,4 @@
+import { installPresentationFooter } from './presentation-footer.js';
 import { createFrameLint } from './frame-lint.js';
 import { createFrameTheme } from './frame-theme.js';
 import { createFrameBlocks } from './frame-blocks.js';
@@ -163,7 +164,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   if (presenting) {
     // Legacy presentation set this before the runtime started; do the same in
     // the first head agent so the authored runtime sees it immediately.
-    try { win.__slideStudioNoHash = true; } catch { /* frozen window */ }
+    try { win.__slideStudioNoHash = true; win.__slideStudioPresent = true; } catch { /* frozen window */ }
   }
   const channel = new MessageChannelCtor();
   const port = channel.port1;
@@ -184,6 +185,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   let cachedStageNumbers = null;
   let slidesDirty = true;
   let stageObserver = null;
+  let overviewObserver = null;
 
   function currentDeck() {
     try {
@@ -221,7 +223,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   }
 
   function snapshotKey(snapshot) {
-    return `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
+    return `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${snapshot.overviewOpen}/${snapshot.blackout}/${snapshot.pageInput}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
   }
 
   function clampString(value, max) {
@@ -330,6 +332,9 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       stageNumbers: cachedStageNumbers,
       sourceVersion: liveSourceVersion,
       hasReferences: !!querySelector('.references-slide .csl-entry'),
+      overviewOpen: !!querySelector('#overview:not([hidden])'),
+      blackout: !!readProperty(currentDeck(), 'blackout'),
+      pageInput: clampString(readProperty(currentDeck(), 'pageInput') || '',6),
     };
     return validateSnapshot(snapshot, identity) ? snapshot : null;
   }
@@ -344,11 +349,28 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     return snapshot;
   }
 
+  let overviewEscape = false;
   function presentationKey(event) {
     if (!presenting) return;
     const key = typeof event.key === 'string' ? event.key : '';
+    // Number entry and blackout also work while a same-origin figure has focus.
+    if (event.currentTarget !== win && !event.isComposing && !event.metaKey && !event.ctrlKey && !event.altKey
+        && !event.target?.closest?.('input,textarea,select,[contenteditable="true"]')
+        && (['b','B','Enter','Backspace'].includes(key) || /^[0-9]$/.test(key))) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      (doc.body || doc.documentElement).dispatchEvent(new win.KeyboardEvent(event.type, {key,repeat:!!event.repeat,bubbles:true,cancelable:true}));
+      return;
+    }
     const fullscreen = key === 'f' && !event.metaKey && !event.ctrlKey && !event.altKey;
     if (key !== 'Escape' && !fullscreen) return;
+    // Let the player close its overview before the shell exits presentation.
+    if (key === 'Escape' && event.type === 'keyup' && overviewEscape) {
+      overviewEscape = false; event.preventDefault(); event.stopImmediatePropagation(); return;
+    }
+    if (key === 'Escape' && readProperty(currentDeck(), 'pageInput')) return;
+    if (key === 'Escape' && win.document.querySelector('#overview:not([hidden])')) {
+      overviewEscape = true; return;
+    }
     // The parent decides what to do. The agent only blocks the content-side
     // default for the two presentation keys the legacy shell owns.
     event.preventDefault();
@@ -453,6 +475,11 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     addWindowListener('deckchange', () => { publish('deckchange', false, true); });
     watchStageStructure();
     if (presenting) {
+      const overview = querySelector('#overview');
+      if (overview && typeof win.MutationObserver === 'function') {
+        overviewObserver = new win.MutationObserver(() => publish('deckchange', true));
+        overviewObserver.observe(overview, { attributes: true, attributeFilter: ['hidden'] });
+      }
       addWindowListener('keydown', presentationKey, true);
       addWindowListener('keyup', presentationKey, true);
       addWindowListener('load', event => {
@@ -460,6 +487,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         if (frame?.tagName === 'IFRAME') attachFigureKeys(frame);
       }, true);
       attachNestedFrames();
+      installPresentationFooter(win, currentDeck);
       installFullscreenButton();
     }
     installLinkInterception();
@@ -480,6 +508,15 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     removeWindowListener('deckready', markReady);
     installReadyListeners();
     if (!presenting) {
+      doc.addEventListener('click', event => {
+        if (!event.isTrusted) return;
+        const target = event.target?.closest?.('.toc-list li');
+        const style = target && getComputedStyle(target);
+        const root = getComputedStyle(doc.documentElement);
+        sendEvent('toc.select', { sourceVersion: liveSourceVersion, trusted: true, selected: !!target,
+          px: style ? parseFloat(style.fontSize) : 30, ink: style?.color || '',
+          colors: Object.fromEntries(['--ink','--accent','--good','--warn','--mark'].map(k => [k, root.getPropertyValue(k).trim()])) });
+      }, true);
       doc.addEventListener('pointerdown', event => {
         if(event.isTrusted)sendEvent('insert.pointer',{sourceVersion:liveSourceVersion,trusted:true});
       },true);
@@ -522,6 +559,15 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     if (!target) throw errorWithCode('not-ready', 'deck is not ready');
     const params = request.params || {};
     switch (request.method) {
+      case 'setBlackout':
+        if (!presenting) throw errorWithCode('forbidden', 'presentation input only');
+        return Promise.resolve(invokeDeck('setBlackout', params.value));
+      case 'presentationKey':
+        if (!presenting) throw errorWithCode('forbidden', 'presentation input only');
+        // Dispatch below Window so its capture handlers run before the player.
+        // At Window itself, listeners run in registration order instead.
+        (doc.body || doc.documentElement).dispatchEvent(new win.KeyboardEvent(params.type, {...params, bubbles:true, cancelable:true}));
+        return Promise.resolve();
       case 'go':
         return Promise.resolve(invokeDeck('go', params.index, params.step));
       case 'move':
@@ -783,6 +829,8 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       port.onmessage = null;
       try { stageObserver?.disconnect(); } catch { /* already gone */ }
       stageObserver = null;
+      try { overviewObserver?.disconnect(); } catch { /* already gone */ }
+      overviewObserver = null;
       try { selection?.destroy(); } catch { /* already gone */ }
       selection = null;
       inflightTheme?.cancel();

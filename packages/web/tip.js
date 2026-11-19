@@ -22,6 +22,7 @@ function target(node) {
 const nameOf = t => t.dataset.tip || t.getAttribute('aria-label');
 
 function show(t) {
+  if (document.documentElement.dataset.tooltips === 'false') return;
   if (!el) { el = document.createElement('div'); el.className = 'tip'; el.setAttribute('role', 'tooltip'); document.body.append(el); }
   const name = Object.assign(document.createElement('span'), { className: 'tip-name', textContent: nameOf(t) });
   const keys = (t.dataset.keys || '').split(' ').filter(Boolean).map(k => Object.assign(document.createElement('kbd'), { textContent: k }));

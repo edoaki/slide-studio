@@ -3,7 +3,7 @@ import test from 'node:test';
 import {mkdtempSync,readFileSync,writeFileSync,existsSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {Workspace} from '../../packages/core/src/legacy-workspace.js';
+import {Workspace} from '../../packages/core/src/workspace.js';
 
 test('portable compiler provisions standalone Node code and keeps user modifications on refresh',t=>{
  const root=mkdtempSync(join(tmpdir(),'studio-portable-test-'));t.after(()=>rmSync(root,{recursive:true,force:true}));

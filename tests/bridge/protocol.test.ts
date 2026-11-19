@@ -116,6 +116,17 @@ test("requests are identity scoped and reject unknown methods or arbitrary URLs"
   assert.equal(p.validateThemeName("a/b"), false);
 });
 
+test("presentation input only accepts player navigation keys and event types", () => {
+  const request = p.makeRequest(identity, 1, "presentationKey", {type:"keydown", key:"o", repeat:false});
+  assert.equal(p.validateRequest(request, identity), true);
+  for (const key of ['b','B','Enter','Backspace',...'0123456789']) assert.equal(p.validateRequest({...request,params:{type:'keydown',key,repeat:false}},identity),true);
+  assert.equal(p.validateRequest({...request,method:'setBlackout',params:{value:true}},identity),true);
+  assert.equal(p.validateRequest({...request,method:'setBlackout',params:{value:'true'}},identity),false);
+  for (const params of [{type:"click",key:"o",repeat:false}, {type:"keydown",key:"F12",repeat:false}, {type:"keyup",key:"ArrowRight",repeat:"yes"}]) {
+    assert.equal(p.validateRequest({...request,params}, identity), false);
+  }
+});
+
 test("responses and snapshots are validated before they reach the cache", () => {
   const response = p.makeResponse(identity, 1, true, snapshot);
   assert.equal(p.validateResponse(response, identity), true);
@@ -261,6 +272,10 @@ test('direct editing boundary rejects unknown operations, invalid author layouts
  const event=(name:string,data:unknown)=>p.validateEvent(p.makeEvent(identity,name,data),identity);
  assert.equal(event('block.intent',{...base,kind:'operation',key:'p0/0',name:'eval',value:'code'}),false);
  assert.equal(event('block.intent',{...base,sequence:-1,kind:'layout'}),false);
+ assert.equal(event('block.intent',{...base,kind:'context',key:'p0/0',point:{x:20,y:30}}),true);
+ assert.equal(event('block.intent',{...base,kind:'context',key:'p0/0',point:{x:NaN,y:30}}),false);
+ assert.equal(event('block.intent',{...base,trusted:false,kind:'context',key:'p0/0',point:{x:20,y:30}}),false);
+ assert.equal(event('block.intent',{...base,kind:'context',key:'p0/0',point:{x:100000,y:30}}),false);
  assert.equal(event('block.intent',{...base,kind:'outside',key:'p0/0',phase:'drop',point:{x:100,y:700}}),true);
  assert.equal(event('block.intent',{...base,kind:'outside',key:'p0/0',phase:'drop',point:{x:Infinity,y:700}}),false);
  assert.equal(event('cover.intent',{...base,kind:'commit',state:{values:{file:'outside'}}}),false);
@@ -326,4 +341,15 @@ test("clipboard bridge accepts only trusted bounded image or HTML file payloads"
  const parsed=p.parseSnapshot(value,identity);assert.deepEqual(parsed?.slides[0]?.figures,figures);
  figures[0]!.steps=8;assert.equal(parsed?.slides[0]?.figures?.[0]?.steps,5);
  for(const bad of [[{key:'p0/0',steps:-1}],[{key:'p0/0',steps:NaN}],[{key:'',steps:1}],[{key:'p0/0',steps:1.5}],Array(10001).fill({key:'p0/0',steps:0})])assert.equal(p.validateSnapshot({...snapshot,slides:[{...slide,figures:bad}]},identity),false);
+});
+
+
+test("TOC selection validates trusted source state and bounded theme colors", () => {
+  const state = { sourceVersion: "v1", trusted: true, selected: true, px: 30, ink: "rgb(0, 0, 0)", colors: { "--good": "#008800" } };
+  const valid = (data: unknown) => p.validateEvent(p.makeEvent(identity, "toc.select", data), identity);
+  assert.equal(valid(state), true);
+  assert.equal(valid({ ...state, trusted: false }), false);
+  assert.equal(valid({ ...state, px: Infinity }), false);
+  assert.equal(valid({ ...state, colors: { "--unknown": "red" } }), false);
+  assert.equal(valid({ ...state, ink: "x".repeat(257) }), false);
 });

@@ -11,6 +11,8 @@ import { makeBlocks } from './blocks.js';
 import { makeOutput } from './output.js';
 import { makeChecks, issueMessage } from './checks.js';
 import { makePresent } from './present.js';
+import { makeSpeakerNotes } from './speaker-notes.js';
+import { makePresenter } from './presenter.js';
 import { makeChat } from './chat.js';
 import { makeBibliography } from './bibliography.js';
 import { makeAssets } from './assets.js';
@@ -26,11 +28,13 @@ import { navigate } from './app.js';
 import { makeThemes } from './themes.js';
 import { makeThemeTab } from './theme-tab.js';
 import { makeHistory } from './history.js';
+import { makeSlideLibrary } from './slide-library.js';
 import { makeTocSettings } from './toc-settings.js';
+import { makeManuscriptSearch } from './manuscript-search.js';
 
 const SAVE_DELAY = 120;
 // 編集画面に機能を登録する（下書きはチャットの後：開いたときにチャットを下書きのチャットにするため）
-export const plugins = [makeThemes, makeTocSettings, makeQmdBlocks, makeBlocks, makeOutput, makePresent, makeChat, makeMemo, makeAssets, makeMaterials, makeThemeTab, makeBibliography, makeLeftTabs, makeInsert, makeLayoutLint, makePageStrip, makePdfStep, makeChecks];
+export const plugins = [makeThemes, makeTocSettings, makeQmdBlocks, makeBlocks, makeManuscriptSearch, makeOutput, makePresent, makeSpeakerNotes, makePresenter, makeChat, makeMemo, makeAssets, makeMaterials, makeThemeTab, makeBibliography, makeLeftTabs, makeInsert, makeLayoutLint, makePageStrip, makePdfStep, makeChecks, makeSlideLibrary];
 
 export function mountEditor(root, deck) {
   let alive = true;
@@ -70,14 +74,14 @@ export function mountEditor(root, deck) {
       <section class="stage" id="stage">
         <div class="viewport" id="viewport"><div class="slide-box" id="slideBox"></div></div>
         <div class="stepbar">
-          <div class="step-side" id="stepSide"></div>
+          <div class="step-left"><div class="step-side" id="stepSide"></div></div>
           <div class="stepper"><button class="ibtn" id="stepPrev" title="${S.prevStep}" aria-label="${S.prevStep}">${svg('chevL')}</button><span class="count"><span class="page-count" id="pageCount"></span><span class="step-count" id="stepCount" hidden></span></span><label class="pdf-step off" id="pdfStepWrap" data-tip="${S.pdfStep}"><input type="checkbox" id="pdfStep" aria-label="${S.pdfStep}"></label><button class="ibtn" id="stepNext" title="${S.nextStep}" aria-label="${S.nextStep}">${svg('chevR')}</button></div>
           <div class="strip-tools" id="stripTools"></div>
         </div>
         <div class="strip-grip" id="stripGrip" role="separator" aria-orientation="horizontal" tabindex="0"></div>
         <nav class="pagestrip" id="pagestrip" aria-label="ページ"></nav>
       </section>
-      <footer class="hint"><div class="msg" id="hintMsg"></div><div class="keys" id="hintKeys"></div></footer>
+      <footer class="hint"><button class="ibtn editor-settings" data-open-settings aria-haspopup="dialog" aria-label="${S.settings.title}" data-tip="${S.settings.title}">${svg('settings')}</button><div class="msg" id="hintMsg"></div><div class="keys" id="hintKeys"></div></footer>
     </main>
     <div class="splitter" id="chatSplitter" role="separator" aria-orientation="vertical" tabindex="0" data-tip="${S.splitChat}" aria-label="${S.splitChat}"></div>
     <section class="panel" id="chat" aria-label="${S.chat}"></section>
@@ -131,7 +135,7 @@ export function mountEditor(root, deck) {
     else if (ctx.conflict) [text, tone] = [S.status.conflict, 'error'];
     else if (partial) [text, tone] = [S.status.aiPart(ctx.aiTabs || 1, partial), ctx.lock.pages?.length ? 'ai' : 'ai-soft'];
     else if (ctx.dirty || ctx.timer || ctx.blocks?.pending) [text, tone] = [S.status.pending, 'busy'];
-    else if (ctx.saving) [text, tone] = [S.status.saving, 'busy'];
+    else if (ctx.saving || ctx.styleSaving) [text, tone] = [S.status.saving, 'busy'];
     else if (ctx.rendering) [text, tone] = [S.status.rendering, 'busy'];
     else if (!ctx.renderOk) [text, tone] = [S.status.stale, 'error'];
     else if (ctx.checkStatus) [text, tone, act] = ctx.checkStatus;
@@ -192,23 +196,35 @@ export function mountEditor(root, deck) {
     if (ctx.locked || !await ctx.flush()) return;
     const before = ctx.text, caret = editor.caretOffset();
     const put = async body => {
+      const submittedFrom = ctx.text;
       ctx.styleSavingText = body.text;
       ctx.styleSaving = (async () => {
         const r = await api(`/api/deck/${encodeURIComponent(deck)}/style`, { method: 'PUT', body });
-        ctx.version = r.version; ctx.saved = r.text; ctx.text = r.text;
-        editor.setText(r.text, { caret });
-        ctx.plugins.forEach(p => p.textChanged?.(r.text));
+        ctx.version = r.version; ctx.saved = r.text;
+        if (ctx.text === submittedFrom) {
+          ctx.text = r.text;
+          editor.setText(r.text, { caret });
+          ctx.plugins.forEach(p => p.textChanged?.(r.text));
+        } else if (r.text !== submittedFrom && ctx.text !== r.text) {
+          // 原稿も変える操作と入力が重なったら、入力を残して競合として扱う。
+          showConflict(r);
+        }
         return r;
       })();
+      showStatus();
       try { return await ctx.styleSaving; }
-      finally { ctx.styleSaving = null; ctx.styleSavingText = null; }
+      finally {
+        ctx.styleSaving = null; ctx.styleSavingText = null;
+        if (ctx.dirty && !ctx.conflict) scheduleSave();
+        showStatus();
+      }
     };
     const r = await put({ vars, text, base: ctx.version });
     if (r.before === r.css && before === r.text) return;
     ctx.recordHistory({
       source: true,
-      undo: () => put({ css: r.before, css_base: r.css, text: before, base: ctx.version }),
-      redo: () => put({ css: r.css, css_base: r.before, text: r.text, base: ctx.version }),
+      undo: () => put({ css: r.before, css_base: r.css, text: before === r.text ? ctx.text : before, base: ctx.version }),
+      redo: () => put({ css: r.css, css_base: r.before, text: before === r.text ? ctx.text : r.text, base: ctx.version }),
     });
   };
 
@@ -237,6 +253,8 @@ export function mountEditor(root, deck) {
   };
   addEventListener('beforeunload', beforeUnload);
   async function save() {
+    // 余白と原稿の保存が終わるまで、古い版で原稿を送信しない。
+    if (ctx.styleSaving) return;
     if (ctx.saving) return ctx.saving;
     if (ctx.conflict || ctx.allLocked || !ctx.dirty) return;
     const text = ctx.text;
@@ -550,6 +568,7 @@ export function mountEditor(root, deck) {
   let held = null, holdTimer = 0, long = false;
   const inField = t => t.closest?.('input, textarea, select, [contenteditable="true"]');
   function keydown(e) {
+    if (ctx.presenting) return;
     // [data-undo-keys] の中の欄（テーマの色など）は、欄ではなく共通の履歴を戻す
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !(inField(e.target) && e.target !== editor.ta && !e.target.closest('[data-undo-keys]'))) {
       e.preventDefault();
@@ -566,6 +585,7 @@ export function mountEditor(root, deck) {
     }
   }
   function keyup(e) {
+    if (ctx.presenting) { clearTimeout(holdTimer); held = null; return; }
     if (e.key !== held) return;
     clearTimeout(holdTimer);
     if (!long) preview.move(e.key === 'ArrowRight' ? 1 : -1);

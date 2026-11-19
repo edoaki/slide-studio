@@ -1,5 +1,5 @@
 // ホームの AI 準備。チャットと同じ取得・認証 API を使う。
-import { api, esc } from './api.js';
+import { api, esc, toast } from './api.js';
 import { S } from './strings.js';
 
 const T = S.ai, R = T.runtime;
@@ -11,7 +11,11 @@ export function homeAi(host) {
   let alive = true, timer = 0, generation = 0, rows = [], providers = [], states = new Map(), shown = '', error = '', statusError = '';
   let detecting = false, detected = false, detectAgain = false;
   const pending = new Map(), failures = new Map();
-  const ids = Object.keys(T.onboard);
+  const completion = (id, state) => state?.status === 'completed' ? T.onboard[id].done : state?.status === 'ready' ? T.installDone : '';
+  function acceptState(id, state) {
+    if (active(states.get(id)) && finished(state)) toast(completion(id, state));
+    states.set(id, state);
+  }
 
   function row(a) {
     const p = providers.find(p => p.id === a.id), l = states.get(a.id) || {};
@@ -28,7 +32,7 @@ export function homeAi(host) {
       + (a.previous ? button('rollback', R.rollbackShort, R.rollback(a.previous)) : '');
     const auto = a.fixed ? '' : `<label class="env-ai-auto"><input type="checkbox" data-act="ai-auto" data-id="${esc(a.id)}" aria-label="${esc(`${a.name}：${R.auto}`)}" ${a.auto ? 'checked' : ''} ${busy ? 'disabled' : ''}>${R.auto}</label>`;
     const failure = failures.get(a.id) || (l.status === 'failed' ? l.error || T.loginFailed : '');
-    const status = failure || (l.status === 'pending' ? T.loginPending : working ? (percent(l.progress) == null ? pending.get(a.id) === 'login' ? T.loginOpening : T.loginPreparing : T.loginDownloading(percent(l.progress))) : p?.reason === 'error' ? p.message || T.connectionRetry : '');
+    const status = failure || (l.status === 'pending' ? T.loginPending : working ? (percent(l.progress) == null ? pending.get(a.id) === 'login' ? T.loginOpening : T.loginPreparing : T.loginDownloading(percent(l.progress))) : p?.reason === 'error' ? p.message || T.connectionRetry : completion(a.id, l));
     return `<li data-ai="${esc(a.id)}"><div class="env-ai-head"><b>${esc(a.name)}</b><span class="detail" title="${esc(detail)}">${esc(detail)}</span></div>
       <div class="env-ai-acts">${setup}${actions}${auto}</div>
       <p class="env-ai-status${failure ? ' error' : ''}" role="status" ${status ? '' : 'hidden'}>${esc(status)}</p>
@@ -66,15 +70,16 @@ export function homeAi(host) {
     const current = ++generation;
     if (!detected || force || recheck) detect(force || recheck);
     try {
-      const [runtime, logins] = await Promise.all([
-        api('/api/ai/runtimes' + (force ? '?refresh=1' : '')),
-        Promise.all(ids.map(async id => [id, await api(`/api/ai/${id}/login`)])),
-      ]);
+      const runtime = await api('/api/ai/runtimes' + (force ? '?refresh=1' : ''));
+      if (!alive || current !== generation) return;
+      const logins = await Promise.all(runtime.ai.map(async ({id}) => [id, await api(`/api/ai/${id}/login`)]));
       if (!alive || current !== generation) return;
       // 取得・認証の完了後は、最大5分の検出キャッシュを更新する。
       const completed = logins.some(([id, state]) => finished(state) && states.get(id)?.status !== state.status);
       const changed = runtime.ai.some(a => rows.some(old => old.id === a.id && (old.version !== a.version || old.busy && !a.busy)));
-      rows = runtime.ai; states = new Map(logins); error = '';
+      rows = runtime.ai;
+      for (const [id, state] of logins) acceptState(id, state);
+      states = new Map(logins); error = '';
       render();
       if ((completed || changed) && !force && !recheck) detect(true);
       if (rows.some(a => a.busy) || logins.some(([, state]) => active(state))) timer = setTimeout(() => refresh(), 1000);
@@ -96,7 +101,7 @@ export function homeAi(host) {
     try {
       if (action === 'install' || action === 'login') {
         const state = await api(`/api/ai/${id}/login`, { method: 'POST', body: { download: action === 'install' } });
-        if (alive) { states.set(id, state); recheck = finished(state); }
+        if (alive) { acceptState(id, state); recheck = finished(state); }
       } else {
         await api(`/api/ai/${id}/runtime`, { method: 'POST', body: action === 'auto' ? { auto: el.checked } : { action } });
         recheck = action === 'rollback';

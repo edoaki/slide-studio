@@ -13,11 +13,16 @@ export interface FrameSnapshot extends FrameIdentity {
    * The transport identity/version remains the immutable bootstrap revision. */
   sourceVersion?: string;
   hasReferences?: boolean;
+  overviewOpen?: boolean;
+  blackout?: boolean;
+  pageInput?: string;
 }
 export type NavigationCommand =
   | { method: "go"; params: { index: number; step: number } }
   | { method: "move"; params: { delta: number } }
   | { method: "jump"; params: { delta: number } }
+  | { method: "setBlackout"; params: { value: boolean } }
+  | { method: "presentationKey"; params: { type: "keydown" | "keyup"; key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | " " | "o" | "Escape" | "b" | "B" | "Enter" | "Backspace" | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"; repeat: boolean } }
   | { method: "goStage"; params: { stage: number } }
   | { method: "resize"; params: Record<string, never> }
   | { method: "setFilter"; params: { indices: number[] | null } }
@@ -102,7 +107,7 @@ export interface FrameResponse extends FrameIdentity {
 }
 export type FrameEvent = FrameIdentity & {
   protocol: typeof EDIT_BRIDGE_PROTOCOL; type: "event";
-  event: "ready" | "deckchange" | "layout" | "key" | "link.open" | "failure" | "edit.layout" | "edit.intent" | "text.state" | "text.heading" | "cover.intent" | "block.intent" | "theme.select" | "edit.lint" | "insert.pointer" | "insert.paste";
+  event: "ready" | "deckchange" | "layout" | "key" | "link.open" | "failure" | "edit.layout" | "edit.intent" | "text.state" | "text.heading" | "toc.select" | "cover.intent" | "block.intent" | "theme.select" | "edit.lint" | "insert.pointer" | "insert.paste";
   data: unknown;
 };
 // Text sessions carry source revisions and single-session leases; frame events

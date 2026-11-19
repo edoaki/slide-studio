@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { relative } from 'node:path';
-import { Workspace, figure_steps } from '../../core/src/legacy-workspace.js';
-import { parse, type Doc } from '../../core/src/legacy-source.js';
-import { TARGET_KEY, type Attachment } from '../../core/src/legacy-chat-store.js';
-import { prompt_lines } from '../../core/src/legacy-materials.js';
-import type { Mode } from '../../core/src/legacy-ai-roles.js';
+import { Workspace, figure_steps } from '../../core/src/workspace.js';
+import { parse, type Doc } from '../../core/src/source.js';
+import { TARGET_KEY, type Attachment } from '../../core/src/chat-store.js';
+import { prompt_lines } from '../../core/src/materials.js';
+import type { Mode } from '../../core/src/ai-roles.js';
 
 export interface Item {
   key: string; text: string; label: string; page_title?: string;

@@ -3,7 +3,7 @@
  * Package Slide Studio for macOS (DMG) or Windows (NSIS).
  *
  * This script owns native Pandoc staging and never edits the frozen
- * electron-builder.json config. It deliberately builds only an explicitly
+ * scripts/electron-builder.config.cjs config. It deliberately builds only an explicitly
  * requested target and never signs with a developer identity or publishes.
  */
 import { spawn } from "node:child_process";
@@ -959,7 +959,7 @@ function resolveElectronBuilderCli() {
 function buildArguments(descriptor) {
   const args = [
     "--config",
-    "electron-builder.json",
+    "scripts/electron-builder.config.cjs",
     descriptor.platform === "darwin" ? "--mac" : "--win",
     descriptor.platform === "darwin" ? "dmg" : "nsis",
     descriptor.arch === "arm64" ? "--arm64" : "--x64",

@@ -11,7 +11,7 @@ export const padCss = ([t, r, b, l]) => t === b && r === l ? (t === r ? px(t) : 
 export function makeHandles(host) {
   const layer = document.createElement('div');
   layer.className = 'bh-layer'; host.append(layer);
-  let env = null, drag = null, placed = [];
+  let env = null, drag = null, placed = [], tagged = [], sideValues = {};
   const commit = (name,key,value) => env.apply ? env.apply(name,key,value) : env.write(op[name](env.st.text,env.st,key,value));
 
   const scale = () => { const s = env.win.document.querySelector('#stage'); return s ? s.getBoundingClientRect().width / 1280 : 1; };
@@ -34,9 +34,27 @@ export function makeHandles(host) {
     return { left, top, width: Math.max(...rs.map(r => r.right)) - left, height: Math.max(...rs.map(r => r.bottom)) - top };
   };
   // つまみの位置は動かすたびに測り直す（動かしている間も枠の線に付いていく）
+  // スライドの端のブロックでも欠けないように、つまみは枠の中に収める（表の列の線は除く）
+  const fit = (h, r) => {
+    if (h.classList.contains('table-col')) return r;
+    const W = layer.clientWidth, H = layer.clientHeight;
+    return { ...r, left: Math.max(1, Math.min(r.left, W - r.width - 1)), top: Math.max(1, Math.min(r.top, H - r.height - 1)) };
+  };
   const relayout = () => placed.forEach(([h, at]) => {
-    const r = at(); if (r) Object.assign(h.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    const r0 = at(), r = r0 && fit(h, r0); if (!r) return;
+    Object.assign(h.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    // 数値の札はつまみの右（縦のつまみは下）。スライドの端で欠けるときは反対側に出す
+    const W = layer.clientWidth, H = layer.clientHeight, wide = r.width > r.height;
+    h.toggleAttribute('data-flip', wide ? r.left + r.width + 34 > W : r.top + r.height + 22 > H);
+    // 左右のつまみの札は、ブロックと反対の側へ伸ばす（欠けるときは内側へ）
+    if (!wide) {
+      const lean = { left: 'end', right: 'start' }[h.dataset.side] || '';
+      h.dataset.lean = lean !== 'start' && r.left + r.width / 2 < 18 ? 'start' : lean !== 'end' && r.left + r.width / 2 > W - 18 ? 'end' : lean;
+    }
   });
+  // つまみに、その辺の余白の数値を付ける
+  const syncValues = () => tagged.forEach(([h, side]) => { if (sideValues[side] != null) h.dataset.value = sideValues[side]; });
+  const tag = (h, side) => { h.dataset.side = side; tagged.push([h, side]); syncValues(); relayout(); };
   // 動かし終える。離したのがスライドの iframe の上だと、つまみに pointerup が届かないことがある（Safari など）ので、
   // 親画面・iframe の pointerup、捕捉が外れたとき、ボタンを離して動かしたときのどれでも終える
   function end(ok) {
@@ -74,8 +92,9 @@ export function makeHandles(host) {
     const b = document.createElement('div'); b.className = 'bh-band';
     if (side) b.dataset.side = side;
     Object.assign(b.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${Math.max(0, rect.width)}px`, height: `${Math.max(0, rect.height)}px` });
-    if (text != null) b.dataset.value = text;
     layer.append(b);
+    // 数値は帯ではなく、その辺のつまみの横に出す（まわりの文字に被せない）
+    if (text != null && side) { sideValues[side] = text; syncValues(); }
   };
 
   // ---------------------------------------------------------------- 大きさ
@@ -263,11 +282,12 @@ export function makeHandles(host) {
     show();
     names.forEach((name, i) => {
       const at = () => {
+        // 値の計算に使う動く縁に、つまみの中心を合わせる。
         const r = box(), pos = edges(i, current)[grab[i].n];
-        return i % 2 ? { left:pos-4, top:r.top+r.height/2-14, width:8, height:28 }
-          : { left:r.left+r.width/2-14, top:pos-4, width:28, height:8 };
+        return i % 2 ? { left:pos-1, top:r.top+r.height/2-16, width:2, height:32 }
+          : { left:r.left+r.width/2-16, top:pos-1, width:32, height:2 };
       };
-      handle(`pad-${i % 2 ? 'x' : 'y'}`, S.spaceSide[name], at, () => {
+      tag(handle(`pad-${i % 2 ? 'x' : 'y'}`, S.spaceSide[name], at, () => {
         let changed = false;
         return {
           move(dx, dy, all) {
@@ -283,7 +303,7 @@ export function makeHandles(host) {
           },
           cancel() { apply(original); current = [...pad]; show(); },
         };
-      }, () => commit('setSpace', key, null));
+      }, () => commit('setSpace', key, null)), name);
     });
   }
   function padHandles(c) {
@@ -294,15 +314,15 @@ export function makeHandles(host) {
       const gap = parseFloat(cs.columnGap) || 0, kids = c.children.map(k => els(k.key)[0]).filter(Boolean);
       kids.slice(0, -1).forEach((k, n) => {
         const a = toHost(k.getBoundingClientRect());
-        band({ left: a.left + a.width, top: r.top, width: gap * s, height: r.height }, Math.round(gap));
-        handle('pad-x', S.padSide.gap, () => ({ left: a.left + a.width + gap * s / 2 - 4, top: r.top + r.height / 2 - 14, width: 8, height: 28 }), () => {
+        band({ left: a.left + a.width, top: r.top, width: gap * s, height: r.height }, Math.round(gap), 'gap');
+        tag(handle('pad-x', S.padSide.gap, () => ({ left: a.left + a.width + gap * s / 2 - 1, top: r.top + r.height / 2 - 16, width: 2, height: 32 }), () => {
           let v = null;
           return {
             move(dx) { v = Math.max(0, Math.round(gap + 2 * dx)); el.style.setProperty('--gutter', `${v}px`); },
             done() { if (v != null) { commit('setPad', key, `${v}px`); env.padded('columns', `${v}px`); } },
             cancel() { el.style.removeProperty('--gutter'); },
           };
-        }, () => commit('setPad', key, null));
+        }, () => commit('setPad', key, null)), 'gap');
         void n;
       });
       return;
@@ -362,20 +382,14 @@ export function makeHandles(host) {
     restore();
     show(pad);
     for (const i of sides) {
-      // つまみは掴む縁の中央。枠の縁なら選択の枠の線の上、中身の縁なら帯の内側の端。余白の量は帯と数値で示す
+      // ドラッグ量の計算と同じ縁に置く。内側の縁なら余白の増減に合わせて中へ動く。
       const at = () => {
-        let r, pos;
-        if (grab[i].inner) {
-          r = box(); if (!r) return null;
-          const v = current[i] * s;
-          pos = [r.top + v, r.left + r.width - v, r.top + r.height - v, r.left + v][i];
-        } else {
-          r = toHost(union([el])); if (!r) return null;
-          pos = [r.top, r.left + r.width, r.top + r.height, r.left][i];
-        }
-        return i % 2 ? { left: pos - 4, top: r.top + r.height / 2 - 14, width: 8, height: 28 } : { left: r.left + r.width / 2 - 14, top: pos - 4, width: 28, height: 8 };
+        const r = box(); if (!r) return null;
+        const inset = grab[i].inner ? current[i] * s : 0;
+        const pos = [r.top + inset, r.left + r.width - inset, r.top + r.height - inset, r.left + inset][i];
+        return i % 2 ? { left: pos - 1, top: r.top + r.height / 2 - 16, width: 2, height: 32 } : { left: r.left + r.width / 2 - 16, top: pos - 1, width: 32, height: 2 };
       };
-      handle(`pad-${i % 2 ? 'x' : 'y'}`, S.padSide[names[i]], at, () => {
+      tag(handle(`pad-${i % 2 ? 'x' : 'y'}`, S.padSide[names[i]], at, () => {
         let p = null;
         return {
           // 帯を太らせる向きに動かすと増える。⇧で4辺をそろえる
@@ -393,7 +407,7 @@ export function makeHandles(host) {
           },
           cancel() { restore(); current = [...pad]; show(pad); },
         };
-      }, () => commit('setPad', key, null));
+      }, () => commit('setPad', key, null)), names[i]);
     }
   }
 
@@ -403,7 +417,7 @@ export function makeHandles(host) {
       // 動かしている間は描き直さない。別のブロックを選んだら、動かしていた分は取り消す
       if (drag && next?.key === env?.key && next?.live) return;
       end(false);
-      env = next; layer.replaceChildren(); placed = [];
+      env = next; layer.replaceChildren(); placed = []; tagged = []; sideValues = {};
       if (!env?.win || !env.live || !env.key) return;
       const c = op.find(env.st, env.key)?.chunk;
       if (!c || c.kind === 'opaque' || c.kind === 'def') return;
@@ -413,7 +427,7 @@ export function makeHandles(host) {
       if (env.padMode === 'outer') spaceHandles(c);
       else if (env.padMode) padHandles(c); else sizeHandles(c);
     },
-    clear() { end(false); layer.replaceChildren(); placed = []; },
+    clear() { end(false); layer.replaceChildren(); placed = []; tagged = []; sideValues = {}; },
     destroy() { delete host.dataset.operating; layer.remove(); },
   };
 }

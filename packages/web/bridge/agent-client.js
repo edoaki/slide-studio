@@ -235,6 +235,8 @@ export class AgentClient {
           ?? stage + 1;
       },
       go(index, step = 0) { return client.request('go', { index, step }); },
+      setBlackout(value) { return client.request('setBlackout', {value}); },
+      presentationKey(type, key, repeat = false) { return client.request('presentationKey', {type, key, repeat}); },
       move(delta = 1) { return client.request('move', { delta }); },
       jump(delta = 1) { return client.request('jump', { delta }); },
       goStage(stage) { return client.request('goStage', { stage }); },
@@ -379,7 +381,7 @@ export class AgentClient {
     // This is the committed frame revision. A later configure request cannot
     // advance it; only a frame snapshot/theme ack can.
     this._frameSourceVersion = snapshot.sourceVersion ?? this.identity.version;
-    const key = `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
+    const key = `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${snapshot.overviewOpen}/${snapshot.blackout}/${snapshot.pageInput}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
     if (key === this._lastSnapshotKey) return;
     this._lastSnapshotKey = key;
     this.snapshot = snapshot;

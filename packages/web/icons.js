@@ -1,5 +1,18 @@
 // アイコン（Lucide）。元：ai-slide mock/gui/index.html の ICON。
 export const ICON = {
+  sort: '<path d="M4 6h15M4 12h10M4 18h5m9-7v10m-3-3 3 3 3-3"/>',
+  textSearch: '<path d="M3 5h14M3 10h7M3 15h5"/><circle cx="15" cy="14" r="4"/><path d="m18 17 4 4"/>',
+  slideSearch: '<rect x="2" y="3" width="17" height="12" rx="2"/><path d="M6 7h6M6 10h3"/><circle cx="16" cy="16" r="4"/><path d="m19 19 3 3"/>',
+  replaceText: '<path d="M4 5h10M9 5v7M6 12h6M4 18h11m-3-3 3 3-3 3M19 4v8m-2-2 2 2 2-2"/>',
+  replaceAll: '<path d="M3 4h10M8 4v6M5 10h6M3 15h12m-3-3 3 3-3 3M3 21h12m-3-3 3 3-3 3M20 4v10m-2-2 2 2 2-2"/>',
+  settings: '<path d="M9.7 4.3 10.2 2h3.6l.5 2.3 2.1 1.2 2.2-.7 1.8 3.2-1.7 1.6v2.4l1.7 1.6-1.8 3.2-2.2-.7-2.1 1.2-.5 2.3h-3.6l-.5-2.3-2.1-1.2-2.2.7-1.8-3.2L5.3 12V9.6L3.6 8l1.8-3.2 2.2.7Z" transform="translate(0 1.2)"/><circle cx="12" cy="12" r="3"/>',
+  speakerView: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M14 4v13M6 8h5M6 11h3M8 21h8M12 17v4"/>',
+  stopwatch: '<circle cx="12" cy="14" r="8"/><path d="M12 10v4l2 2M9 2h6M12 2v4M18 6l2-2"/>',
+  historyList: '<path d="M3 7v5h5M3 12a9 9 0 1 1 3 6M12 7v5l3 2"/>',
+  sliders: '<path d="M4 7h7M15 7h5M4 17h3M11 17h9"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
+  monitorOut: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M9 10h6m-3-3 3 3-3 3"/>',
+
   presenter: '<circle cx="12" cy="7" r="3"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/>',
   affiliation: '<path d="M4 21V3h16v18M2 21h20M9 21v-5h6v5M8 7h1m6 0h1M8 11h1m6 0h1"/>',
   affiliationbottom: '<rect x="4" y="3" width="16" height="9" rx="2"/><path d="M8 17h8M8 21h8"/>',

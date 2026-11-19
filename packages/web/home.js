@@ -5,7 +5,8 @@ import { S } from './strings.js';
 import { navigate } from './app.js';
 import { themeCards, dialog } from './themes.js';
 import { homeManage } from './home-manage.js';
-import { homeAi } from './home-ai.js';
+import { trashDialog } from './home-trash.js';
+import { presentationList } from './home-list.js';
 
 const ago = t => {
   if (!t) return '';
@@ -49,7 +50,7 @@ export function card(d) {
   return b;
 }
 
-// 見出しのすぐ横の［＋］。作ったまま手を入れていないものがある欄では隠す（load）
+// 見出しの横の［＋］。一覧の読み込み後に表示する（load）。
 const add = (act, label) => `<button class="ibtn sec-add" data-act="${act}" aria-label="${label}" data-tip="${label}" hidden>${svg('plus')}</button>`;
 
 export function mountHome(root) {
@@ -60,23 +61,13 @@ export function mountHome(root) {
     <header class="home-bar">
       <div class="brand">${svg('logo')}${S.appName}</div>
       <span class="grow"></span>
-      <button class="btn" data-act="location">${S.location.manage}</button>
-      <div class="env-wrap">
-        <button class="env-btn" data-act="env" aria-label="${S.env}" data-tip="${S.envOk}" aria-haspopup="dialog" aria-expanded="false">${svg('activity')}<span>${S.env}</span>${svg('chevD')}</button>
-        <div class="env-pop" role="dialog" aria-label="${S.env}" hidden>
-          <div class="pop-head"><b>${S.env}</b><button class="ibtn" data-act="refresh" aria-label="${S.refresh}" title="${S.refresh}">${svg('refresh')}</button></div>
-          <h3 class="env-section">${S.envTools}</h3>
-          <ul class="env-list"><li class="muted">${S.status.loading}</li></ul>
-          <h3 class="env-section env-ai-title">${S.envAi}</h3>
-          <ul class="env-list env-ai"><li class="muted">${S.status.loading}</li></ul>
-          <div class="env-root"><span>${S.root}</span><code></code></div>
-        </div>
-      </div>
+      <button class="ibtn" data-act="trash" aria-label="${S.homeTrash.title}" data-tip="${S.homeTrash.title}">${svg('trash')}</button>
+      <button class="ibtn" data-open-settings aria-haspopup="dialog" aria-label="${S.settings.title}" data-tip="${S.settings.title}">${svg('settings')}</button>
     </header>
     <main class="home-main">
       <section>
-        <div class="sec-head"><h2>${S.decks}</h2>${add('new', S.newDeck)}</div>
-        <div class="cards"></div>
+        <div class="sec-head"><h2>${S.decks}</h2><button type="button" class="ibtn home-sort-trigger" aria-label="${S.homeList.sort}" data-tip="${S.homeList.sort}" aria-haspopup="menu" aria-expanded="false">${svg('sort')}</button>${add('new', S.newDeck)}<div class="home-sort-menu" popover="auto" role="menu" aria-label="${S.homeList.sort}">${Object.entries(S.homeList.sorts).map(([value,label]) => `<button type="button" role="menuitemradio" data-sort="${value}" aria-checked="${value === 'opened'}">${svg('check')}<span>${label}</span></button>`).join('')}</div></div>
+        <p class="empty-note home-no-results" role="status" hidden>${S.homeList.empty}</p><div class="cards"></div>
       </section>
       <section>
         <div class="sec-head"><h2>${S.libraries}</h2>${add('topic', S.topic.create)}</div>
@@ -84,12 +75,33 @@ export function mountHome(root) {
       </section>
       <section><div class="sec-head"><h2>${S.agents.title}</h2></div><a class="agent-home-card" href="/agents" data-nav data-tip="${S.agents.open}">${svg('sparkles')}<span><b>${S.agents.open}</b><small>${S.agents.homeHint}</small></span>${svg('chevR')}</a></section>
       <section><div class="sec-head"><h2>${S.themes.title}</h2></div><div class="theme-cards"></div></section>
+
     </main>
   </div>`;
   const $ = s => root.querySelector(s);
-  let data = null, alive = true, loadSequence = 0;
+  let data = null, alive = true, loadSequence = 0, sort = 'opened';
+  const sortButton = $('.home-sort-trigger'), sortMenu = $('.home-sort-menu');
+  sortButton.onclick = () => {
+    if (sortMenu.matches(':popover-open')) { sortMenu.hidePopover(); return; }
+    const r = sortButton.getBoundingClientRect();
+    sortMenu.style.top = `${r.bottom + 6}px`; sortMenu.style.left = `${Math.max(8, r.right - 180)}px`;
+    sortMenu.showPopover(); sortMenu.querySelector('[aria-checked=true]').focus();
+  };
+  sortMenu.addEventListener('toggle', () => sortButton.setAttribute('aria-expanded', String(sortMenu.matches(':popover-open'))));
+  sortMenu.onclick = e => {
+    const option = e.target.closest('[data-sort]'); if (!option) return;
+    sort = option.dataset.sort;
+    sortMenu.querySelectorAll('[data-sort]').forEach(b => b.setAttribute('aria-checked', String(b === option)));
+    sortButton.dataset.tip = `${S.homeList.sort} · ${S.homeList.sorts[sort]}`;
+    drawPresentations(); sortMenu.hidePopover(); sortButton.focus();
+  };
+  sortMenu.onkeydown = e => {
+    if (!['ArrowDown','ArrowUp','Home','End'].includes(e.key)) return;
+    e.preventDefault(); const items = [...sortMenu.querySelectorAll('button')], i = items.indexOf(document.activeElement);
+    items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus();
+  };
   const actions = homeManage(root, load);
-  const ai = homeAi($('.env-ai'));
+
 
 
   async function load() {
@@ -99,12 +111,9 @@ export function mountHome(root) {
     data = d;
     data.themeDetails = themes.themes;
     themeCards($('.theme-cards'), themes.themes, theme => newDeckDialog(data, { theme }), undefined, () => load());
-    $('[data-act=new]').hidden = data.recent.some(d => d.blank);
+    $('[data-act=new]').hidden = false;
     $('[data-act=topic]').hidden = data.shelves.some(s => s.empty);
-    $('.env-root code').textContent = data.root;
-    const cards = $('.cards');
-    cards.textContent = '';
-    for (const d of data.recent) cards.append(actions.card(card(d), d));
+    drawPresentations();
     const libs = $('.libs');
     libs.innerHTML = data.shelves.length ? '' : `<p class="empty-note">${S.noLibraries}</p>`;
     for (const s of data.shelves) {
@@ -118,45 +127,23 @@ export function mountHome(root) {
       libs.append(el);
     }
   }
-  async function loadEnv(refresh = false) {
-    const env = await api('/api/env' + (refresh ? '?refresh=1' : ''));
-    if (!alive) return;
-    const ng = env.items.filter(i => !i.ok);
-    $('.env-list').innerHTML = env.items.map(i => `<li><span class="${i.ok ? 'ok' : 'ng'}">${svg(i.ok ? 'check' : 'x')}</span><b>${esc(i.name)}</b><span class="detail" title="${esc(i.detail)}">${esc(i.detail)}</span>
-      ${!i.ok && i.name === 'Chromium' ? `<button class="btn sm primary" data-act="setup">${S.setup}</button>` : !i.ok && i.fix ? `<p class="fix">${esc(i.fix)}</p>` : ''}</li>`).join('');
-    const btn = $('.env-btn');
-    btn.classList.toggle('warn', ng.length > 0);
-    btn.innerHTML = `${svg(ng.length ? 'alert' : 'circleCheck')}<span>${S.env}</span>${ng.length ? `<small>${S.envNeeded}</small>` : ''}${svg('chevD')}`;
-    btn.dataset.tip = ng.length ? S.envNg : S.envOk;
-  }
-  const pop = () => $('.env-pop');
-  function togglePop(open = pop().hidden) {
-    pop().hidden = !open;
-    $('.env-btn').setAttribute('aria-expanded', String(open));
+  function drawPresentations() {
+    if (!data) return;
+    const rows = presentationList(data.recent, '', sort);
+    $('.cards').replaceChildren(...rows.map(d => actions.card(card(d), d)));
+    $('.home-no-results').hidden = rows.length > 0;
   }
   root.onclick = async e => {
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (!pop().hidden && !e.target.closest('.env-wrap')) togglePop(false);
     try {
-      if (act === 'location') location.assign('/location');
-      if (act === 'env') togglePop();
-      if (act === 'refresh') await Promise.all([loadEnv(true), ai.refresh(true)]);
-      if (act?.startsWith('ai-')) await ai.act(e.target.closest('[data-act]'));
       if (act === 'new' && data) newDeckDialog(data);
       if (act === 'topic') newTopic(load);
-      if (act === 'setup') {
-        const button = e.target.closest('button');
-        button.disabled = true; button.textContent = S.setupBusy;
-        try { await api('/api/setup', {method: 'POST'}); toast(S.setupDone); }
-        finally { if (alive) await loadEnv(true); }
-      }
+      if (act === 'trash') trashDialog(async () => { actions.clearUndo(); await load(); });
     } catch (err) { toast(err.message); }
   };
-  const keydown = e => { if (e.key === 'Escape' && !pop().hidden) { togglePop(false); $('.env-btn').focus(); } };
-  addEventListener('keydown', keydown);
-  load().catch(e => toast(e.message)); loadEnv().catch(e => toast(e.message)); ai.refresh();
+  load().catch(e => toast(e.message));
   const off = onEvent(ev => { if (['files', 'theme-shots', 'chat', 'chat-round'].includes(ev.type)) load().catch(e => toast(e.message)); });
-  return () => { alive = false; ai.destroy(); actions.destroy(); off(); root.onclick = null; removeEventListener('keydown', keydown); document.querySelectorAll('.dialog-back').forEach(d => d.remove()); };
+  return () => { alive = false; actions.destroy(); off(); root.onclick = null; document.querySelector('dialog.location-dialog')?.close(); document.querySelectorAll('.dialog-back').forEach(d => d.remove()); };
 }
 
 function newTopic(done) {

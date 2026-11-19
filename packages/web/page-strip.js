@@ -4,6 +4,7 @@ import { S } from './strings.js';
 import { tip } from './tip.js';
 import { makeOverview } from './overview.js';
 import { shotThumbs } from './shot-thumbs.js';
+import { makePageActions } from './page-actions.js';
 import { makePageReorder } from './page-reorder.js';
 
 const MIN_W = 80, DEFAULT_W = 200;
@@ -110,7 +111,9 @@ export function makePageStrip(ctx) {
   } });
   reorder.attach(strip);
   reorder.attach(root.querySelector('#qblocks'), true);
-  const overview = makeOverview(ctx, { shots: () => shots, changed: prioritize, reorder });
+  const actions = makePageActions(ctx);
+  const stopActions = actions.attach(strip), stopSourceActions = actions.attach(root.querySelector('#qblocks'), true);
+  const overview = makeOverview(ctx, { shots: () => shots, changed: prioritize, reorder, actions });
   const decorate = () => { thumbs.decorate(); overview.decorate(); };
 
   async function load() {
@@ -122,8 +125,8 @@ export function makePageStrip(ctx) {
   load().catch(e => toast(e.message));
 
   return {
-    stripRendered() { thumbs.decorate(); reorder.decorate(strip); overview.render(); size(); prioritize(); },
-    previewLoaded() { reorder.previewLoaded(); },
+    stripRendered() { actions.decorate(strip); thumbs.decorate(); reorder.decorate(strip); overview.render(); size(); prioritize(); },
+    previewLoaded() { reorder.previewLoaded(); actions.previewLoaded(); },
     // 今のページの縮小画像は今の step にそろえる
     slideChanged() {
       thumbs.rest();
@@ -134,7 +137,7 @@ export function makePageStrip(ctx) {
     destroy() {
       alive = false; fit.disconnect(); stripFit.disconnect(); visibility.disconnect();
       strip.removeEventListener('scroll', prioritize); cancelAnimationFrame(priorityFrame);
-      wantedPriority = '[]'; sendPriority(); overview.destroy(); reorder.destroy();
+      wantedPriority = '[]'; sendPriority(); overview.destroy(); reorder.destroy(); stopActions(); stopSourceActions(); actions.destroy();
     },
   };
 }

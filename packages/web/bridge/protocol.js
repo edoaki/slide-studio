@@ -8,7 +8,7 @@ export const PROTOCOL = 'slide-studio-edit/1';
 
 export const EVENT_TYPES = Object.freeze([
   'ready', 'deckchange', 'layout', 'key', 'link.open', 'failure',
-  'insert.pointer', 'insert.paste', 'edit.lint', 'theme.select', 'edit.layout', 'edit.intent', 'text.state', 'text.heading', 'cover.intent', 'block.intent',
+  'insert.pointer', 'insert.paste', 'edit.lint', 'theme.select', 'edit.layout', 'edit.intent', 'text.state', 'text.heading', 'toc.select', 'cover.intent', 'block.intent',
 ]);
 
 // Stage 1 only forwards presentation keys. Keep this an allowlist; do not
@@ -18,7 +18,7 @@ export const KEY_ALLOWLIST = Object.freeze(['Escape', 'f']);
 // Navigation commands are the only operations in stage 1. No command accepts
 // HTML, JavaScript, selectors, filesystem paths or an arbitrary remote URL.
 export const COMMAND_METHODS = Object.freeze([
-  'go', 'move', 'jump', 'goStage', 'resize', 'setFilter', 'theme.swap', 'finish', 'pageWheel',
+  'presentationKey', 'setBlackout', 'go', 'move', 'jump', 'goStage', 'resize', 'setFilter', 'theme.swap', 'finish', 'pageWheel',
   'lint.inspect', 'theme.configure', 'theme.preview', 'theme.inspect', 'theme.mark', 'theme.gradient', 'edit.configure', 'edit.select', 'edit.hover', 'edit.designing', 'edit.measure', 'edit.locks', 'edit.issues', 'edit.markStep', 'text.begin', 'text.command', 'text.cellAt', 'edit.themeValues', 'edit.themePreview', 'cover.inspect', 'cover.configure', 'cover.select', 'block.configure', 'block.dropAt', 'block.clear', 'block.cancel',
 ]);
 
@@ -152,6 +152,9 @@ export function validateSnapshot(value, expected) {
   if (typeof value.background !== 'string' || value.background.length > 512) return false;
   if (!isFiniteNumber(value.scale) || value.scale < 0 || value.scale > 1000) return false;
   if (value.hasReferences !== undefined && !isBoolean(value.hasReferences)) return false;
+  if (value.pageInput !== undefined && (typeof value.pageInput !== 'string' || !/^[0-9]{0,6}$/.test(value.pageInput))) return false;
+  if (value.blackout !== undefined && !isBoolean(value.blackout)) return false;
+  if (value.overviewOpen !== undefined && !isBoolean(value.overviewOpen)) return false;
   if (value.sourceVersion !== undefined && !isSafeString(value.sourceVersion, { max: 4096 })) return false;
   if (value.stageAt !== undefined && !isFiniteInteger(value.stageAt, 0, MAX_STEPS)) return false;
   if (value.stageNumbers !== undefined) {
@@ -181,6 +184,9 @@ export function parseSnapshot(value, expected) {
     }),
   };
   if (value.hasReferences !== undefined) snapshot.hasReferences = value.hasReferences;
+  if (value.pageInput !== undefined) snapshot.pageInput = value.pageInput;
+  if (value.blackout !== undefined) snapshot.blackout = value.blackout;
+  if (value.overviewOpen !== undefined) snapshot.overviewOpen = value.overviewOpen;
   if (value.sourceVersion !== undefined) snapshot.sourceVersion = value.sourceVersion;
   if (value.stageAt !== undefined) snapshot.stageAt = value.stageAt;
   if (Array.isArray(value.stageNumbers)) {
@@ -240,6 +246,7 @@ function validBlockIntent(data) {
   if (data.kind === 'layout') return true;
   if (data.kind === 'gesture') return isBoolean(data.active);
   if (data.kind === 'outside') return ['move','drop','cancel'].includes(data.phase) && isEditKey(data.key) && isRecord(data.point) && Number.isFinite(data.point.x) && Number.isFinite(data.point.y) && Math.abs(data.point.x)<100000 && Math.abs(data.point.y)<100000;
+  if (data.kind === 'context') return isEditKey(data.key) && isRecord(data.point) && isFiniteNumber(data.point.x) && isFiniteNumber(data.point.y) && Math.abs(data.point.x) < 100000 && Math.abs(data.point.y) < 100000;
   if (data.kind === 'select') return isEditKey(data.key);
   if (data.kind === 'padded') return ['columns','box','text','image','fig','column'].includes(data.padKind) && (data.value===null || typeof data.value==='string' && /^-?[0-9.]+px(?: -?[0-9.]+px){0,3}$/.test(data.value));
   return data.kind === 'operation' && isEditKey(data.key) && ['setSize','setPad','setSpace','setColumnWidths','setCoverLayout','setTextOptions','move'].includes(data.name) && JSON.stringify(data).length < 100000;
@@ -399,6 +406,9 @@ function validateEditSelect(params) {
 export function validateParams(method, params) {
   if (!isRecord(params)) params = {};
   switch (method) {
+    case 'setBlackout': return isBoolean(params.value);
+    case 'presentationKey':
+      return ['keydown','keyup'].includes(params.type) && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' ','o','Escape','b','B','Enter','Backspace','0','1','2','3','4','5','6','7','8','9'].includes(params.key) && isBoolean(params.repeat);
     case 'go':
       return isFiniteInteger(params.index, 0, MAX_SLIDES)
         && isFiniteInteger(params.step, 0, MAX_STEPS);
@@ -583,6 +593,7 @@ export function validateEvent(value, expected) {
   if (value.event === 'theme.select') return isRecord(value.data) && value.data.trusted === true && themeKey(value.data.key) && isFiniteInteger(value.data.index,0,MAX_SLIDES) && isSafeString(value.data.sourceVersion,{max:256});
   if (value.event === 'block.intent') return validBlockIntent(value.data);
   if (value.event === 'cover.intent') return validEditEnvelope(value.data) && value.data.trusted === true && ['select','layout','commit'].includes(value.data.kind) && validCoverState(value.data.state);
+  if (value.event === 'toc.select') return isRecord(value.data) && value.data.trusted === true && isSafeString(value.data.sourceVersion,{max:256}) && isBoolean(value.data.selected) && Number.isFinite(value.data.px) && isSafeString(value.data.ink,{allowEmpty:true,max:256}) && isRecord(value.data.colors) && Object.entries(value.data.colors).every(([k,v]) => ['--ink','--accent','--good','--warn','--mark'].includes(k) && isSafeString(v,{allowEmpty:true,max:256}));
   if (value.event === 'text.heading') return isRecord(value.data) && value.data.trusted === true && isSafeString(value.data.sourceVersion,{max:256}) && isRecord(value.data.point) && ['x','y'].every(k=>Number.isFinite(value.data.point[k]));
   if (value.event === 'text.state') return validEditEnvelope(value.data) && validTextState(value.data.state) && isSafeString(value.data.lease, {max:128}) && isSafeString(value.data.sourceVersion, {max:256}) && Number.isSafeInteger(value.data.sequence) && ['input','selection','finished','cell','link'].includes(value.data.kind) && (value.data.html == null || typeof value.data.html === 'string' && value.data.html.length <= 1000000) && JSON.stringify(value.data).length <= 1500000;
   if (value.event === 'edit.layout') return validateEditLayout(value.data);

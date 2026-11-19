@@ -6,14 +6,14 @@ import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
 import {parseArgs} from 'node:util';
-import {Workspace} from '../../packages/core/src/legacy-workspace.js';
-import {render_text} from '../../packages/core/src/legacy-render.js';
+import {Workspace} from '../../packages/core/src/workspace.js';
+import {render_text} from '../../packages/core/src/render.js';
 import {bundleHtml} from '../../packages/core/src/bundle.js';
 import {atomicWriteFile} from '../../packages/core/src/atomic.js';
 import {acquireWorkspaceLock,releaseWorkspaceLock} from '../../packages/core/src/lock.js';
-import {LegacyOutput,output_path} from '../server/legacy-output.js';
-import {sha256} from '../../packages/core/src/source.js';
-import type {LegacyInspect} from '../../packages/contracts/src/legacy-output.js';
+import {LegacyOutput,output_path} from '../server/output.js';
+import {sha256} from '../../packages/core/src/encoding.js';
+import type {LegacyInspect} from '../../packages/contracts/src/output.js';
 import type {RenderResult} from '../../packages/renderer/src/contracts.js';
 
 export async function main(root:string,args:string[]):Promise<number>{

@@ -29,7 +29,7 @@ interface CaseFiles {
 function repoRoot(): string {
   let current = dirname(fileURLToPath(import.meta.url));
   for (;;) {
-    if (existsSync(join(current, "scripts/migration/render-spike.mjs"))) return current;
+    if (existsSync(join(current, "scripts/render-cli.mjs"))) return current;
     const parent = dirname(current);
     if (parent === current) throw new Error("cannot locate the repository root");
     current = parent;
@@ -134,7 +134,7 @@ function runJob(
   const started = Date.now();
   return new Promise<RunResult>((resolve, reject) => {
     const child = spawn(process.execPath, [
-      join(repoRoot(), "scripts/migration/render-spike.mjs"),
+      join(repoRoot(), "scripts/render-cli.mjs"),
       "--job",
       jobPath,
     ], {

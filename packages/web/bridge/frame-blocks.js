@@ -9,6 +9,13 @@ export function createFrameBlocks(win,doc,{getSourceVersion,sendEvent}){
  let swallow=false;doc.addEventListener('click',e=>{if(swallow){e.preventDefault();e.stopImmediatePropagation();swallow=false;}},true);
  const emit=(kind,values)=>{if(config?.live&&sourceVersion===getSourceVersion())sendEvent('block.intent',{sourceVersion,sequence:++sequence,trusted:true,kind,...values});};
  new win.MutationObserver(()=>emit('gesture',{active:host.hasAttribute('data-operating')})).observe(host,{attributes:true,attributeFilter:['data-operating']});
+ doc.addEventListener('contextmenu', event => {
+  if (!event.isTrusted || !config?.live || sourceVersion !== getSourceVersion() || event.target.closest?.('input,textarea,[contenteditable=true],.slide-studio-controls')) return;
+  const key = event.target.closest?.('[data-slide-studio]')?.dataset.slideStudio;
+  if (!key || !op.find(st,key)) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  emit('context',{key,point:{x:event.clientX,y:event.clientY}});
+ },true);
  const apply=(name,key,value)=>emit('operation',{name,key,value});
  const frame={getBoundingClientRect:()=>({left:0,top:0,right:win.innerWidth,bottom:win.innerHeight,width:win.innerWidth,height:win.innerHeight})};
  const env=()=>({win,edit,frame,st,selected:config?.key,live:!!config?.live,preview:{index:win.deck.index,pageOfSlide:i=>{const page=win.deck.slides[i]?.dataset?.page;return page==null?i:Number(page);}}});

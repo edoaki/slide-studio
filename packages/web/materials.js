@@ -93,7 +93,8 @@ export function makeMaterials(ctx) {
     // materials/（押すとパソコンのフォルダの画面で開く）・入る先・［新しいフォルダ］［ファイルを追加］［フォルダを追加］
     const top = document.createElement('div'); top.className = 'mt-top';
     const where = tip(document.createElement('button'), M.reveal); where.type = 'button'; where.className = 'mt-where'; where.dataset.act = 'reveal';
-    where.innerHTML = `${svg('folder')}<span>materials/</span>`;
+    where.innerHTML = svg('folder');
+    where.append(Object.assign(document.createElement('span'), { textContent: M.root }));
     const into = document.createElement('span'); into.className = 'mt-into';
     top.append(where, into, Object.assign(document.createElement('span'), { className: 'grow' }),
       tool('folder', 'folderPlus', M.newFolder), tool('files', 'upload', M.addFiles), tool('dir', 'folderUp', M.addFolder));

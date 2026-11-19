@@ -1,31 +1,46 @@
 // ページの縮小画像と step めくり（ページの帯・一覧で共通）。カーソルの横の位置で step を選ぶ（ホームの一覧のページめくりと同じ）。
 // shots()：ページごとの各 step の画像の URL。restStep(i)：カーソルが乗っていないときに出す step。
-// 画像はサーバーが描画のたびに裏で撮る（shots.py）。まだ無いページはページ名で出す。
+// 画像はサーバーが描画のたびに裏で撮る。一度も読み込めていないページはページ名で出す。
 export function shotThumbs(host, shots, restStep) {
   const urlsOf = b => shots()[+b.dataset.index] || [];
+  const pending = new WeakMap(), failed = new WeakMap();
   function show(b, k) {
-    const urls = urlsOf(b), img = b.querySelector('img.shot');
-    if (!img) return;
+    const urls = urlsOf(b);
     k = Math.max(0, Math.min(urls.length - 1, k));
     const url = urls[k] || urls[0];
-    if (url && img.getAttribute('src') !== url) img.src = url;
+    // 再撮影中・取得失敗時も、表示できている画像を残す。
+    if (!url || b.querySelector('img.shot')?.getAttribute('src') === url) {
+      pending.delete(b);
+    } else if (pending.get(b)?.url !== url && failed.get(b) !== url) {
+      const img = Object.assign(new Image(), { className: 'shot', alt: '', draggable: false, decoding: 'async' });
+      const request = { url, img };
+      pending.set(b, request);
+      img.src = url;
+      // DOM に入れる前にデコードする。連続変更で後着した古い画像は出さない。
+      img.decode().then(() => {
+        if (pending.get(b) !== request || !host.contains(b)) return;
+        pending.delete(b);
+        const previous = b.querySelector('img.shot');
+        if (previous) previous.replaceWith(img);
+        else b.prepend(img);
+        b.classList.add('has-shot');
+      }).catch(() => {
+        if (pending.get(b) === request) { pending.delete(b); failed.set(b, url); }
+      });
+    }
     b.querySelectorAll('.steps i').forEach((t, j) => t.classList.toggle('on', j === k));
   }
-  // ボタンに画像・step の目盛りを付ける（作り直したとき・画像が届いたとき）
+  // ボタンと読み込み済みの画像・step の目盛りを再利用する。
   function decorate() {
     host.querySelectorAll('button[data-index]').forEach(b => {
-      const urls = urlsOf(b), n = urls.length;
-      let img = b.querySelector('img.shot');
-      b.querySelector('.steps')?.remove();
-      if (!urls.some(Boolean)) { img?.remove(); b.classList.remove('has-shot'); return; }
-      if (!img) {
-        img = Object.assign(document.createElement('img'), { className: 'shot', alt: '', draggable: false, decoding: 'async' });
-        // 読み込めた画像だけを出す（届く前・読めないときはページ名のまま）
-        img.onload = () => b.classList.add('has-shot');
-        img.onerror = () => b.classList.remove('has-shot');
-        b.prepend(img);
+      const n = urlsOf(b).length;
+      failed.delete(b);
+      const steps = b.querySelector('.steps');
+      if (n <= 1) steps?.remove();
+      else if (steps?.children.length !== n) {
+        steps?.remove();
+        b.insertAdjacentHTML('beforeend', `<span class="steps" aria-hidden="true">${'<i></i>'.repeat(n)}</span>`);
       }
-      if (n > 1) b.insertAdjacentHTML('beforeend', `<span class="steps" aria-hidden="true">${'<i></i>'.repeat(n)}</span>`);
       show(b, b.dataset.step != null ? +b.dataset.step : restStep(+b.dataset.index));
     });
   }

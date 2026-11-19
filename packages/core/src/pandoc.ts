@@ -1,26 +1,80 @@
+/**
+ * Native sandboxed Pandoc runner.
+ *
+ * The caller supplies the fixed argument list for one conversion, and this
+ * module owns the process, isolated data/home directories, output bounds,
+ * timeouts, and clean shutdown.
+ *
+ * Security properties:
+ * - `--sandbox` is always prepended and cannot be removed by the caller.
+ * - Caller arguments are an exact allowlist; sandbox/data-dir overrides,
+ *   filters, defaults, outputs, positional inputs and `--` are rejected.
+ * - Pandoc is spawned with `shell: false`; no command string is ever built.
+ * - `PATH`, `HOME`, XDG and temporary variables are replaced with isolated
+ *   values; the caller's environment is not inherited.
+ * - The source document never chooses a filter. Callers pass only absolute,
+ *   validated workspace/packaged paths.
+ */
+
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { delimiter, isAbsolute, join, resolve } from "node:path";
 import { CoreError } from "./errors.js";
 
-export const PANDOC_TIMEOUT_MS = 30_000;
-const MAX_STDOUT_BYTES = 32 * 1024 * 1024;
-const MAX_STDERR_BYTES = 1024 * 1024;
+/** Legacy one-shot conversions use the same 60-second budget as Python. */
+export const PANDOC_TIMEOUT_MS = 60_000;
+export const MAX_STDOUT_BYTES = 32 * 1024 * 1024;
+export const MAX_STDERR_BYTES = 1024 * 1024;
 
-export interface PandocPaths {
+export interface RunPandocOptions {
+  /** Absolute path to the bundled or test Pandoc executable. */
   pandocPath: string;
-  luaFilter: string;
-  csl: string;
-  dataDirectory: string;
-  temporaryDirectory: string;
+  /** Absolute working directory (the deck folder for legacy rendering). */
+  cwd: string;
+  /** Optional caller-owned isolated directory. A unique directory is used when omitted. */
+  temporaryDirectory?: string;
+  /** Hard wall-clock limit. Defaults to {@link PANDOC_TIMEOUT_MS}. */
+  timeoutMs?: number;
 }
 
-interface ActiveProcess {
+export interface RunPandocResult {
+  stdout: string;
+  stderr: string;
+}
+
+/** Pandoc exited with a non-zero status. The complete output remains available. */
+export class PandocError extends CoreError {
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly exitCode: number | null;
+  readonly signal: NodeJS.Signals | null;
+
+  constructor(
+    stdout: string,
+    stderr: string,
+    exitCode: number | null,
+    signal: NodeJS.Signals | null,
+  ) {
+    const detail = stderr.trim()
+      || (exitCode === null ? `Pandoc was terminated by ${signal ?? "a signal"}` : `Pandoc exited with ${exitCode}`);
+    super("RENDER_FAILED", detail);
+    this.name = "PandocError";
+    this.stdout = stdout;
+    this.stderr = stderr;
+    this.exitCode = exitCode;
+    this.signal = signal;
+  }
+}
+
+interface ActiveRun {
   child: ChildProcess;
   exited: Promise<void>;
-  kill: () => void;
+  cancel: () => void;
 }
+
+const ACTIVE = new Set<ActiveRun>();
 
 function killGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   const pid = child.pid;
@@ -29,7 +83,7 @@ function killGroup(child: ChildProcess, signal: NodeJS.Signals): void {
       process.kill(-pid, signal);
       return;
     } catch {
-      // Fall through when the group has already gone away.
+      // The process group has already gone away; fall through to child.kill.
     }
   }
   try {
@@ -41,7 +95,9 @@ function killGroup(child: ChildProcess, signal: NodeJS.Signals): void {
 
 function childEnvironment(temporaryDirectory: string): NodeJS.ProcessEnv {
   // Only OS-essential values are passed through. LUA_PATH, DYLD_*, secrets and
-  // the launching terminal's locale must not change Pandoc's behaviour.
+  // the launching terminal's locale must not change Pandoc's behaviour. The
+  // packaged filter uses no require/dofile/loadfile, so there is no Lua search
+  // path to expose.
   const env: NodeJS.ProcessEnv = {
     PATH: "/usr/bin:/bin",
     LANG: "en_US.UTF-8",
@@ -69,53 +125,153 @@ function childEnvironment(temporaryDirectory: string): NodeJS.ProcessEnv {
   return env;
 }
 
-/** Runs one bounded Pandoc process at a time and owns its process group. */
-export class PandocRunner {
-  readonly #paths: PandocPaths;
-  #active: ActiveProcess | null = null;
-  #closed = false;
-  #closing: Promise<void> | null = null;
+async function prepareEnvironment(temporaryDirectory: string): Promise<void> {
+  await mkdir(join(temporaryDirectory, "home"), { recursive: true });
+  await mkdir(join(temporaryDirectory, "tmp"), { recursive: true });
+  await mkdir(join(temporaryDirectory, "xdg", "data"), { recursive: true });
+  await mkdir(join(temporaryDirectory, "xdg", "config"), { recursive: true });
+  await mkdir(join(temporaryDirectory, "xdg", "cache"), { recursive: true });
+  await mkdir(join(temporaryDirectory, "xdg", "state"), { recursive: true });
+  await mkdir(join(temporaryDirectory, "xdg", "run"), { recursive: true });
+  await mkdir(join(temporaryDirectory, "data"), { recursive: true });
+}
 
-  constructor(paths: PandocPaths) {
-    this.#paths = paths;
+function validateOptions(options: RunPandocOptions): number {
+  if (typeof options.pandocPath !== "string" || !isAbsolute(options.pandocPath)) {
+    throw new CoreError("INVALID_INPUT", "pandocPath must be an absolute path");
   }
-
-  get closed(): boolean {
-    return this.#closed;
+  if (typeof options.cwd !== "string" || !isAbsolute(options.cwd)) {
+    throw new CoreError("INVALID_INPUT", "Pandoc cwd must be an absolute path");
   }
+  if (options.temporaryDirectory !== undefined) {
+    if (typeof options.temporaryDirectory !== "string" || !isAbsolute(options.temporaryDirectory)) {
+      throw new CoreError("INVALID_INPUT", "temporaryDirectory must be an absolute path");
+    }
+  }
+  const timeoutMs = options.timeoutMs ?? PANDOC_TIMEOUT_MS;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new CoreError("INVALID_INPUT", "Pandoc timeout must be a positive number of milliseconds");
+  }
+  return timeoutMs;
+}
 
-  async run(body: string, cwd: string, extraArguments: string[]): Promise<{ stdout: string; stderr: string }> {
-    if (this.#closed) throw new CoreError("BUSY", "workspace is closing");
-    if (this.#active !== null) throw new CoreError("BUSY", "another Pandoc render is already running");
-    await this.#prepareEnvironment();
-    if (this.#closed) throw new CoreError("BUSY", "workspace is closing");
+const FORMAT_VALUE = /^[A-Za-z0-9_+.-]+$/u;
+const METADATA_KEYS = new Set([
+  "citation-abbreviations",
+  "link-citations",
+  "suppress-bibliography",
+]);
 
-    const args = [
+function invalidArgument(argument: string): never {
+  throw new CoreError("INVALID_INPUT", `Pandoc argument is not allowed: ${argument}`);
+}
+
+function requireValue(args: string[], index: number, flag: string): string {
+  const value = args[index];
+  if (value === undefined) {
+    throw new CoreError("INVALID_INPUT", `Pandoc argument ${flag} requires a value`);
+  }
+  return value;
+}
+
+/**
+ * The caller's argument list is an exact allowlist. Pandoc accepts abbreviations
+ * (`--sand=false`) and last-one-wins options, so validating only the prepended
+ * flags would let a caller disable the sandbox or add filters/defaults/outputs.
+ */
+function validateArguments(args: string[]): void {
+  let index = 0;
+  while (index < args.length) {
+    const argument = args[index]!;
+    if (argument === "--from" || argument === "--to") {
+      const value = requireValue(args, index + 1, argument);
+      if (value.startsWith("-") || !FORMAT_VALUE.test(value)) {
+        invalidArgument(`${argument} ${value}`);
+      }
+      index += 2;
+      continue;
+    }
+    if (argument === "--mathml" || argument === "--citeproc" || argument === "--wrap=none") {
+      index += 1;
+      continue;
+    }
+    if (argument === "-M") {
+      const assignment = requireValue(args, index + 1, argument);
+      const separator = assignment.indexOf("=");
+      const key = separator < 0 ? "" : assignment.slice(0, separator);
+      if (!METADATA_KEYS.has(key)) invalidArgument(`${argument} ${assignment}`);
+      if (key === "citation-abbreviations") {
+        const value = assignment.slice(separator + 1);
+        if (!isAbsolute(value)) invalidArgument(`${argument} ${assignment}`);
+      }
+      index += 2;
+      continue;
+    }
+    if (argument === "--lua-filter" || argument === "--csl" || argument === "--bibliography") {
+      const value = requireValue(args, index + 1, argument);
+      if (!isAbsolute(value)) invalidArgument(`${argument} ${value}`);
+      index += 2;
+      continue;
+    }
+    if (argument === "--resource-path") {
+      const value = requireValue(args, index + 1, argument);
+      const parts = value.split(delimiter);
+      if (parts.length === 0 || parts.some((part) => !isAbsolute(part))) {
+        invalidArgument(`${argument} ${value}`);
+      }
+      index += 2;
+      continue;
+    }
+    invalidArgument(argument);
+  }
+}
+
+/**
+ * Run one Pandoc conversion with bounded output and isolated state.
+ *
+ * The fixed `--sandbox` flag is always the first argument. The remaining
+ * arguments must match the allowlist above and derive paths from validated
+ * absolute locations.
+ */
+export async function run_pandoc(
+  input: string,
+  args: string[],
+  options: RunPandocOptions,
+): Promise<RunPandocResult> {
+  const timeoutMs = validateOptions(options);
+  if (!Array.isArray(args) || args.some((argument) =>
+    typeof argument !== "string" || argument.includes("\u0000"))) {
+    throw new CoreError("INVALID_INPUT", "Pandoc arguments must be NUL-free strings");
+  }
+  validateArguments(args);
+
+  const ownsTemporary = options.temporaryDirectory === undefined;
+  const temporaryDirectory = ownsTemporary
+    ? await mkdtemp(join(tmpdir(), "slide-studio-pandoc-"))
+    : resolve(options.temporaryDirectory!);
+  const dataDirectory = join(temporaryDirectory, "data");
+
+  try {
+    await prepareEnvironment(temporaryDirectory);
+    const pandocArguments = [
       "--sandbox",
-      "--data-dir", this.#paths.dataDirectory,
-      "--from", "markdown-yaml_metadata_block-pandoc_title_block+fenced_divs+tex_math_dollars",
-      "--to", "html5",
-      "--mathml",
-      "--wrap=none",
-      "--lua-filter", this.#paths.luaFilter,
-      "--citeproc",
-      "--csl", this.#paths.csl,
-      ...extraArguments,
+      "--data-dir", dataDirectory,
+      ...args,
     ];
 
-    return new Promise((resolve, reject) => {
+    return await new Promise<RunPandocResult>((resolvePromise, rejectPromise) => {
       let child: ChildProcess;
       try {
-        child = spawn(this.#paths.pandocPath, args, {
-          cwd,
-          env: childEnvironment(this.#paths.temporaryDirectory),
+        child = spawn(options.pandocPath, pandocArguments, {
+          cwd: options.cwd,
+          env: childEnvironment(temporaryDirectory),
           shell: false,
           windowsHide: true,
           detached: process.platform !== "win32",
           stdio: ["pipe", "pipe", "pipe"],
         });
       } catch (error) {
-        reject(new CoreError("RENDER_FAILED", `cannot start Pandoc: ${String(error)}`));
+        rejectPromise(new CoreError("RENDER_FAILED", `cannot start Pandoc: ${String(error)}`));
         return;
       }
 
@@ -125,17 +281,18 @@ export class PandocRunner {
       let stderrBytes = 0;
       let overflow = false;
       let timedOut = false;
+      let cancelled = false;
       let settled = false;
       let killTimer: ReturnType<typeof setTimeout> | undefined;
       let timeout: ReturnType<typeof setTimeout> | undefined;
-      const hardKill = () => {
+
+      const hardKill = (): void => {
         if (killTimer === undefined) {
           killTimer = setTimeout(() => killGroup(child, "SIGKILL"), 1_500);
           killTimer.unref?.();
         }
       };
-
-      const kill = () => {
+      const kill = (): void => {
         killGroup(child, "SIGTERM");
         hardKill();
       };
@@ -144,23 +301,31 @@ export class PandocRunner {
       const exited = new Promise<void>((done) => {
         markExited = done;
       });
-      this.#active = { child, exited, kill };
+      const active: ActiveRun = {
+        child,
+        exited,
+        cancel: () => {
+          cancelled = true;
+          kill();
+        },
+      };
+      ACTIVE.add(active);
 
       const finish = (error?: CoreError): void => {
         if (settled) return;
         settled = true;
         if (timeout) clearTimeout(timeout);
         if (killTimer) clearTimeout(killTimer);
-        if (this.#active?.child === child) this.#active = null;
+        ACTIVE.delete(active);
         markExited();
-        if (error) reject(error);
-        else resolve({ stdout, stderr });
+        if (error) rejectPromise(error);
+        else resolvePromise({ stdout, stderr });
       };
 
       timeout = setTimeout(() => {
         timedOut = true;
         kill();
-      }, PANDOC_TIMEOUT_MS);
+      }, timeoutMs);
       timeout.unref?.();
 
       child.stdout?.setEncoding("utf8");
@@ -191,7 +356,14 @@ export class PandocRunner {
       });
       child.on("close", (code, signal) => {
         if (timedOut) {
-          finish(new CoreError("RENDER_TIMEOUT", "Pandoc preview timed out after 30 seconds"));
+          finish(new CoreError(
+            "RENDER_TIMEOUT",
+            `Pandoc timed out after ${timeoutMs} milliseconds`,
+          ));
+          return;
+        }
+        if (cancelled) {
+          finish(new CoreError("BUSY", "Pandoc was cancelled while the workspace was closing"));
           return;
         }
         if (overflow) {
@@ -199,8 +371,7 @@ export class PandocRunner {
           return;
         }
         if (code !== 0) {
-          const detail = stderr.trim() || `Pandoc exited with ${signal ?? code}`;
-          finish(new CoreError("RENDER_FAILED", detail));
+          finish(new PandocError(stdout, stderr, code, signal));
           return;
         }
         finish();
@@ -213,32 +384,26 @@ export class PandocRunner {
       child.stdin.on("error", () => {
         // The process may have been killed before consuming stdin.
       });
-      child.stdin.end(body);
+      child.stdin.end(input);
     });
+  } finally {
+    if (ownsTemporary) {
+      await rm(temporaryDirectory, { recursive: true, force: true }).catch(() => undefined);
+    }
   }
+}
 
-  async close(): Promise<void> {
-    if (this.#closing) return this.#closing;
-    this.#closed = true;
-    this.#closing = (async () => {
-      const active = this.#active;
-      if (active) {
-        active.kill();
-        await active.exited;
-      }
-    })();
-    return this.#closing;
-  }
-
-  async #prepareEnvironment(): Promise<void> {
-    const temp = this.#paths.temporaryDirectory;
-    await mkdir(join(temp, "home"), { recursive: true });
-    await mkdir(join(temp, "tmp"), { recursive: true });
-    await mkdir(join(temp, "xdg", "data"), { recursive: true });
-    await mkdir(join(temp, "xdg", "config"), { recursive: true });
-    await mkdir(join(temp, "xdg", "cache"), { recursive: true });
-    await mkdir(join(temp, "xdg", "state"), { recursive: true });
-    await mkdir(join(temp, "xdg", "run"), { recursive: true });
-    await mkdir(this.#paths.dataDirectory, { recursive: true });
-  }
+/**
+ * Terminate every Pandoc process started by this module.
+ *
+ * This is called by the host during shutdown (and by tests). It does not
+ * permanently close the module: a later explicit conversion can start again.
+ */
+export async function close_pandoc(): Promise<void> {
+  const running = [...ACTIVE];
+  for (const active of running) active.cancel();
+  await Promise.all(running.map((active) => active.exited));
+  // Do not clear ACTIVE: a run may have started while we were waiting, and a
+  // second close must still be able to cancel it. `finish` removes completed
+  // runs individually.
 }

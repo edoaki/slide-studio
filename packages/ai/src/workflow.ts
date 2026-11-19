@@ -1,12 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import type { Workspace } from '../../core/src/legacy-workspace.js';
+import type { Workspace } from '../../core/src/workspace.js';
 import { atomicWriteFile } from '../../core/src/atomic.js';
-import { merge3, touched } from '../../core/src/legacy-edit-scope.js';
-import { ACTIVE, attachments, type ChatRound, type ChatStore, type ChatTab } from '../../core/src/legacy-chat-store.js';
-import * as roles from '../../core/src/legacy-ai-roles.js';
-import * as snapshots from '../../core/src/legacy-snapshot.js';
+import { merge3, touched } from '../../core/src/edit-scope.js';
+import { ACTIVE, attachments, type ChatRound, type ChatStore, type ChatTab } from '../../core/src/chat-store.js';
+import * as roles from '../../core/src/ai-roles.js';
+import * as snapshots from '../../core/src/snapshot.js';
 import { cleanItems, prompt, type Item } from './context.js';
 import type { AIStatus } from './status.js';
 import { runNative, schema, type NativeOptions, type RunEvent } from './native.js';

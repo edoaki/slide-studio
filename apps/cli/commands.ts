@@ -1,15 +1,15 @@
 import { parseArgs } from 'node:util';
 import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import type { Workspace } from '../../packages/core/src/legacy-workspace.js';
-import { new_figure } from '../../packages/core/src/legacy-figures.js';
-import { import_deck } from '../../packages/core/src/legacy-importer.js';
-import { sha256 } from '../../packages/core/src/source.js';
-import { LegacyOutput } from '../server/legacy-output.js';
-import type { LegacyInspect } from '../../packages/contracts/src/legacy-output.js';
-import type { LegacyFeatureRequest } from '../../packages/contracts/src/legacy.js';
+import type { Workspace } from '../../packages/core/src/workspace.js';
+import { new_figure } from '../../packages/core/src/figures.js';
+import { import_deck } from '../../packages/core/src/importer.js';
+import { sha256 } from '../../packages/core/src/encoding.js';
+import { LegacyOutput } from '../server/output.js';
+import type { LegacyInspect } from '../../packages/contracts/src/output.js';
+import type { LegacyFeatureRequest } from '../../packages/contracts/src/server.js';
 import { request } from '../../packages/ai/src/bridge.js';
-import * as audit from '../server/legacy-audit.js';
+import * as audit from '../server/audit.js';
 
 export const HELP = `Slide Studio
 

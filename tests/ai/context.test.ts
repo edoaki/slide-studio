@@ -3,8 +3,8 @@ import test from 'node:test';
 import {mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {Workspace} from '../../packages/core/src/legacy-workspace.js';
-import {new_figure} from '../../packages/core/src/legacy-figures.js';
+import {Workspace} from '../../packages/core/src/workspace.js';
+import {new_figure} from '../../packages/core/src/figures.js';
 import {cleanItems,prompt} from '../../packages/ai/src/context.js';
 
 test('HTML editing guidance reaches whole-deck, page and figure-step requests while preserving target scope',async t=>{

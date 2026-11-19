@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
 import {_electron, type ElectronApplication} from 'playwright-core';
-import {Workspace} from '../../packages/core/src/legacy-workspace.js';
+import {Workspace} from '../../packages/core/src/workspace.js';
 
 const run = promisify(execFile);
 const installed = process.env.SLIDE_STUDIO_LIFECYCLE_APP;

@@ -1,6 +1,7 @@
 // 自動生成する目次の表示と配置。原稿の変更は履歴・保存の共通経路を通す。
 import { S } from './strings.js';
 import { structureOf } from './structure.js';
+import { makeTextFormat } from './text-format.js';
 
 export function makeTocSettings(ctx) {
   const el = document.createElement('div');
@@ -24,6 +25,9 @@ export function makeTocSettings(ctx) {
     toggle.checked = !!p && !p.classes.includes('toc-off');
     layout = p?.classes.includes('toc-columns') ? 'columns' : 'vertical';
     toggle.disabled = ctx.locked;
+    attrs = p?.kv ?? {};
+    if (!toggle.checked || ctx.locked) clear();
+    format.update(); updatePadding();
     for (const button of layouts) {
       button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
       button.disabled = ctx.locked || !toggle.checked;
@@ -47,12 +51,82 @@ export function makeTocSettings(ctx) {
     ctx.setText(next);
     refresh();
   }
-  toggle.onchange = change;
+  toggle.onchange = () => change();
   for (const button of layouts) button.onclick = () => {
     if (button.disabled || button.dataset.layout === layout) return;
     layout = button.dataset.layout;
     change();
   };
+  const host = ctx.root.querySelector('#viewport'), bar = document.createElement('div');
+  bar.className = 'toolbar toc-text-tools'; bar.hidden = true;
+  bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', S.fmt.bar); host.append(bar);
+  let attrs = {}, colors = {}, shown = { px: 30, ink: '' }, chosen = false, client = null, off = null;
+  const canEdit = () => !ctx.locked && !ctx.conflict && ctx.renderOk && !ctx.blocks?.editing;
+  function clear() { chosen = false; bar.hidden = true; format.close(); }
+  function place() { bar.style.left = `${Math.max(4, (host.clientWidth - bar.offsetWidth) / 2)}px`; bar.style.top = '8px'; }
+  async function save(patch) {
+    if (!chosen || !canEdit()) return;
+    const text = ctx.text, st = await structureOf(text);
+    if (dead || text !== ctx.text || !chosen || !canEdit()) return;
+    const p = st.pages.find(p => p.generated === 'toc'); if (!p) return;
+    const head = text.slice(p.start, p.head_end).replace(/(^ {0,3}:{3,}[ \t]*\{)([^}]*)(\})/m, (_, start, values, end) => {
+      for (const [key, value] of Object.entries(patch)) {
+        values = values.replace(new RegExp(`\\s+${key}=(?:"[^"]*"|'[^']*'|[^\\s}]+)`, 'g'), '');
+        if (value != null) values += ` ${key}="${value}"`;
+      }
+      return start + values + end;
+    });
+    ctx.setText(text.slice(0, p.start) + head + text.slice(p.head_end));
+    await refresh();
+  }
+  const px = () => Number(attrs['toc-size']) || shown.px;
+  const format = makeTextFormat(() => null, null, {
+    formatState: () => ({ px: px(), ink: colors[`--${attrs['toc-color'] === 'highlight' ? 'mark' : attrs['toc-color']}`] || attrs['toc-color'] || shown.ink, color: attrs['toc-color'] }),
+    colors: () => colors, align: () => 'left',
+    size: value => { if (Number.isFinite(value) && value >= 8 && value <= 200) save({ 'toc-size': value }); },
+    stepSize: delta => save({ 'toc-size': Math.min(200, Math.max(8, px() + delta * 2)) }),
+    color: value => save({ 'toc-color': value }),
+    clearFormat: () => { shown = { px: 30, ink: colors['--ink'] }; save({ 'toc-size': null, 'toc-color': null }); },
+    focus() {}, finish: clear,
+  });
+  format.plain(true); format.cell(true); bar.append(...format.nodes);
+  const paddingLabel = document.createElement('label'), padding = document.createElement('input');
+  paddingLabel.className = 'toc-padding'; paddingLabel.append(S.toc.paddingLabel);
+  padding.type = 'number'; padding.min = '0'; padding.max = '100'; padding.step = '1'; padding.className = 'fmt-size';
+  padding.setAttribute('aria-label', S.toc.padding); padding.title = S.toc.padding;
+  paddingLabel.append(padding); bar.append(paddingLabel);
+  function updatePadding() { padding.value = String(attrs['toc-padding'] ?? 16); }
+  function savePadding() {
+    const value = padding.valueAsNumber;
+    if (!Number.isFinite(value) || value < 0 || value > 100) { updatePadding(); return; }
+    if (value !== Number(attrs['toc-padding'] ?? 16)) save({ 'toc-padding': value });
+  }
+  padding.addEventListener('change', savePadding);
+  padding.addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); savePadding(); }
+  });
+  function attach() {
+    const next = ctx.preview.client; if (!next || client === next) return;
+    off?.(); client = next;
+    const offSelect = client.on('toc.select', event => {
+      if (event.sourceVersion !== ctx.preview.sourceVersion) return;
+      if (!event.selected || !canEdit()) { clear(); return; }
+      ctx.blocks?.select(null); chosen = true; colors = event.colors; shown = { px: event.px, ink: event.ink };
+      bar.hidden = false; format.update(); updatePadding(); place();
+    });
+    const offKey = client.on('edit.intent', event => {
+      if (event.sourceVersion === ctx.preview.sourceVersion && event.kind === 'key' && event.code === 'Escape') clear();
+    });
+    off = () => { offSelect(); offKey(); };
+  }
+  const outside = event => { if (!bar.contains(event.target)) clear(); };
+  const key = event => { if (event.key === 'Escape') clear(); };
+  host.addEventListener('pointerdown', outside); window.addEventListener('keydown', key);
+  const resize = new ResizeObserver(place); resize.observe(host);
   refresh();
-  return { textChanged: refresh, slideChanged: refresh, destroy() { dead = true; } };
+  return {
+    textChanged: refresh, previewLoaded() { attach(); refresh(); },
+    slideChanged() { clear(); refresh(); },
+    destroy() { dead = true; off?.(); resize.disconnect(); host.removeEventListener('pointerdown', outside); window.removeEventListener('keydown', key); format.destroy(); bar.remove(); },
+  };
 }

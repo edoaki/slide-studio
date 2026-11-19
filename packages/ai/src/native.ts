@@ -1,8 +1,8 @@
 import { join } from 'node:path';
-import type { Workspace } from '../../core/src/legacy-workspace.js';
+import type { Workspace } from '../../core/src/workspace.js';
 import { readAsset } from '../../core/src/assets.js';
-import type { RoleId } from '../../core/src/legacy-ai-roles.js';
-import { Providers,type ProviderId } from './providers.js';
+import type { RoleId } from '../../core/src/ai-roles.js';
+import { Providers,assertCallable,type ProviderId } from './providers.js';
 import { execute } from './process.js';
 import { runCodex } from './codex-run.js';
 import type { JsonObject } from './app-server.js';
@@ -19,6 +19,7 @@ export function schema(role:RoleId):JsonObject|null{
 }
 function toml(value:unknown):string{if(object(value))return '{'+Object.entries(value).map(([k,v])=>JSON.stringify(k)+' = '+toml(v)).join(', ')+'}';return JSON.stringify(value);}
 export function nativeArgs(id:ProviderId,ws:Workspace,o:NativeOptions){
+ assertCallable(id);
  const protectedPaths=['snapshots','chat'].map(name=>join(ws.state,name)),output=o.outputSchema===undefined?schema(o.role):o.outputSchema;
  if(id==='codex'){const config:JsonObject={web_search:o.web?'live':'disabled'};if(!o.readonly)Object.assign(config,{default_permissions:'slide-studio','permissions.slide-studio.extends':':workspace','permissions.slide-studio.filesystem':Object.fromEntries(protectedPaths.map(p=>[p,'read']))});return ['app-server','--listen','stdio://',...Object.entries(config).flatMap(([key,value])=>['-c',`${key}=${toml(value)}`])];}
  if(id==='claude'){
@@ -26,10 +27,10 @@ export function nativeArgs(id:ProviderId,ws:Workspace,o:NativeOptions){
   const args=['-p','--output-format','stream-json','--verbose','--permission-mode',o.readonly?'default':'acceptEdits','--setting-sources','project','--settings',JSON.stringify(settings),'--model',o.model];
   if(o.web)args.push('--allowedTools','WebSearch,WebFetch');const denied=[...(o.readonly?['Edit','Write','NotebookEdit']:[]),...(!o.web?['WebSearch','WebFetch']:[])];if(denied.length)args.push('--disallowedTools',denied.join(','));if(o.effort)args.push('--effort',o.effort);if(o.session)args.push('--resume',o.session);if(output)args.push('--json-schema',JSON.stringify(output));return [...args,'--',o.prompt];
  }
- const deny=['mcp(*)',...(o.readonly?['write_file(*)','command(*)']:protectedPaths.map(p=>`write_file(${p}/**)`)),...(!o.web?['read_url(*)']:[])];
- const args=['--output-format','stream-json','--mode',o.readonly?'plan':'accept-edits','--sandbox','--settings',JSON.stringify({toolPermission:'proceed-in-sandbox',permissions:{allow:o.web?['read_url(*)']:[],deny}}),'--model',o.model+(o.effort?'-'+o.effort:'')];if(output)args.push('--json-schema',JSON.stringify(output));if(o.session)args.push('--conversation',o.session);return [...args,'-p',o.prompt];
+ throw Error('未対応の AI です');
 }
 export async function runNative(providers:Providers,id:ProviderId,ws:Workspace,o:NativeOptions){
+ assertCallable(id);
  const executable=providers.binary(id);if(!executable)throw Error('AI の実行ファイルがありません');const env={...providers.environment(id),SLIDE_STUDIO_HOME:ws.root,SLIDE_STUDIO_SANDBOX:'1'},args=nativeArgs(id,ws,o);
  if(id==='codex'){
   const result=await runCodex({executable,args,cwd:ws.root,env,pool:providers.pool,prompt:o.prompt,model:o.model,effort:o.effort,session:o.session,images:o.images,schema:(o.outputSchema===undefined?schema(o.role):o.outputSchema)??undefined,readonly:o.readonly,signal:o.signal,onSession:session=>o.onEvent({session}),onEvent:event=>{

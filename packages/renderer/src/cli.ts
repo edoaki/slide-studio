@@ -111,12 +111,12 @@ function profileDirectory(): string | undefined {
 let bootstrapError: string | undefined;
 if (!app || !protocol) {
   bootstrapError = "must run inside Electron with ELECTRON_RUN_AS_NODE removed; "
-    + "use scripts/migration/render-spike.mjs";
+    + "use scripts/render-cli.mjs";
 } else {
   const profile = profileDirectory();
   if (!profile) {
     bootstrapError = `${PROFILE_ENV} must be an existing absolute directory created by `
-      + "scripts/migration/render-spike.mjs";
+      + "scripts/render-cli.mjs";
   } else {
     try {
       app.setPath("userData", profile);

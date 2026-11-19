@@ -1,6 +1,6 @@
 import { AppServerClient } from './app-server.js';
 import { execute } from './process.js';
-import { type ProviderId, type Providers } from './providers.js';
+import { assertCallable, type ProviderId, type Providers } from './providers.js';
 import type { Runtime } from './runtime.js';
 
 type State = {status: 'preparing' | 'pending' | 'ready' | 'completed' | 'failed'; error?: string};
@@ -14,6 +14,7 @@ export class Logins {
     return job ? {...job.state, progress: this.runtime(id).progress, retry: !job.done && job.since !== null && Date.now() - job.since >= 5000} : {status: 'idle', retry: false};
   }
   start(id: ProviderId, download = false) {
+    assertCallable(id);
     if (this.closed) throw Error('アプリを終了しています');
     const old = this.jobs.get(id);
     if (old && !old.done && !this.state(id).retry) return this.state(id);

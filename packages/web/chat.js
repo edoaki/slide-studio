@@ -60,7 +60,7 @@ export function makeChat(ctx) {
       <div class="chat-tablist" role="tablist" aria-label="${T.tabs}"></div>
       <div class="chat-actions">
         <button class="ibtn" data-act="add" aria-label="${T.newTab}" title="${T.newTab}">${svg('plus')}</button>
-        <button class="btn sm ghost" data-act="hist" aria-expanded="false" data-tip="${T.openHistory}">${svg('clock')}${T.history}</button>
+        <button class="ibtn" data-act="hist" aria-expanded="false" aria-label="${T.openHistory}" data-tip="${T.openHistory}">${svg('historyList')}</button>
       </div>
       <div class="chat-hist" role="dialog" aria-label="${T.historyTitle}" hidden></div>
     </div>

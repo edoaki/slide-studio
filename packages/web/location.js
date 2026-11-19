@@ -1,10 +1,10 @@
 import { api, esc } from './api.js';
 import { S } from './strings.js';
 const T = S.location;
-const root = document.querySelector('#root');
-root.className = 'location-page';
-root.innerHTML = `<div class="brand">${S.appName}</div><h1>${T.title}</h1><p>${T.hint}</p>
-  <div class="location-current"></div><div class="location-recent"></div>
+export function mountLocation(root, close) {
+root.classList.add('location-page');
+root.innerHTML = `<header class="location-head"><h1 id="location-title">${T.title}</h1>${close ? `<button type="button" class="btn" data-close autofocus>${S.close}</button>` : `<a class="btn" href="/">${T.back}</a>`}</header><p>${T.hint}</p>
+  <div class="location-recent"></div>
   <form><div class="seg" role="group">
     <button type="button" data-mode="new" aria-pressed="true">${T.new}</button>
     <button type="button" data-mode="existing" aria-pressed="false">${T.existing}</button>
@@ -15,6 +15,7 @@ root.innerHTML = `<div class="brand">${S.appName}</div><h1>${T.title}</h1><p>${T
   <div class="error" role="alert"></div><div class="actions">
     <button type="button" data-act="browse" class="btn">${T.browse}</button>
     <button type="submit" class="btn primary">${T.start}</button></div></form>`;
+root.querySelector('[data-close]')?.addEventListener('click', close);
 const form = root.querySelector('form'), input = form.elements.path;
 let mode = 'new', current = null, busy = false;
 // Keep async recent-folder rendering from moving the form during its first click.
@@ -64,12 +65,10 @@ form.addEventListener('submit', async e => {
 const initialBrowse = browse().catch(error);
 
 const initialLocations = api('/api/location').then(data => {
-  if (data.current) {
-    root.querySelector('.location-current').innerHTML = `<p>${T.current}: ${esc(data.current)}</p><a class="btn" href="/">${T.back}</a>`;
-  }
   const recent = root.querySelector('.location-recent');
-  if (data.recent.length) {
-    recent.innerHTML = `<h2>${T.recent}</h2><div class="folder-list">${data.recent.map(path => `<button type="button" class="btn ghost" data-path="${esc(path)}">${esc(path)}</button>`).join('')}</div>`;
+  const paths = data.recent.filter(path => path !== data.current);
+  if (paths.length) {
+    recent.innerHTML = `<h2>${T.recent}</h2><div class="folder-list">${paths.map(path => `<button type="button" class="btn ghost" data-path="${esc(path)}">${esc(path)}</button>`).join('')}</div>`;
     recent.onclick = e => {
       const path = e.target.closest('[data-path]')?.dataset.path;
       if (!path || busy) return;
@@ -81,3 +80,18 @@ const initialLocations = api('/api/location').then(data => {
 }).catch(error);
 
 Promise.allSettled([initialBrowse, initialLocations]).then(() => {form.inert = false; input.disabled = false;});
+
+}
+
+export function openLocationDialog() {
+  if (document.querySelector('dialog.location-dialog')) return;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'location-dialog';
+  dialog.setAttribute('aria-labelledby', 'location-title');
+  document.body.append(dialog);
+  mountLocation(dialog, () => dialog.close());
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  dialog.showModal();
+}
+
+if (location.pathname === '/location') mountLocation(document.querySelector('#root'));

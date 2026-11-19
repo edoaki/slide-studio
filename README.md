@@ -1,68 +1,55 @@
 # Slide Studio
 
-従来のSlide Studioの画面を使う、TypeScript・Electron版です。ソース起動、ブラウザー起動、インストール版で同じ編集画面と保存処理を使います。Python・uvは必要ありません。従来版との全機能・全操作の照合は継続中です。確認済みの範囲と残作業は [検証記録](docs/migration/full-parity-progress.json) に記録しています。
+Markdown（`.qmd`）をベースに、スライド作成・直接編集・発表・HTML／PDF書き出しまでをローカル環境で完結できるデスクトップアプリです。
+
+## 特徴
+
+- **`.qmd` を正本とした編集**：原稿編集とスライド上の直接編集が同期し、未編集の原文を壊さずに保存します。
+- **単一 HTML／PDF 書き出し**：アニメーションを含むオフライン再生可能な単一 HTML と、各ステップの確定状態を収めた PDF を書き出せます。
+- **発表者ビューと投影ウィンドウ**：現在・次のスライド、発表メモ、リハーサルの持ち時間・経過時間を確認しながら、別ウィンドウでスライドのみを投影できます（投影ウィンドウは `F` キーで全画面切替）。
+- **ポータブルな保管フォルダ**：保管フォルダには原稿・図・テーマ・再ビルド用スクリプトをまとめて保存し、アプリなしでも再ビルドできます。
+- **環境構築不要のアプリ版**：Pandoc と描画ランタイムを同梱しており、利用者が Node.js や Pandoc を別途インストールする必要はありません。
 
 ## アプリ版
 
-- macOS（Apple Silicon）：`Slide-Studio-0.1.0-mac-arm64.dmg` を開き、`Slide Studio.app` を Applications にコピーします。
-- macOS（Intel）：`Slide-Studio-0.1.0-mac-x64.dmg` を使います。Intel実機での検証は未実施です。
-- Windows（x64）：`Slide-Studio-0.1.0-win-x64-Setup.exe` を実行します。
-
-インストーラーは下記のビルドコマンドで `release/` に生成します。従来画面を組み込んだDMGをこのMacにインストールし、発表作成、下書き保存、直接編集、プレビュー、HTML／PDF書き出しを確認しています。macOSはアドホック署名、Windowsは未署名です。Apple Developer ID・公証、Windows署名、正式Releaseでの配布は未対応です。WindowsとIntel Macの実機確認は未実施です。Intel版は、このApple Silicon MacのRosetta上で作成・編集・HTML／PDF出力を確認しました。
-
-アプリにはPandocを同梱します。利用者によるNode.js・Python・uv・Pandocのインストールは不要です。
+- **macOS（Apple Silicon）**：`Slide-Studio-<version>-mac-arm64.dmg` を開き、`Slide Studio.app` を `Applications` にコピーします。
+- **macOS（Intel）**：`Slide-Studio-<version>-mac-x64.dmg` を使用します。
+- **Windows（x64）**：`Slide-Studio-<version>-win-x64-Setup.exe` を実行します。
 
 ## ソースから起動
 
-Node.js 24.18.xとnpmを使います。TS・Electron版のソースは、GitHubの `migration/electron` ブランチから取得できます。
+Node.js 24.18.x と npm を使用します。
 
 ```sh
-git clone --branch migration/electron https://github.com/edoaki/slide-studio.git
+git clone https://github.com/edoaki/slide-studio.git
 cd slide-studio
-npm install
+npm ci
 npm start
 ```
 
-初回起動時にPandoc 3.9を公式配布元からダウンロードし、固定したSHA-256と照合します。依存関係とPandocの取得にはネット接続が必要です。その後の基本編集はローカルで動作します。
+初回起動時に Pandoc 3.9 を公式配布元から取得し、固定した SHA-256 と照合します。依存関係と Pandoc の取得後は、基本編集をローカルで行えます。
 
-ホーム画面の「新しい発表」から、タイトル、トピック、テーマを選んで作成します。原稿やスライド上の文字を編集すると保存され、上部の書き出しボタンからHTML／PDFを書き出せます。「保管フォルダ」で別の保存先に切り替えられます。
-
-既存フォルダを指定する場合：
+既存の保管フォルダを指定する場合：
 
 ```sh
 npm start -- --root /absolute/path/to/workspace
 ```
 
-ソース版とインストール版で同じ保管フォルダを指定すれば原稿を共有できます。同じフォルダの書き込みは一つのホストが管理します。起動中のアプリへのCLI検査・相談は、保管フォルダ内の要求ファイルを介して実行します。
-
-ブラウザーで同じ画面を開く場合：
+ブラウザーで同じ編集画面を開く場合：
 
 ```sh
 npm run browser -- --root /absolute/path/to/workspace
 ```
 
-描画・検査・PDF生成には同梱のElectronを使います。別のChromiumをダウンロードする必要はありません。
+## 基本的な使い方
 
-## インストーラーを作る
+- **発表の作成と編集**：ホーム画面の「新しい発表」からタイトル・トピック・テーマを選んで作成します。原稿やスライド上の文字を編集すると自動保存され、上部の書き出しボタンから HTML／PDF を書き出せます。「保管フォルダ」から別の保存先へ切り替えられます。
+- **発表メモ**：スライド上部の開閉欄または発表者ビューで「このスライド」「全体」を切り替えて編集でき、`.qmd` 内の `.note` ブロックに自動保存されます。メモは投影や HTML／PDF 出力には含まれません。
+- **リハーサル**：「リハーサル」で持ち時間を設定して計測を開始すると、残り時間と経過時間を表示します。進捗の分母は `##` のページ数で、初期設定では参考文献の手前までを数えます（最後まで・指定ページまでに変更可能）。
 
-```sh
-npm run dist:mac
-node scripts/package-desktop.mjs --mac --arch x64
-npm run dist:win
-```
+## CLI
 
-`release/` にDMG／EXEと `SHA256SUMS` を生成します。OS別のPandocを自動で取得し、アプリに同梱します。これらのコマンドは公開やRelease作成を行いません。GitHub Actionsの `desktop-build` は手動実行用で、Macの両CPU向けとWindows x64向けを生成します。`verify` はpush・PR時に型検査とテストを実行します。
-
-## 検証とCLI
-
-```sh
-npm test
-npm run typecheck
-npm run test:desktop:e2e
-npm run test:bridge:e2e
-```
-
-発表の作成、従来原稿の取り込み、検査、書き出しには次のCLIを使います。
+発表の作成、既存原稿の取り込み、検査、書き出しをコマンドラインからも実行できます。
 
 ```sh
 npm run cli -- new intro --topic research --root /absolute/path/to/workspace
@@ -73,40 +60,27 @@ npm run cli -- build intro --root /absolute/path/to/workspace
 npm run cli -- --help
 ```
 
-`build` はHTMLとPDFを書き出します。`--html-only` はHTMLだけを選び、`--force` は検査エラーがあっても書き出します。ただし、素材の欠落などで単一HTMLを作れない場合は停止します。AI用の `consult` と、画像・指摘の確認を記録する `audit` も同じCLIに含まれます。
-
-保管フォルダには、アプリなしで再ビルドするためのコードも同梱します。Node.jsとnpmを用意して、そのフォルダで実行できます。初回の準備にはネット接続が必要です。
+- `build` は HTML と PDF を書き出します。`--html-only` で HTML のみ出力、`--force` で検査警告があっても書き出します。
+- 保管フォルダ内では、アプリを使わずに Node.js から直接再ビルドすることもできます（初回のみ `--setup` にネット接続が必要）。
 
 ```sh
 node build.mjs --setup
 node build.mjs --list
-node build.mjs 発表名
+node build.mjs <発表名>
 ```
 
-描画サービス単体の検証には、素材を埋め込んだSlide Studio形式の単一HTMLを使います。ジョブJSONの入力・出力は絶対パス、出力先は未作成のディレクトリを指定します。
-
-```json
-{
-  "schemaVersion": 1,
-  "inputHtml": "/absolute/path/slide-studio/tests/fixtures/render/nco-intro.html",
-  "outputDir": "/absolute/path/new-output",
-  "timeoutMs": 60000,
-  "screenshots": true
-}
-```
+## インストーラーのビルド
 
 ```sh
-npm run render:spike -- --job /absolute/path/render-job.json
+npm run dist:mac
+node scripts/package-desktop.mjs --mac --arch x64
+npm run dist:win
 ```
 
-PDF、各stepのPNG、検査結果の `manifest.json` を保存します。
+OS 別の Pandoc を自動で取得・同梱し、`release/` に DMG／EXE と `SHA256SUMS` を生成します。
 
-## 移行の状況とライセンス
+## ライセンス
 
-PDFの旧版との差分検証と、既存テスト全件との照合は継続中です。AI連携、履歴・復元、直接編集、素材・参考資料・文献・テーマ管理は同じホストに接続しています。実AIの全プロバイダーでの疎通を、テスト用の応答による検証だけで合格にはしていません。従来のPython版は `../slide-studio-old` の `legacy/python` ブランチ（基準コミット `ca1f148`）に保存しています。
-
-ソースは公開リポジトリで提供しますが、現行ライセンスはPolyForm Noncommercial 1.0.0で、OSI定義のOSSではありません。ライセンス変更は行っていません。同梱するPandocのライセンスとソース参照は [NOTICE.md](NOTICE.md) を参照してください。
-
-- [開発ガイド](CONTRIBUTING.md)
-- [移行計画](docs/electron-migration-plan.md)
-- [検証結果と残作業](docs/migration/status.json)
+- 本体ライセンス：[PolyForm Noncommercial 1.0.0](LICENSE)（非商用利用向けライセンスであり、OSI 定義の OSS ではありません）
+- 同梱 Pandoc のライセンスおよびソース参照：[NOTICE.md](NOTICE.md)
+- 開発・テスト・コントリビュート方法：[CONTRIBUTING.md](CONTRIBUTING.md)

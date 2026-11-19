@@ -63,6 +63,7 @@ export class Runtime {
   progress: {done: number; total: number | null} | null = null;
   private pending: Promise<string> | null = null;
   private writes: Promise<void> = Promise.resolve();
+  private versionProbe: {key: string; at: number; result: Promise<string | null>} | null = null;
   constructor(readonly providers: Providers, readonly id: ProviderId, private options: {fetch?: Fetch; release?: (signal?: AbortSignal) => Promise<Release>; accept?: (path: string) => Promise<void>} = {}) {}
   get root() { return join(this.providers.home(this.id), 'runtime'); }
   get busy() { return this.pending !== null; }
@@ -83,9 +84,20 @@ export class Runtime {
       await this.save({latest: release.version, checked: Date.now() / 1000, error: null}); return release;
     } catch (error) { await this.save({error: `${NAMES[this.id]} の最新版を確かめられませんでした。`}); throw error; }
   }
-  info() {
+  private async installedVersion(binary: string, refresh: boolean, signal?: AbortSignal) {
+    let key = binary;
+    try { const file = await stat(binary); key += `:${file.mtimeMs}:${file.size}`; } catch { return null; }
+    if (!refresh && this.versionProbe?.key === key && Date.now() - this.versionProbe.at < 300000) return this.versionProbe.result;
+    const result = execute(binary, ['--version'], {env: this.providers.environment(this.id), signal, timeoutMs: 5000})
+      .then(out => out.code === 0 ? /(?:^|\s)v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)(?=\s|$)/u.exec(`${out.stdout}\n${out.stderr}`)?.[1] ?? null : null)
+      .catch(() => null);
+    this.versionProbe = {key, at: Date.now(), result};
+    return result;
+  }
+  async info(refresh = false, signal?: AbortSignal) {
     const saved = this.state(), binary = this.providers.binary(this.id), managed = !!binary?.startsWith(this.root + '/');
-    return {id: this.id, name: NAMES[this.id], version: managed ? saved.current : null, terminal: !!binary && !managed, fixed: this.overridden, latest: saved.latest, update: !!saved.latest && (!saved.current || saved.latest.localeCompare(saved.current, undefined, {numeric: true}) > 0), previous: saved.previous, auto: saved.auto, busy: this.busy, progress: this.progress, error: saved.error};
+    const version = binary ? managed ? binary.slice(this.root.length + 1).split('/')[0]! : await this.installedVersion(binary, refresh, signal) : null;
+    return {id: this.id, name: NAMES[this.id], version, terminal: !!binary && !managed, fixed: this.overridden, latest: saved.latest, update: !!saved.latest && (!saved.current || saved.latest.localeCompare(saved.current, undefined, {numeric: true}) > 0), previous: saved.previous, auto: saved.auto, busy: this.busy, progress: this.progress, error: saved.error};
   }
   async setAuto(auto: boolean) { if (this.overridden) throw Error('実行ファイルが指定されています'); await this.save({auto}); }
   async rollback() {

@@ -110,10 +110,19 @@ async function paginateReferences() {
     }
     finish();
   }
-  const pages = [...document.querySelectorAll('#stage > .slide')];
-  pages.forEach((s, i) => { s.querySelector('.page-number').textContent = `${i + 1} / ${pages.length}`; });
+
 }
 await paginateReferences();
+const numberedPages = [...document.querySelectorAll('#stage > .slide')];
+numberedPages.forEach((slide, index) => {
+  const number = slide.querySelector('.page-number');
+  if (!number) return;
+  number.textContent = String(index + 1);
+  const total = document.createElement('span');
+  total.className = 'page-number-total';
+  total.textContent = ` / ${numberedPages.length}`;
+  number.append(total);
+});
 const slides = [...document.querySelectorAll('#stage > .slide')], stage = document.querySelector('#stage'), overview = window.__slideStudioNoOverview ? null : document.querySelector('#overview'); // 編集画面は GUI 側の一覧を使う
 let index = 0, step = 0, held = null, timer = null, long = false, lastInput = -Infinity;
 // ページの構造は読み込み中に確定する。step 移動では現在ページだけを触る。
@@ -236,11 +245,32 @@ function paint(animate = false) {
   // 同じ処理内の連続移動では、古い位置のレイアウト・画像待ちを積まない。
   return Promise.resolve().then(() => version === paintVersion ? settle(target) : undefined);
 }
+const presenting = !window.__slideStudioFrameAgentStarted || window.__slideStudioPresent;
+const availableSlides = () => slides.map((slide,i) => i).filter(i => !presenting || document.body.classList.contains('export') || !slides[i].classList.contains('studio-skip'));
+let blackout = false, pageInput = '';
+const blackoutScreen = document.createElement('div');
+blackoutScreen.id = 'studio-blackout'; blackoutScreen.hidden = true;
+blackoutScreen.style.cssText = 'position:fixed;inset:0;background:#000;z-index:2147483646';
+blackoutScreen.onclick = () => setBlackout(false);
+const pageEntry = document.createElement('output'); pageEntry.id = 'studio-page-entry'; pageEntry.hidden = true;
+pageEntry.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 20px;background:#111;color:white;font:32px monospace;z-index:2147483647';
+pageEntry.setAttribute('aria-live','polite'); document.body.append(blackoutScreen,pageEntry);
+function setBlackout(value) {
+  if (blackout === !!value) return;
+  blackout = !!value; blackoutScreen.hidden = !blackout;
+  dispatchEvent(new CustomEvent('deckchange', {detail:{index,step,maxStep:maxStep()}}));
+}
+function inputPage(value) {
+  pageInput = value; pageEntry.textContent = value; pageEntry.hidden = !value;
+  dispatchEvent(new CustomEvent('deckchange', {detail:{index,step,maxStep:maxStep()}}));
+}
 let pageFilter = null;
 function setFilter(indices) { pageFilter = indices?.length ? indices : null; }
 function go(i, n = 0, animate = false) {
-  if (pageFilter && !pageFilter.includes(i)) {
-    i = i > index ? pageFilter.find(k => k >= i) ?? pageFilter.at(-1) : [...pageFilter].reverse().find(k => k <= i) ?? pageFilter[0];
+  const allowed = availableSlides().filter(k => !pageFilter || pageFilter.includes(k));
+  if (!allowed.length) return Promise.resolve();
+  if (!allowed.includes(i)) {
+    i = i >= index ? allowed.find(k => k >= i) ?? allowed.at(-1) : [...allowed].reverse().find(k => k <= i) ?? allowed[0];
   }
   index = Math.max(0, Math.min(slides.length - 1, i));
   const loading = slides[index] && frames(slides[index]).some(f => !completed.has(f));
@@ -278,23 +308,21 @@ function resize(size) {
 function close() { overview.hidden = true; document.querySelector('#menu')?.focus(); }
 function menu() {
   thumbs(); overview.hidden = false;
-  overview.querySelectorAll('.thumb').forEach((b, i) => b.setAttribute('aria-current', String(i === index)));
+  overview.querySelectorAll('.thumb').forEach((b, i) => b.setAttribute('aria-current', String(+b.dataset.index === index)));
   overview.querySelector('#close').focus();
   overview.querySelector('.thumb[aria-current=true]')?.scrollIntoView({ block: 'center', inline: 'center' });
 }
 const grouped = slides.some(s => s.dataset.sectionStart === 'true');
 let row;
 slides.forEach((s, i) => {
+  if (!availableSlides().includes(i)) return;
   if (!overview) return;
   if (!row || s.dataset.sectionStart === 'true') {
-    if (grouped) { const h = document.createElement('h2'); h.textContent = s.dataset.group || '表紙'; overview.append(h); }
     row = document.createElement('div'); row.className = grouped ? 'overview-row' : 'overview-grid'; overview.append(row);
   }
   const b = document.createElement('button'); b.className = 'thumb'; b.dataset.index = i;
-  const num = document.createElement('span'); num.textContent = String(i + 1).padStart(2, '0');
-  const title = s.querySelector('h1,h2')?.textContent || 'Slide', caption = document.createElement('div');
-  caption.className = 'thumb-caption'; caption.append(num, title); b.title = title;
-  b.append(caption);
+  const title = s.querySelector('h1,h2')?.textContent || 'Slide';
+  b.setAttribute('aria-label', `${i + 1}. ${title}`);
   b.onclick = () => { go(i); close(); }; row.append(b);
 });
 // 一覧の縮小画像：初めて開いたときにページを複製して縮める。カーソルの横の位置の step を出し、離れると最後の step に戻す。
@@ -315,7 +343,7 @@ function thumbs() {
   if (thumbsMade || !overview) return; thumbsMade = true;
   const fit = new ResizeObserver(es => es.forEach(e => e.target.style.setProperty('--thumb-scale', e.contentRect.width / 1280)));
   overview.querySelectorAll('.thumb').forEach((b, i) => {
-    const s = slides[i].cloneNode(true);
+    const s = slides[+b.dataset.index].cloneNode(true);
     s.classList.add('active'); s.removeAttribute('aria-hidden');
     copies.set(b, partsOf(s));
     s.querySelectorAll('iframe').forEach(f => {
@@ -412,8 +440,20 @@ addEventListener('keydown', e => {
     if (e.key === 'Tab') { const items = [...overview.querySelectorAll('button')]; if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1).focus(); } else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0].focus(); } }
     return;
   }
-  if (e.target.closest?.('button,a') && (e.key === ' ' || e.key === 'Enter')) return;
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest?.('button,a') && (e.key === ' ' || e.key === 'Enter' && !pageInput)) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+  if (/^[0-9]$/.test(e.key) || ['Enter','Backspace'].includes(e.key) && pageInput || e.key.toLowerCase() === 'b') {
+    e.preventDefault(); if (e.repeat) return;
+    if (/^[0-9]$/.test(e.key)) inputPage((pageInput + e.key).slice(-6));
+    else if (e.key === 'Backspace') inputPage(pageInput.slice(0,-1));
+    else if (e.key === 'Enter') {
+      const target = Number(pageInput) - 1; inputPage('');
+      if (target >= 0 && target < slides.length && availableSlides().includes(target) && (!pageFilter || pageFilter.includes(target))) { setBlackout(false); go(target); }
+    } else { inputPage(''); setBlackout(!blackout); }
+    return;
+  }
+  if (pageInput && e.key === 'Escape') { e.preventDefault(); inputPage(''); return; }
+  if (pageInput) inputPage('');
   if (['ArrowLeft', 'ArrowRight'].includes(e.key)) {
     e.preventDefault(); if (held) return; held = e.key; long = false;
     timer = setTimeout(() => { long = true; jump(e.key === 'ArrowRight' ? 1 : -1); }, 450); return;
@@ -451,7 +491,7 @@ function stageNumber(k, i = index) {
   const next = t.stages.find(s => s >= k);
   return (next == null ? t.count : t.start.get(next)) + 1;
 }
-window.deck = { go, pageWheel, setFilter, move, jump, maxStep, pdfMarks, pdfSteps, stageAt, stageNumber, goStage, settle, slides, resize, get index() { return index; }, get step() { return step; }, get count() { return slides.length; } };
+window.deck = { setBlackout, get blackout() { return blackout; }, get pageInput() { return pageInput; }, go, pageWheel, setFilter, move, jump, maxStep, pdfMarks, pdfSteps, stageAt, stageNumber, goStage, settle, slides, resize, get index() { return index; }, get step() { return step; }, get count() { return slides.length; } };
 addEventListener('resize', resize); resize();
 // 整数の viewport 寸法が変わらない、小数だけのリサイズも追従する。
 if (window.__slideStudioFill && window.frameElement) new ResizeObserver(resize).observe(window.frameElement);

@@ -16,8 +16,8 @@ export function makeCoverAuthors(host, { ctx, live, select, write }) {
     if (!snapshot?.rect?.width) { bar.hidden = true; return; }
     const r = snapshot.rect, fr = ctx.preview.frame.getBoundingClientRect(), hr = host.getBoundingClientRect();
     bar.hidden = false;
-    bar.style.left = `${Math.max(4, Math.min(fr.left - hr.left + r.left, hr.width - bar.offsetWidth - 4))}px`;
-    bar.style.top = `${Math.max(4, fr.top - hr.top + r.top - bar.offsetHeight - 10)}px`;
+    bar.style.left = `${Math.max(4, (hr.width - bar.offsetWidth) / 2)}px`;
+    bar.style.top = '8px';
   }
   function draw() {
     if (!snapshot) return clear();

@@ -1,5 +1,5 @@
-import type { Workspace } from '../../core/src/legacy-workspace.js';
-import { supported } from '../../core/src/legacy-ai-roles.js';
+import type { Workspace } from '../../core/src/workspace.js';
+import { supported } from '../../core/src/ai-roles.js';
 import { Providers, type ProviderStatus } from './providers.js';
 import type { Limits } from './limits.js';
 

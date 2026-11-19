@@ -6,7 +6,7 @@ import {createRequire} from 'node:module';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {_electron} from 'playwright-core';
-import {Workspace} from '../../packages/core/src/legacy-workspace.js';
+import {Workspace} from '../../packages/core/src/workspace.js';
 const require=createRequire(import.meta.url);
 
 test('original desktop isolates authored content, preserves CRLF and rejects stale writes', {timeout:90000},async t=>{

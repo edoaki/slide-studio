@@ -192,11 +192,11 @@ export function makeThemeTab(ctx) {
       const updates = { [key]: value, ...extra };
       if (live.has('--heading-mode')) updates['--heading-mode'] = live.get('--heading-mode');
       if ((key === '--header' || key === FILL) && live.has('--header-ink')) updates['--header-ink'] = live.get('--header-ink');
-      const at = n => async () => { await put({ css: n }, []); show(key === FILL ? '--header' : key === BGS[0] ? '--paper' : key); };
+      const at = n => async () => { await put({ css: n }, []); if (!key.startsWith('--page-number-')) show(key === FILL ? '--header' : key === BGS[0] ? '--paper' : key); };
       await put({ vars: updates }, Object.entries(updates), r => ctx.recordHistory({ undo: at(r.before), redo: at(r.css) }));
     } catch (e) { failed = true; live.delete(key); paint(); fill(); toast(e.message); }
   }
-  const hexOf = k => k.startsWith('--block-') || k.startsWith('--heading-') ? vars[k] : k.startsWith('--font-') || FILLS.includes(k) ? vars[k] : hex(vars[k]);
+  const hexOf = k => k.startsWith('--page-number-') || k.startsWith('--block-') || k.startsWith('--heading-') ? vars[k] : k.startsWith('--font-') || FILLS.includes(k) ? vars[k] : hex(vars[k]);
   // テーマ標準では変数と描画色が一致しないことがある。単色の欄は実際の色に合わせる。
   const contentColor = key => live.get(key) ?? remoteColors.get(target())?.[key] ?? hexOf(key);
   const headingColor = contentColor;
@@ -219,7 +219,7 @@ export function makeThemeTab(ctx) {
 
     colors.replaceChildren(); faces.replaceChildren();
     for (const [key, value] of Object.entries(vars)) {
-      if (['--paper','--header','--rule','--font-head'].includes(key) || key === '--mark-line' || FILLS.includes(key) || key.startsWith('--block-') || key.startsWith('--heading-')) continue;
+      if (['--paper','--header','--rule','--font-head'].includes(key) || key === '--mark-line' || FILLS.includes(key) || key.startsWith('--block-') || key.startsWith('--heading-') || key.startsWith('--page-number-')) continue;
       const label = document.createElement('label'); label.dataset.tip = T.field(S.themes.vars[key]);
       label.dataset.key = key;
       const text = document.createElement('span'); text.textContent = S.themes.vars[key];
@@ -261,6 +261,22 @@ export function makeThemeTab(ctx) {
     section(S.themes.controls.emphasis, ['--good', '--warn', '--mark', '--mark-ink', ...Object.keys(CONTENT)].map(k => colors.querySelector(`[data-key="${k}"]`)));
     const heading = section(S.themes.controls.heading, [colors.querySelector('[data-key="--header-ink"]')]);
     const hint = document.createElement('p'); hint.className = 'tv-heading-hint'; hint.textContent = S.themes.controls.headingHint; heading.append(hint);
+    const N = S.themes.pageNumber;
+    const numberFields = [];
+    for (const [key, choices] of [
+      ['--page-number-format', [['theme', N.standard], ['number', N.number], ['total', N.total], ['hidden', N.hidden]]],
+      ['--page-number-position', [['theme', N.standard], ['top-right', N.topRight], ['bottom-right', N.bottomRight], ['bottom-left', N.bottomLeft]]],
+      ['--page-number-size', null],
+    ]) {
+      const label = document.createElement('label'); label.dataset.key = key;
+      const title = document.createElement('span'); title.textContent = S.themes.vars[key];
+      const input = document.createElement(choices ? 'select' : 'input'); input.name = key; input.setAttribute('aria-label', S.themes.vars[key]);
+      if (choices) for (const [value, text] of choices) input.add(new Option(text, value));
+      else { input.type = 'number'; input.min = '8'; input.max = '60'; input.step = '1'; input.placeholder = N.standard; input.title = N.sizeHint; }
+      input.onchange = () => { if (!input.checkValidity()) { input.reportValidity(); return; } saveField(key, choices ? input.value : input.value ? `${input.value}px` : 'theme'); };
+      label.append(title, input); numberFields.push(label);
+    }
+    section(N.title, numberFields);
     fill();
   }
   function fill() {
@@ -275,6 +291,12 @@ export function makeThemeTab(ctx) {
         return;
       }
       input.disabled = locked;
+      if (key.startsWith('--page-number-')) {
+        if (key.endsWith('-size') && document.activeElement === input) return;
+        const value = live.get(key) ?? vars[key] ?? 'theme';
+        input.value = key.endsWith('-size') ? value === 'theme' ? '' : parseInt(value, 10) : value;
+        return;
+      }
       input.value = CONTENT[key] ? contentColor(key) : ['--header', '--header-ink'].includes(key) ? headingColor(key) : live.get(key) ?? (key.startsWith('--heading-') ? vars[key] : hexOf(key));
       const picker = view.querySelector('.tv-inline-color');
       if (picker?.dataset.key === key) { picker.refresh(input.value); picker.querySelectorAll('input, button').forEach(e => { e.disabled = locked; }); picker.inert = !!locked; }

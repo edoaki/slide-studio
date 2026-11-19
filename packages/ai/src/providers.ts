@@ -9,7 +9,11 @@ export type ProviderId='codex'|'claude'|'agy';
 export interface Model {id:string;name:string;efforts:string[];effort:string|null;context:number|null}
 export interface ProviderStatus {id:ProviderId;name:string;ok:boolean;reason:string;message:string;models:Model[];default:string|null;account?:unknown;limits?:unknown}
 const EFFORTS=['minimal','low','medium','high','xhigh','max','ultra'];
-export const IDS:ProviderId[]=['codex','claude','agy'];
+// Consumer plans prohibit wrapping agy in third-party agents or applications.
+// Verified 2026-11-18: https://antigravity.google/docs/faq and /terms section 6.
+export const IDS:ProviderId[]=['codex','claude'];
+export const AGY_DISABLED='Antigravity は利用規約により Slide Studio から呼び出せません。別の AI を選択してください。';
+export function assertCallable(id:ProviderId){if(id==='agy')throw Error(AGY_DISABLED);}
 export const NAMES={codex:'Codex',claude:'Claude Code',agy:'Antigravity'};
 function executable(path:string){try{accessSync(path,constants.X_OK);return true;}catch{return false;}}
 function json(path:string):Record<string,unknown>{try{return JSON.parse(readFileSync(path,'utf8'));}catch{return {};}}
@@ -36,7 +40,9 @@ export class Providers {
   if(id==='codex')env.CODEX_HOME=this.home(id);if(id==='claude'){env.CLAUDE_CONFIG_DIR=this.home(id);env.DISABLE_AUTOUPDATER='1';}if(id==='agy')env.AGY_CLI_DISABLE_AUTO_UPDATE='true';return env;
  }
  async detect(id:ProviderId,signal?:AbortSignal):Promise<ProviderStatus>{
-  const out:ProviderStatus={id,name:NAMES[id],ok:false,reason:'',message:'',models:[],default:null},exe=this.binary(id);if(!exe)return {...out,reason:'missing'};
+  const out:ProviderStatus={id,name:NAMES[id],ok:false,reason:'',message:'',models:[],default:null};
+  if(id==='agy')return {...out,reason:'policy',message:AGY_DISABLED};
+  const exe=this.binary(id);if(!exe)return {...out,reason:'missing'};
   mkdirSync(this.home(id),{recursive:true,mode:0o700});const env=this.environment(id);
   try{
    if(id==='codex'){const found=await inspectAppServer({executable:exe,args:['app-server','--listen','stdio://'],env,signal,timeoutMs:15000});Object.assign(out,found);out.models=found.models.map(m=>({...model(m.id,m.name,m.efforts,m.context),effort:m.effort}));}
@@ -46,9 +52,6 @@ export class Providers {
     // CLI aliases follow the original selector; full configured model IDs are retained.
     out.models=[['opus','Claude Opus'],['sonnet','Claude Sonnet'],['haiku','Claude Haiku'],['fable','Claude Fable']].map(([id,name])=>model(id!,name!,['low','medium','high','xhigh','max']));
     if(!out.models.some(m=>m.id===defaultId))out.models.unshift(model(defaultId,defaultId,['low','medium','high','xhigh','max']));out.default=defaultId;out.ok=true;out.message=typeof auth.authMethod==='string'?auth.authMethod:'';
-   }else{
-    const result=await execute(exe,['models'],{env,signal,timeoutMs:60000});if(result.code!==0)return {...out,reason:/sign.?in|log.?in|authenticat/iu.test(result.stdout+result.stderr)?'login':'error',message:(result.stderr||result.stdout).trim().split('\n').at(-1)??''};
-    const groups=new Map<string,{name:string;efforts:string[]}>();for(const line of result.stdout.split('\n')){const at=line.indexOf('\t');if(at<0)continue;const id=line.slice(0,at).trim(),label=line.slice(at+1).trim(),match=/^(.+)-(minimal|low|medium|high|xhigh|max|ultra)$/u.exec(id),base=match?.[1]??id,group=groups.get(base)??{name:label.replace(/\s*\((minimal|low|medium|high|xhigh|max|ultra)\)\s*$/iu,''),efforts:[]};if(match)group.efforts.push(match[2]!);groups.set(base,group);}out.models=[...groups].map(([id,g])=>model(id,g.name,g.efforts));out.ok=out.models.length>0;if(!out.ok)out.reason='login';
    }
    if(out.ok&&!out.default)out.default=out.models[0]?.id??null;return out;
   }catch(error){return {...out,ok:false,reason:'error',message:(error instanceof Error?error.message:String(error)).slice(0,300)};}

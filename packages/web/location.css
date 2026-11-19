@@ -13,6 +13,12 @@
 .location-page .folder-list button { text-align: left; }
 .location-page .error { color: var(--error); white-space: pre-wrap; }
 
-.location-current p, .location-recent button { overflow-wrap: anywhere; }
+.location-recent button { overflow-wrap: anywhere; }
 .location-recent .folder-list { display: grid; gap: 6px; max-height: 220px; overflow: auto; }
 .location-recent button { white-space: normal; text-align: left; }
+
+.location-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.location-head h1 { margin: 0; }
+.location-head .btn { flex-shrink: 0; }
+dialog.location-dialog { width: min(640px, calc(100vw - 48px)); max-height: calc(100vh - 48px); box-sizing: border-box; margin: auto; overflow: auto; border: 1px solid var(--outline-strong); border-radius: 16px; background: var(--surface); color: var(--on); box-shadow: 0 24px 80px #0003; }
+dialog.location-dialog::backdrop { background: #0006; }
