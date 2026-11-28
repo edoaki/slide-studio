@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { BrowserWindow, session, type Session, type WebContents } from "electron";
+import { WebContentsView, type BaseWindow, session, type Session, type WebContents } from "electron";
 import { PDFDocument } from "pdf-lib";
 import type { RenderStep } from "./contracts.js";
 import type { JobDeadline } from "./deadline.js";
@@ -15,10 +15,9 @@ import {
   STUDIO_RENDER_SCHEME,
   classifyRenderUrl,
 } from "./protocol.js";
+import { createRenderWindow, type RenderWindowPool, VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "./render-window.js";
 import { errorMessage, unique } from "./util.js";
 
-const VIEWPORT_WIDTH = 1280;
-const VIEWPORT_HEIGHT = 720;
 const PDF_WIDTH_INCHES = 40 / 3;
 const PDF_HEIGHT_INCHES = 7.5;
 const PDF_WIDTH_POINTS = 960;
@@ -231,6 +230,7 @@ export async function renderDeck(
   job: ValidatedRenderJob,
   outputDir: string,
   deadline: JobDeadline,
+  pool?: RenderWindowPool,
 ): Promise<RenderDeckResult> {
   const errors = new Set<string>();
   const blocked = new Set<string>();
@@ -249,7 +249,9 @@ export async function renderDeck(
     }
   };
 
-  let win: BrowserWindow | undefined;
+  let win: BaseWindow | undefined;
+  let view: WebContentsView | undefined;
+  let failed = false;
   let renderSession: Session | undefined;
   let onAbort: (() => void) | undefined;
   let loadedOnce = false;
@@ -305,15 +307,13 @@ export async function renderDeck(
       });
     });
 
-    win = new BrowserWindow({
-      show: false,
-      width: VIEWPORT_WIDTH,
-      height: VIEWPORT_HEIGHT,
-      useContentSize: true,
-      autoHideMenuBar: true,
-      paintWhenInitiallyHidden: true,
+    ensureActive();
+    win = pool ? pool.acquire() : createRenderWindow();
+    view = new WebContentsView({
       webPreferences: {
         session: renderSession,
+        // Keep animation frames and captures running while the native window is hidden.
+        offscreen: true,
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
@@ -326,10 +326,12 @@ export async function renderDeck(
       },
     });
 
-    const contents = win.webContents;
+    win.contentView.addChildView(view);
+    view.setBounds({ x: 0, y: 0, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT });
+    const contents = view.webContents;
     contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
     onAbort = () => {
-      if (!win?.isDestroyed()) win?.destroy();
+      if (!contents.isDestroyed()) contents.close({ waitForBeforeUnload: false });
     };
     deadline.signal.addEventListener("abort", onAbort, { once: true });
     if (deadline.aborted) onAbort();
@@ -468,7 +470,10 @@ export async function renderDeck(
       return found;
     };
 
-    for (let slide = 0; slide < count; slide++) {
+    const naturalOrder = Array.from({length:count}, (_,i) => i);
+    const priority = job.pdf === false ? (job.priorityIndices ?? []).filter(i => i < count) : [];
+    const slideOrder = new Set([...priority, ...naturalOrder]);
+    for (const slide of slideOrder) {
       const skipped = await deadline.race(contents.executeJavaScript(`Boolean(deck.slides[${slide}]?.classList.contains("studio-skip"))`, true));
       if (errors.size > 0 || blocked.size > 0) break;
       await deadline.race(contents.executeJavaScript(`deck.go(${slide}, 0, false)`, true));
@@ -515,7 +520,7 @@ export async function renderDeck(
           await assertViewport(contents, deadline);
           const shot = await deadline.race(contents.debugger.sendCommand(
             "Page.captureScreenshot",
-            { format: "png", fromSurface: true, captureBeyondViewport: false },
+            { format: "png", fromSurface: true, captureBeyondViewport: false, optimizeForSpeed: true },
           )) as unknown;
           if (
             shot === null
@@ -578,6 +583,7 @@ export async function renderDeck(
       screenshotFiles,
     };
   } catch (error) {
+    failed = true;
     const messages = unique(errors);
     if (deadline.aborted) messages.push(deadline.reason.message);
     const errorList = error instanceof RenderFailure
@@ -590,13 +596,21 @@ export async function renderDeck(
     throw new RenderFailure(errorMessage(error), errorList, blockedList);
   } finally {
     if (onAbort) deadline.signal.removeEventListener("abort", onAbort);
-    if (win && !win.isDestroyed()) {
-      try {
-        if (win.webContents.debugger.isAttached()) win.webContents.debugger.detach();
-      } catch {
-        // The renderer may already be gone.
+    if (view) {
+      const contents = view.webContents;
+      if (win && !win.isDestroyed()) win.contentView.removeChildView(view);
+      if (!contents.isDestroyed()) {
+        try {
+          if (contents.debugger.isAttached()) contents.debugger.detach();
+        } catch {
+          // The renderer may already have exited.
+        }
+        if (!contents.isDestroyed()) contents.close({ waitForBeforeUnload: false });
       }
-      win.destroy();
+    }
+    if (win && !win.isDestroyed()) {
+      if (pool && !failed && !deadline.aborted) pool.release(win);
+      else win.destroy();
     }
     try {
       renderSession?.protocol.unhandle(STUDIO_RENDER_SCHEME);

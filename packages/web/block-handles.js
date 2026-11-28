@@ -12,6 +12,7 @@ export function makeHandles(host) {
   const layer = document.createElement('div');
   layer.className = 'bh-layer'; host.append(layer);
   let env = null, drag = null, placed = [], tagged = [], sideValues = {};
+  let reusable = [];
   const commit = (name,key,value) => env.apply ? env.apply(name,key,value) : env.write(op[name](env.st.text,env.st,key,value));
 
   const scale = () => { const s = env.win.document.querySelector('#stage'); return s ? s.getBoundingClientRect().width / 1280 : 1; };
@@ -64,9 +65,9 @@ export function makeHandles(host) {
     if (ok) env?.ended?.(env.padMode);
   }
   function handle(cls, label, at, onDrag, onReset) {
-    const h = document.createElement('div');
+    const h = reusable.shift() ?? document.createElement('div');
     h.className = `bh ${cls}`; h.setAttribute('role', 'slider'); h.setAttribute('aria-label', label); h.title = label;
-    h.addEventListener('pointerdown', e => {
+    h.onpointerdown = e => {
       if (!e.isTrusted || e.button) return;
       e.preventDefault(); e.stopPropagation();
       h.setPointerCapture(e.pointerId); h.classList.add('on'); host.dataset.operating = '';
@@ -74,16 +75,16 @@ export function makeHandles(host) {
       wins.forEach(w => w.addEventListener('pointerup', up, true));
       h.addEventListener('lostpointercapture', up);
       drag = { x: e.clientX, y: e.clientY, s: scale(), move: onDrag(), h, off: () => { wins.forEach(w => w.removeEventListener('pointerup', up, true)); h.removeEventListener('lostpointercapture', up); } };
-    });
-    h.addEventListener('pointermove', e => {
+    };
+    h.onpointermove = e => {
       if (!e.isTrusted || drag?.h !== h) return;
       if (!(e.buttons & 1)) { end(true); return; }
       drag.move.move((e.clientX - drag.x) / drag.s, (e.clientY - drag.y) / drag.s, e.shiftKey);
       relayout();
-    });
-    h.addEventListener('pointercancel', () => end(false));
-    h.addEventListener('dblclick', e => { if(!e.isTrusted)return;e.preventDefault(); onReset(); });
-    layer.append(h);
+    };
+    h.onpointercancel = () => end(false);
+    h.ondblclick = e => { if(!e.isTrusted)return;e.preventDefault(); onReset(); };
+    if (!h.isConnected) layer.append(h);
     placed.push([h, at]);
     relayout();
     return h;
@@ -220,8 +221,9 @@ export function makeHandles(host) {
             if (last) v[i] = Math.min(limit - others, Math.max(MIN.tableCol, start[i] + dx));
             else { const d = Math.min(start[j] - MIN.tableCol, Math.max(MIN.tableCol - start[i], dx)); v[i] += d; v[j] -= d; }
             ws = v.map(Math.round);
-            Object.assign(table.style, { width: `${ws.reduce((a, b) => a + b, 0)}px`, tableLayout: 'fixed', overflowWrap: 'anywhere' });
-            cells.forEach((td, k) => { td.style.width = `${ws[k]}px`; });
+            const total = ws.reduce((a, b) => a + b, 0);
+            Object.assign(table.style, { width: `${total}px`, tableLayout: 'fixed', overflowWrap: 'anywhere' });
+            cells.forEach((td, k) => { td.style.width = `${100 * ws[k] / total}%`; });
             styled.slice(1).forEach(td => { td.style.whiteSpace = 'normal'; });
           },
           done() { if (ws) commit('setTextOptions', key, { '--table-cols': ws.join(' ') }); },
@@ -307,7 +309,7 @@ export function makeHandles(host) {
     });
   }
   function padHandles(c) {
-    const { key, kind } = env, el = padTarget(c); if (!el) return;
+    const { key } = env, { kind } = c, el = padTarget(c); if (!el) return;
     const cs = env.win.getComputedStyle(el), s = scale(), box = () => toHost(el.getBoundingClientRect()), r = box();
     if (kind === 'columns' && env.padMode === 'gap') {
       // 列の間：列と列のあいだごとに1つ
@@ -332,8 +334,8 @@ export function makeHandles(host) {
     // 文字は行ボックスの上下と、包みの中の段落 margin もバッファに含める。
     // 調整時はその分を trim して padding に移す。表示しただけでは原稿も見た目も変えない。
     const tp = parseFloat(cs.getPropertyValue('--text-pad')) || 0;
-    const pad = c.kind === 'text' && op.outer(c) === c ? [tp, tp, tp, tp] : ['Top', 'Right', 'Bottom', 'Left'].map(k => parseFloat(cs[`padding${k}`]) || 0);
-    const text = c.kind === 'text';
+    const text = c.kind === 'text' && !op.isTable(env.st.text, c);
+    const pad = text && op.outer(c) === c ? [tp, tp, tp, tp] : ['Top', 'Right', 'Bottom', 'Left'].map(k => parseFloat(cs[`padding${k}`]) || 0);
     const apply = p => {
       el.style.padding = padCss(p);
       if (text || op.isFramed(c)) el.style.setProperty('text-box', 'trim-both text');
@@ -417,15 +419,22 @@ export function makeHandles(host) {
       // 動かしている間は描き直さない。別のブロックを選んだら、動かしていた分は取り消す
       if (drag && next?.key === env?.key && next?.live) return;
       end(false);
-      env = next; layer.replaceChildren(); placed = []; tagged = []; sideValues = {};
+      const sameSpacing = next?.live && next.key && next.key === env?.key && next.padMode && next.padMode === env.padMode;
+      reusable = sameSpacing ? placed.map(([handle]) => handle) : [];
+      if (sameSpacing) layer.querySelectorAll('.bh-band').forEach(band => band.remove());
+      else layer.replaceChildren();
+      placed = []; tagged = []; sideValues = {};
+      env = next;
       if (!env?.win || !env.live || !env.key) return;
       const c = op.find(env.st, env.key)?.chunk;
-      if (!c || c.kind === 'opaque' || c.kind === 'def') return;
+      if (!c || c.kind === 'opaque' || c.kind === 'def') { layer.replaceChildren(); reusable = []; return; }
       // つまみの色は、選んだブロックの枠と同じ層の色
       layer.style.setProperty('--hc', env.color);
       layer.dataset.spacing = env.padMode || '';
       if (env.padMode === 'outer') spaceHandles(c);
       else if (env.padMode) padHandles(c); else sizeHandles(c);
+      for (const unused of reusable) unused.remove();
+      reusable = [];
     },
     clear() { end(false); layer.replaceChildren(); placed = []; tagged = []; sideValues = {}; },
     destroy() { delete host.dataset.operating; layer.remove(); },

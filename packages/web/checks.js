@@ -10,7 +10,7 @@ export function makeChecks(ctx) {
   const nextIssue = new Map();
   const issues = () => [...(state.result?.errors || []), ...(state.result?.warnings || [])];
   function clear() { ctx.preview.client?.request('edit.issues', {rects:[],level:'warning'}).catch(() => {}); }
-  // 問題のページ・step を開き、場所を枠（エラーは赤・警告は黄）で囲む（場所が無ければ撮った画像を出す）。
+  // 問題のページ・step を開き、場所を枠（エラーは赤・警告は黄）で囲む。
   // 書き出しの一覧から開くときは、その検査の結果を result で渡す
   async function show(x, result = state.result) {
     if (x.citation_key) { await ctx.bibliography?.open(x.citation_key); return; }
@@ -24,16 +24,18 @@ export function makeChecks(ctx) {
     if (!alive || result?.version?.qmd !== ctx.version || result === state.result && state.stale) return;
     clear();
     await ctx.preview.client?.request('edit.issues', {rects:x.rects || [],level:x.level === 'error' ? 'error' : 'warning'});
-    if (x.image && !x.rects?.length) {
-      const img = document.createElement('img'); img.className = 'check-issue-image'; img.alt = x.message;
-      img.src = `/files/.slide-studio/build/${encodeURIComponent(ctx.deck)}/${x.image}?v=${result.checked_at}`;
-      const back = document.createElement('div'); back.className = 'dialog-back';
-      const box = document.createElement('div'); box.className = 'dialog';
-      const close = tip(Object.assign(document.createElement('button'), {className: 'ibtn', innerHTML: svg('x')}), S.close);
-      close.onclick = () => back.remove(); box.append(img, close); back.append(box); document.body.append(back);
-    }
   }
   ctx.showIssue = show;
+  // AI への修正依頼の文（検査が古い・検査中は出さない）。空のチャットのボタンと、問題の一覧のボタンで使う
+  const MAX_ASK = 30;
+  function askText(xs) {
+    if (!xs.length) return '';
+    const where = x => x.page_id ? `${x.page_id}：` : x.slide != null ? `${S.checks.page(x.slide + 1)}：` : '';
+    const lines = xs.slice(0, MAX_ASK).map(x => `- ${S.checks.level[x.level === 'error' ? 'error' : 'warning']} ${where(x)}${issueMessage(x)}`);
+    if (xs.length > MAX_ASK) lines.push(`- ${S.checks.askAiMore(xs.length - MAX_ASK)}`);
+    return [S.checks.askAiText, ...lines].join('\n');
+  }
+  ctx.checkIssuesText = () => state.busy || state.stale || state.result?.version?.qmd !== ctx.version ? '' : askText(issues());
   // 上のバーの検査の状態を押すと、問題の一覧を出す（ページの無い問題も読めるように）。ページのある問題は押すとそこへ
   let dialog = null;
   function list() {
@@ -45,7 +47,9 @@ export function makeChecks(ctx) {
     renderIssues(dialog.querySelector('.output-body'), issues(), x => { dialog?.remove(); dialog = null; show(x, result); });
     const close = tip(Object.assign(document.createElement('button'), {className: 'ibtn', innerHTML: svg('x')}), S.close);
     close.onclick = () => { dialog?.remove(); dialog = null; };
-    dialog.querySelector('.df').append(close);
+    const ask = tip(Object.assign(document.createElement('button'), {className: 'btn', type: 'button', textContent: S.checks.askAi}), S.checks.askAiTip);
+    ask.onclick = () => { const text = askText(issues()); close.onclick(); ctx.plugins.find(p => p.ask)?.ask(text); };
+    dialog.querySelector('.df').append(ask, close);
     dialog.addEventListener('click', e => { if (e.target === dialog) close.onclick(); });
     dialog.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close.onclick(); } });
     document.body.append(dialog);
@@ -77,7 +81,7 @@ export function makeChecks(ctx) {
     if (ev.result) nextIssue.clear();
     const stale = state.stale || (state.result && state.result.version.qmd !== ctx.version);
     ctx.checkStatus = state.busy ? [S.checks.busy, 'busy'] : stale ? [S.checks.stale, 'busy'] : state.result ?
-      [state.result.errors.length || state.result.warnings.length ? S.checks.count(state.result.errors.length, state.result.warnings.length) : S.checks.ok, state.result.errors.length ? 'error' : 'ok',
+      [state.result.errors.length || state.result.warnings.length ? S.checks.count(state.result.errors.length, state.result.warnings) : S.checks.ok, state.result.errors.length ? 'error' : 'ok',
         issues().length ? list : null] : null;
     ctx.showStatus(); mark();
   }
@@ -89,7 +93,7 @@ export function makeChecks(ctx) {
     },
     stripRendered: mark,
     slideChanged: clear,
-    destroy() { alive = false; clear(); dialog?.remove(); strip.querySelectorAll('.check-mark').forEach(n => n.remove()); document.querySelectorAll('.check-issue-image').forEach(n => n.closest('.dialog-back')?.remove()); },
+    destroy() { alive = false; clear(); dialog?.remove(); strip.querySelectorAll('.check-mark').forEach(n => n.remove()); },
   };
 }
 

@@ -92,12 +92,17 @@ export async function requestThemeSampleCapability(api, { name, version, generat
   return parsePreviewCapability(data);
 }
 
-export function capabilityUrl(base, { index = 0, step = 0, nonce, mode, generation } = {}) {
+/** @param {string|URL} base @param {{index?:number, step?:number, nonce?:string, mode?:string, generation?:string, footer?:boolean, hostKeys?:boolean}} [options] */
+export function capabilityUrl(base, { index = 0, step = 0, nonce, mode, generation, footer = true, hostKeys = false } = {}) {
   const url = httpUrl(base, globalThis.location?.href);
   // Edit is the default. Presentation needs a hint because the host script
   // contract has no required mode attribute; the agent also recognizes
   // mode=present / edit=0 from the resolver URL.
   if (mode === 'present') url.searchParams.set('studio-mode', 'present');
+  // The presenter view draws its own footer outside the slide.
+  if (mode === 'present' && !footer) url.searchParams.set('studio-footer', 'off');
+  // 発表者ビューの枠と投影用ウィンドウでは、一覧（o）とページ番号の入力を親が受け持つ
+  if (mode === 'present' && hostKeys) url.searchParams.set('studio-keys', 'host');
   // A per-load query keeps the same version from being served from the HTTP
   // cache with the previous generation in its injected HTML.
   if (generation) url.searchParams.set('generation', String(generation));
@@ -130,9 +135,7 @@ export function forwardWheel(frame, event) {
 }
 
 function bridgeError(code, message) {
-  const error = new Error(message || code);
-  error.code = code;
-  return error;
+  return Object.assign(new Error(message || code), {code});
 }
 
 export class AgentClient {
@@ -235,7 +238,8 @@ export class AgentClient {
           ?? stage + 1;
       },
       go(index, step = 0) { return client.request('go', { index, step }); },
-      setBlackout(value) { return client.request('setBlackout', {value}); },
+      trackPointer(enabled) { return client.request('pointer.track', {enabled: !!enabled}); },
+      edgeClicks(enabled) { return client.request('clicks.edges', {enabled: !!enabled}); },
       presentationKey(type, key, repeat = false) { return client.request('presentationKey', {type, key, repeat}); },
       move(delta = 1) { return client.request('move', { delta }); },
       jump(delta = 1) { return client.request('jump', { delta }); },
@@ -381,7 +385,7 @@ export class AgentClient {
     // This is the committed frame revision. A later configure request cannot
     // advance it; only a frame snapshot/theme ack can.
     this._frameSourceVersion = snapshot.sourceVersion ?? this.identity.version;
-    const key = `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${snapshot.overviewOpen}/${snapshot.blackout}/${snapshot.pageInput}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
+    const key = `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${snapshot.overviewOpen}/${snapshot.pageInput}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
     if (key === this._lastSnapshotKey) return;
     this._lastSnapshotKey = key;
     this.snapshot = snapshot;

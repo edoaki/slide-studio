@@ -32,7 +32,7 @@ export function installPresentationFooter(win, currentDeck) {
   const pages = doc.createElement('span'); pages.className = 'presentation-pages';
   const hint = doc.createElement('span'); hint.className = 'presentation-exit-hint'; hint.textContent = S.present.exitHint; hint.title = S.speaker.shortcuts;
   menu.innerHTML = svg('grid'); menu.setAttribute('aria-label', S.present.overview);
-  fullscreen.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>';
+  fullscreen.innerHTML = svg('fullscreen');
   fullscreen.setAttribute('aria-label', S.present.fullscreen);
   toolbar.replaceChildren(progress, pages, menu, fullscreen, hint);
   const update = () => {

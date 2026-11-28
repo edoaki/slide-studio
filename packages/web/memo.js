@@ -219,7 +219,9 @@ export function makeMemo(ctx) {
   });
   load();
 
-  ctx.memo = { flush, get version() { return version; } };
+  ctx.memo = { flush, get version() { return version; },
+    // 見出しだけの下書き（作りたての雛形）は、まだ書いていないものとして扱う
+    hasBody: () => input.value.split('\n').some(line => line.trim() && !/^#+(\s|$)/.test(line.trim())) };
   return {
     flush,
     // 原稿の欄を開閉したら、チャットを合わせる

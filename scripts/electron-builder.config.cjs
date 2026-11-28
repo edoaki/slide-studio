@@ -76,13 +76,10 @@ const base = {
 };
 
 if (process.env.SLIDE_STUDIO_RELEASE === '1') {
-  const { identity: _identity, ...mac } = base.mac;
   module.exports = {
     ...base,
+    mac: { ...base.mac, target: ['dmg'] },
     publish: [{ provider: 'github', owner: 'edoaki', repo: 'slide-studio', releaseType: 'draft' }],
-    forceCodeSigning: true,
-    mac: { ...mac, target: ['dmg', 'zip'], hardenedRuntime: true, notarize: true },
-    win: { ...base.win, signAndEditExecutable: true },
   };
 } else {
   module.exports = base;

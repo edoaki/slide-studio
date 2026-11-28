@@ -98,7 +98,7 @@ function sameAdminOrigin(target) {
 // token を付けるには、検証済みの明示的な送信先が要る。引数なしでは資格を付けない。
 export const locationHeaders = target => {
   const headers = {
-    [LOCATION_HEADER]: document.querySelector('meta[name=slide-studio-location]')?.content || '',
+    [LOCATION_HEADER]: (/** @type {HTMLMetaElement|null} */ (document.querySelector('meta[name=slide-studio-location]')))?.content || '',
   };
   if (token && sameAdminOrigin(target)) headers[TOKEN_HEADER] = token;
   return headers;
@@ -134,6 +134,7 @@ function errorMessage(response, data) {
   return `${response.status}`;
 }
 
+/** @param {string|URL} path @param {{method?:string, body?:unknown}} [options] */
 export async function api(path, { method = 'GET', body } = {}) {
   const url = managementUrl(path);
   const res = await fetch(url.href, {
@@ -149,9 +150,7 @@ export async function api(path, { method = 'GET', body } = {}) {
   try { data = await res.json(); } catch { data = null; }
   if (!res.ok) {
     if (AUTH_STATUS.has(res.status)) clearStoredToken();
-    const err = new Error(errorMessage(res, data));
-    err.status = res.status; err.data = data;
-    throw err;
+    throw Object.assign(new Error(errorMessage(res, data)), {status: res.status, data});
   }
   return data;
 }

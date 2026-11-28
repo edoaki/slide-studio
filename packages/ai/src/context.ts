@@ -1,10 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { Workspace, figure_steps } from '../../core/src/workspace.js';
 import { parse, type Doc } from '../../core/src/source.js';
 import { TARGET_KEY, type Attachment } from '../../core/src/chat-store.js';
 import { prompt_lines } from '../../core/src/materials.js';
 import type { Mode } from '../../core/src/ai-roles.js';
+
+import { resolveExistingInside } from '../../core/src/paths.js';
+import { powerpointDesign } from './powerpoint.js';
 
 export interface Item {
   key: string; text: string; label: string; page_title?: string;
@@ -50,7 +53,7 @@ export function cleanItems(ws: Workspace, deck: string, mode: Mode, value: unkno
   return items;
 }
 
-export function prompt(ws: Workspace, deck: string, mode: Mode, items: Item[], attach: Attachment[], talk = false) {
+export async function prompt(ws: Workspace, deck: string, mode: Mode, items: Item[], attach: Attachment[], talk = false) {
   const theme = ws.deck_theme(deck), qmd = `decks/${deck}/slides.qmd`;
   const lines = mode === 'memo' ? [
     'Slide Studio の「下書き」チャットからの依頼です（skill：slide-studio-memo）。',
@@ -72,6 +75,17 @@ export function prompt(ws: Workspace, deck: string, mode: Mode, items: Item[], a
   for (const attachment of attach) {
     const folder = attachment.kind === 'image' ? ws.asset_root(deck) : ws.deck_dir(deck);
     lines.push(`[添付] ${relative(ws.root, folder).replaceAll('\\', '/')}/${attachment.path}（${attachment.kind === 'image' ? '画像。使う場合はこのパスを参照する' : '参考資料。読むだけで変えない'}）`);
+    if (mode !== 'memo' && attachment.kind === 'file' && /\.p[po]tx$/iu.test(attachment.path)) {
+      try {
+        const file = resolveExistingInside(ws.root, join(folder, attachment.path), 'PowerPoint');
+        const design = await powerpointDesign(file);
+        if (design.decorations.some(shape => shape.image)) lines.push('ロゴの PNG は decorations の image が示す ZIP 内のファイルから取り出せる。雛形に合わせる依頼では元画像をテーマ CSS に埋め込み、表示位置と大きさを合わせる。');
+        lines.push('[PowerPoint の参照元と基本テーマ] ' + JSON.stringify(design),
+          '実際の背景・見出し・装飾はスライドやレイアウトで上書きされるため、添付の該当箇所も確認する。');
+      } catch {
+        lines.push('基本テーマを自動取得できませんでした。添付を直接確認し、読み取れない場合はその旨を伝える。');
+      }
+    }
   }
   const text = readFileSync(ws.qmd(deck), 'utf8'), points = Array.from(text), doc = parse(text);
   items.forEach((item, index) => {

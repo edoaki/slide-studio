@@ -58,7 +58,7 @@ form.addEventListener('submit', async e => {
   button.disabled = true; button.textContent = T.busy;
   try {
     const data = await api('/api/location', { method: 'POST', body: {mode, path: input.value} });
-    location.assign(data.url);
+    if (!data.cancelled) location.assign(data.url);
   } catch (e) { error(e); }
   finally { busy = false; button.disabled = false; button.textContent = T.start; }
 });

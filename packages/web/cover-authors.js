@@ -1,6 +1,7 @@
 // front matter から描画される名前と所属の選択・移動。
 import { svg } from './icons.js';
 import { S } from './strings.js';
+import { studioSelect } from './custom-select.js';
 import { setFront } from './cover-form.js';
 
 export function makeCoverAuthors(host, { ctx, live, select, write }) {
@@ -41,11 +42,8 @@ export function makeCoverAuthors(host, { ctx, live, select, write }) {
       input.value = Math.round(snapshot.formats[key].size);
       input.onchange = () => { if (input.value && input.checkValidity()) save({ [key]: input.valueAsNumber }); };
       label.append(input); group.append(label);
-      const font = document.createElement('select'); font.setAttribute('aria-label', S.coverAuthors[fontKey]); font.disabled = !live();
-      for (const value of ['', 'sans', 'serif', 'mono']) {
-        const option = document.createElement('option'); option.value = value; option.textContent = S.coverAuthors.fonts[value]; font.append(option);
-      }
-      font.value = values()[fontKey] || '';
+      const font = studioSelect({ label: S.coverAuthors[fontKey], size: 'sm', options: ['', 'sans', 'serif', 'mono'].map(value => ({ value, label: S.coverAuthors.fonts[value] })), value: values()[fontKey] || '' });
+      font.disabled = !live();
       font.onchange = () => save({ [fontKey]: font.value });
       const bold = document.createElement('button'); bold.type = 'button'; bold.className = 'btn sm'; bold.innerHTML = svg('bold');
       bold.setAttribute('aria-label', S.coverAuthors[boldKey]); bold.dataset.tip = S.coverAuthors[boldKey]; bold.disabled = !live();
@@ -56,7 +54,7 @@ export function makeCoverAuthors(host, { ctx, live, select, write }) {
     place();
   }
   function clear() { chosen=false; client?.request('cover.select',{selected:false}).catch(()=>{});bar.hidden=true; }
-  function key(e) { if(chosen&&e.key==='Escape'){e.preventDefault();clear();} }
+  function key(e) { if(chosen&&e.key==='Escape'&&!e.target.closest?.('studio-select[open]')){e.preventDefault();clear();} }
   const outside = e => { if (!bar.contains(e.target)) clear(); };
   host.addEventListener('pointerdown', outside);
   window.addEventListener('keydown', key, true);

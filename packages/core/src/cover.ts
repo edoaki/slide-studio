@@ -2,7 +2,7 @@
  * Cover slide metadata and author formatting helpers.
  */
 
-export interface LegacyAuthor {
+export interface CoverAuthor {
   name: string;
   affiliations: string[];
 }
@@ -90,7 +90,7 @@ function text(value: unknown): string {
 }
 
 /** `authors(meta)` from cover.py: `[{name, affiliations: [所属名]}]`. */
-export function authors(meta: Record<string, unknown>): LegacyAuthor[] {
+export function authors(meta: Record<string, unknown>): CoverAuthor[] {
   const raw = meta.author;
   if (raw === null || raw === undefined) return [];
   const items = Array.isArray(raw) ? raw : [raw];
@@ -102,7 +102,7 @@ export function authors(meta: Record<string, unknown>): LegacyAuthor[] {
     }
   }
 
-  const out: LegacyAuthor[] = [];
+  const out: CoverAuthor[] = [];
   for (const item of items) {
     let name: string;
     let affiliationValue: unknown;
@@ -149,7 +149,7 @@ function escapeHtml(value: string): string {
 }
 
 /** `html_block(people, layout=None)` from cover.py. */
-export function html_block(people: LegacyAuthor[], layout: unknown = null): string {
+export function html_block(people: CoverAuthor[], layout: unknown = null): string {
   const body = htmlBlockBody(people);
   if (!body) return body;
 
@@ -194,7 +194,7 @@ export function html_block(people: LegacyAuthor[], layout: unknown = null): stri
   return body.replace(search, () => replacement);
 }
 
-function htmlBlockBody(people: LegacyAuthor[]): string {
+function htmlBlockBody(people: CoverAuthor[]): string {
   if (people.length === 0) return "";
 
   const order: string[] = [];

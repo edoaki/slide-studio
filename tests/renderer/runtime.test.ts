@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test, { type TestContext } from "node:test";
@@ -77,7 +79,7 @@ function go(i, n = 0) {
   return Promise.resolve();
 }
 window.__slideStudioNoHash = true;
-window.deck = { go, get count() { return slides.length; }, pdfSteps() { return [0]; } };
+window.deck = { go, slides, get count() { return slides.length; }, pdfSteps() { return [0]; } };
 ${options.script ?? ""}
 ${readyCode}
 </script>
@@ -354,4 +356,23 @@ window.deck.go = async (i, step) => {
   const [first, second] = await Promise.all(images.map(name => readFile(join(files.outputDir, "screenshots", name))));
   assert.ok(!first!.equals(second!), "returning to zero must paint a different slide state");
   await assertProfilesRemoved(root);
+});
+
+test("consecutive captures reuse one hidden window with isolated documents and recover after timeout", {skip: !E2E, timeout: TEST_TIMEOUT_MS}, async t => {
+  const root = await scratch(t);
+  for (const [name, color] of [["first", "red"], ["second", "blue"]] as const) {
+    const script = `
+      if (localStorage.getItem("seen")) console.error("Previous capture storage survived");
+      localStorage.setItem("seen", "yes");
+      document.querySelector(".slide").style.background = "${color}";
+    `;
+    await writeFile(join(root, name + ".html"), deckHtml({script}));
+  }
+  await writeFile(join(root, "timeout.html"), deckHtml({ready: false}));
+  const env = childEnv(root);
+  delete env.ELECTRON_RUN_AS_NODE;
+  const electron = createRequire(import.meta.url)("electron") as string;
+  await promisify(execFile)(electron, [fileURLToPath(new URL("./reuse-fixture.js", import.meta.url)), root], {
+    env, timeout: RUN_TIMEOUT_MS,
+  });
 });

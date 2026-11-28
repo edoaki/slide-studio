@@ -6,7 +6,7 @@ import { sha256 } from '../../packages/core/src/encoding.js';
 import { Workspace, check_name, set_front, TEMPLATES } from '../../packages/core/src/workspace.js';
 import { parse, ATTR_TOKEN } from '../../packages/core/src/source.js';
 import { FONTS, read_vars, set_vars, restore } from '../../packages/core/src/theme-edit.js';
-import type { LegacyFeatureRequest, LegacyFeatureResponse } from '../../packages/contracts/src/server.js';
+import type { FeatureRequest, FeatureResponse } from '../../packages/contracts/src/server.js';
 
 function pythonJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(pythonJson).join(', ')}]`;
@@ -48,9 +48,9 @@ export function reset_cover_positions(text: string): string {
   return points.join('');
 }
 
-export class LegacyThemes {
+export class ThemeService {
   #restores = new Map<string,string>();
-  #locks = new Map<string,Promise<LegacyFeatureResponse>>();
+  #locks = new Map<string,Promise<FeatureResponse>>();
   constructor(private readonly options: {
     contentOrigin: () => string;
     changed?: (ws: Workspace, name: string) => void;
@@ -77,7 +77,7 @@ export class LegacyThemes {
     return { name, vars: read_vars(css), version: sha256(css), modified: original===null?null:css!==original,
       removable: name!=='default'&&!decks.length, shots,locked:!!this.options.locked?.(ws,name),decks };
   }
-  handle(ws: Workspace, request: LegacyFeatureRequest): Promise<LegacyFeatureResponse|null> {
+  handle(ws: Workspace, request: FeatureRequest): Promise<FeatureResponse|null> {
     if (!/^\/api\/themes(?:\/[^/]+)?$/u.test(request.pathname)) return Promise.resolve(null);
     // Serializing theme mutations also makes base checks atomic across resets and creates.
     const key=ws.root;
@@ -86,7 +86,7 @@ export class LegacyThemes {
     void result.finally(()=>{if(this.#locks.get(key)===result)this.#locks.delete(key)}).catch(()=>{});
     return result;
   }
-  async #handle(ws: Workspace, request: LegacyFeatureRequest): Promise<LegacyFeatureResponse> {
+  async #handle(ws: Workspace, request: FeatureRequest): Promise<FeatureResponse> {
     const body = request.body && typeof request.body==='object' && !Array.isArray(request.body) ? request.body as Record<string,unknown> : {};
     const method=request.method==='HEAD'?'GET':request.method;
     const conflict=()=>({status:409,body:{error:'テーマが外で変更されました'}});

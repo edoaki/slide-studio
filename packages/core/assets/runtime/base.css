@@ -58,14 +58,17 @@ iframe {width:100%; height:350px; border:0; display:block; margin:12px 0; pointe
 button {font:inherit; cursor:pointer; border:1px solid #c1cbcf; background:#fff; color:#182b3a; border-radius:6px; padding:10px 14px}
 button:focus-visible {outline:3px solid #00a2af}
 body #overview {position:fixed; inset:0; z-index:10; overflow:auto; padding:0 16px 16px; background:#f5f5f3; color:#454541; font:13px system-ui,sans-serif}
-#overview[hidden] {display:none}
+/* 一覧は閉じている間は必ず出さない（テーマ・原稿の CSS が display を上書きしても、発表者ビューの枠に閉じるボタンを出さない） */
+#overview[hidden] {display:none !important}
 #overview .overview-controls {position:sticky; top:0; z-index:3; display:flex; justify-content:flex-end; align-items:center; gap:8px; min-height:44px; margin:0 -16px 4px; padding:6px 8px; background:#f5f5f3}
-#overview .overview-close-hint {font:11px system-ui,sans-serif; color:#777773}
-#overview #close {display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:4px; background:transparent; color:#555550}
+#overview .overview-close-hint {font:11px system-ui,sans-serif; line-height:1; color:#777773; white-space:nowrap}
+#overview #close {display:grid; place-items:center; flex:none; box-sizing:border-box; width:32px; height:32px; min-width:0; min-height:0; margin:0; padding:0; border:0; border-radius:4px; box-shadow:none; background:transparent; color:#555550; font:inherit; line-height:1; overflow:hidden}
+#overview #close svg {display:block; flex:none; width:18px; height:18px}
 #overview #close:hover {background:#00000008}
 #overview #close:focus-visible {outline:1px solid #777773; outline-offset:-2px}
-#overview :is(.overview-row,.overview-grid) {display:grid; grid-template-columns:repeat(auto-fill,minmax(min(140px,100%),1fr)); gap:12px; padding:6px 2px 14px}
-#overview .thumb {display:block; min-width:0; width:100%; max-width:220px; padding:0; border:0; border-radius:3px; background:transparent; box-shadow:0 0 0 1px #0003; overflow:hidden; aspect-ratio:16/9}
+/* 一覧の縮小画像は画面の幅に合わせて大きくする（ノートの画面で 4 列、大きい画面で 5〜6 列ほど） */
+#overview :is(.overview-row,.overview-grid) {display:grid; grid-template-columns:repeat(auto-fill,minmax(min(clamp(240px,21vw,360px),100%),1fr)); gap:16px; padding:6px 2px 18px}
+#overview .thumb {display:block; min-width:0; width:100%; padding:0; border:0; border-radius:3px; background:transparent; box-shadow:0 0 0 1px #0003; overflow:hidden; aspect-ratio:16/9}
 #overview .thumb[aria-current=true] {outline:2px solid #1f63d6; outline-offset:2px; background:transparent; box-shadow:none}
 #overview .thumb:hover {box-shadow:0 0 0 1px #777773}
 #overview .thumb:focus-visible {outline:2px solid #1f63d6; outline-offset:2px}

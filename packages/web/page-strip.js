@@ -72,8 +72,14 @@ export function makePageStrip(ctx) {
     grip.setPointerCapture(e.pointerId); grip.classList.add('on'); document.body.classList.add('resizing-y');
     const y0 = e.clientY, w0 = size();
     const move = ev => { want = Math.max(MIN_W, Math.min(maxW(), w0 + (y0 - ev.clientY) * 16 / 9)); size(); };
-    const up = () => { grip.removeEventListener('pointermove', move); grip.classList.remove('on'); document.body.classList.remove('resizing-y'); want = size(); pref('stripW', want); };
-    grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up, { once: true });
+    // 指を離した・取り消された・捕捉を失った、のどれでも1回だけ終える
+    const ends = ['pointerup', 'pointercancel', 'lostpointercapture'];
+    const up = () => {
+      for (const type of ends) grip.removeEventListener(type, up);
+      grip.removeEventListener('pointermove', move); grip.classList.remove('on'); document.body.classList.remove('resizing-y'); want = size(); pref('stripW', want);
+    };
+    grip.addEventListener('pointermove', move);
+    for (const type of ends) grip.addEventListener(type, up);
   });
   grip.addEventListener('keydown', e => {
     const d = { ArrowUp: 16, ArrowDown: -16 }[e.key];
@@ -125,13 +131,17 @@ export function makePageStrip(ctx) {
   load().catch(e => toast(e.message));
 
   return {
-    stripRendered() { actions.decorate(strip); thumbs.decorate(); reorder.decorate(strip); overview.render(); size(); prioritize(); },
+    stripRendered() { actions.decorate(strip); actions.refresh(); thumbs.decorate(); reorder.decorate(strip); overview.render(); size(); prioritize(); },
     previewLoaded() { reorder.previewLoaded(); actions.previewLoaded(); },
     // 今のページの縮小画像は今の step にそろえる
     slideChanged() {
       thumbs.rest();
+      actions.refresh();
       prioritize();
     },
+    // 保存待ち・AI の編集中などはページの操作を止める
+    statusChanged() { actions.refresh(); },
+    textChanged() { actions.refresh(); },
     keydown: e => overview.keydown(e),
     event(ev) { if (ev.type === 'shots') { shots = ev.slides; decorate(); } },
     destroy() {

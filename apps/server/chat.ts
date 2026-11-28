@@ -6,9 +6,9 @@ import { Runtime } from '../../packages/ai/src/runtime.js';
 import { Logins } from '../../packages/ai/src/login.js';
 import { Workflow, RunConflict, type Check, type Runner } from '../../packages/ai/src/workflow.js';
 import type { Mode } from '../../packages/core/src/ai-roles.js';
-import type { LegacyFeatureRequest, LegacyFeatureResponse } from '../../packages/contracts/src/server.js';
+import type { FeatureRequest, FeatureResponse } from '../../packages/contracts/src/server.js';
 
-export class LegacyChat {
+export class ChatService {
   readonly status: AIStatus;
   private stores = new Map<Workspace, ChatStore>();
   private workflows = new Map<Workspace, Workflow>();
@@ -19,32 +19,45 @@ export class LegacyChat {
   private logins: Logins;
   private controller = new AbortController();
   private updateTimer?: NodeJS.Timeout;
+  private startTimer?: NodeJS.Timeout;
   private automaticUpdate: Promise<void> | null = null;
-  constructor(private options: {storage: string; broadcast: (event: Record<string, unknown>) => void; providers?: Providers; runner?: Runner; openExternal?: (url: string) => Promise<boolean>; check: (ws: Workspace, deck: string, mode: Mode) => Promise<Check>; reviewContext?: (ws: Workspace, deck: string, mode: Mode) => Promise<unknown>; changed: (ws: Workspace, paths: string[]) => void}) {
+  /** Workspace of the latest request; used to send a complete model list with `ai-status`. */
+  private current?: Workspace;
+  constructor(private options: {storage: string; broadcast: (event: Record<string, unknown>) => void; saveScript: (ws: Workspace, deck: string, base: string, text: string, signal: AbortSignal) => Promise<void>; providers?: Providers; runner?: Runner; openExternal?: (url: string) => Promise<boolean>; check: (ws: Workspace, deck: string, mode: Mode) => Promise<Check>; reviewContext?: (ws: Workspace, deck: string, mode: Mode) => Promise<unknown>; changed: (ws: Workspace, paths: string[]) => void; runtime?: (providers: Providers, id: ProviderId) => Runtime; idleUpdate?: {delayMs: number; intervalMs: number} | null}) {
     this.status = new AIStatus(options.providers ?? new Providers(options.storage), options.broadcast);
-    for (const id of IDS) this.runtimes.set(id, new Runtime(this.status.providers, id));
-    this.logins = new Logins(this.status.providers, id => this.runtimes.get(id)!, {openExternal: options.openExternal ?? (async () => false), changed: () => this.status.invalidate()});
-    if (!options.providers) {
-      this.updateTimer = setInterval(() => {
+    for (const id of IDS) this.runtimes.set(id, options.runtime?.(this.status.providers, id) ?? new Runtime(this.status.providers, id));
+    this.logins = new Logins(this.status.providers, id => this.runtimes.get(id)!, {openExternal: options.openExternal ?? (async () => false), changed: () => this.refreshStatus()});
+    // Injected providers mean a test; those opt in to the idle update explicitly.
+    const idle = options.idleUpdate !== undefined ? options.idleUpdate : options.providers ? null : {delayMs: 5000, intervalMs: 60000};
+    if (idle) {
+      const tick = () => {
         if (this.closed || this.busy || this.automaticUpdate) return;
         this.automaticUpdate = this.updateIdleRuntimes().finally(() => { this.automaticUpdate = null; });
-      }, 60000);
-      this.updateTimer.unref();
+      };
+      // Shortly after launch as well, so an outdated CLI does not hide new models for the first minute.
+      this.startTimer = setTimeout(tick, idle.delayMs);
+      this.updateTimer = setInterval(tick, idle.intervalMs);
+      this.startTimer.unref(); this.updateTimer.unref();
     }
   }
   private async updateIdleRuntimes() {
     for (const runtime of this.runtimes.values()) {
-      const state=runtime.state();
-      if(this.closed||this.busy) return;
-      if(runtime.overridden||runtime.busy||!state.current||!state.auto||Date.now()/1000-state.checked<86400)continue;
-      try {await runtime.update(false,this.controller.signal);this.status.invalidate();} catch { /* Runtime retains its previous executable and reports the failure. */ }
+      if (this.closed || this.busy) return;
+      try { if (await runtime.automatic(this.controller.signal)) await this.refreshStatus(); }
+      catch { /* Runtime retains its previous executable and reports the failure. */ }
     }
+  }
+  /** Re-detect models after a runtime or login change and push `ai-status` to open screens. */
+  private async refreshStatus() {
+    this.status.invalidate();
+    if (this.closed) return;
+    try { await this.status.refresh(this.current); } catch { /* The next status read detects again. */ }
   }
   get busy() { return this.active > 0 || [...this.workflows.values()].some(w => w.busy); }
   workflow(ws: Workspace) {
     let workflow = this.workflows.get(ws);
     if (!workflow) {
-      workflow = new Workflow(ws, this.store(ws), this.status, {runner: this.options.runner, check: (deck, mode) => this.options.check(ws, deck, mode), reviewContext: (deck, mode) => this.options.reviewContext?.(ws, deck, mode) ?? Promise.resolve(null), changed: paths => this.options.changed(ws, paths)});
+      workflow = new Workflow(ws, this.store(ws), this.status, {runner: this.options.runner, saveScript: (deck, base, text, signal) => this.options.saveScript(ws, deck, base, text, signal), check: (deck, mode) => this.options.check(ws, deck, mode), reviewContext: (deck, mode) => this.options.reviewContext?.(ws, deck, mode) ?? Promise.resolve(null), changed: paths => this.options.changed(ws, paths)});
       this.workflows.set(ws, workflow);
     }
     return workflow;
@@ -56,7 +69,8 @@ export class LegacyChat {
       store = new ChatStore(ws, {
         providerOf: key => this.status.providerOf(key),
         defaultModel: () => this.status.cached(ws).default,
-        status: () => this.status.cached(ws), broadcast: this.options.broadcast,
+        // 検出前は載せない。画面は /api/ai/status の結果を待って「確かめています…」を出す
+        status: () => this.status.known(ws), broadcast: this.options.broadcast,
       });
       this.stores.set(ws, store);
     }
@@ -66,12 +80,14 @@ export class LegacyChat {
     if (this.workflows.get(ws)?.busy) throw Error('AI の作業が終わってから操作してください');
     await this.workflows.get(ws)?.close();
     this.workflows.delete(ws);
+    if (this.current === ws) this.current = undefined;
     await this.stores.get(ws)?.flush();
     this.stores.delete(ws);
   }
-  handle(ws: Workspace, req: LegacyFeatureRequest): Promise<LegacyFeatureResponse | null> {
+  handle(ws: Workspace, req: FeatureRequest): Promise<FeatureResponse | null> {
     if (!['/api/ai/status', '/api/ai/favorites', '/api/ai/runtimes'].includes(req.pathname) && !/^\/api\/ai\/[^/]+\/(?:login|runtime)$/u.test(req.pathname) && !/^\/api\/deck\/[^/]+\/chat(?:\/open|\/tabs(?:\/[^/]+(?:\/send)?)?|\/rounds\/[^/]+\/(?:continue|cancel|restore|handoff))?$/u.test(req.pathname)) return Promise.resolve(null);
     if (this.closed) return Promise.resolve({status: 503, body: {error: 'アプリを終了しています'}});
+    this.current = ws;
     // Provider probes do not own workspace data. They must not hold draft
     // saves or workspace selection behind a slow metadata endpoint.
     if (req.pathname.startsWith('/api/ai/') && ['GET', 'HEAD'].includes(req.method)) return this.run(ws, req);
@@ -81,7 +97,7 @@ export class LegacyChat {
     this.tail = request.catch(() => {});
     return request;
   }
-  private async run(ws: Workspace, req: LegacyFeatureRequest): Promise<LegacyFeatureResponse> {
+  private async run(ws: Workspace, req: FeatureRequest): Promise<FeatureResponse> {
     const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
     try {
       if (req.pathname === '/api/ai/status') return {body: await this.status.read(ws, req.query.has('refresh'))};
@@ -102,8 +118,8 @@ export class LegacyChat {
           await runtime.setAuto(body.auto);
         } else {
           if ([...this.workflows.values()].some(w => w.busy)) throw Error('AI の作業中は変更できません');
-          if (body.action === 'rollback') { await runtime.rollback(); this.status.invalidate(); }
-          else if (body.action === 'update') void runtime.update(true, this.controller.signal).then(() => this.status.invalidate()).catch(() => {});
+          if (body.action === 'rollback') { await runtime.rollback(); void this.refreshStatus(); }
+          else if (body.action === 'update') void runtime.update(true, this.controller.signal).then(() => this.refreshStatus()).catch(() => {});
           else throw Error('操作を確かめてください');
         }
         return {body: await runtime.info(false, this.controller.signal)};
@@ -138,6 +154,7 @@ export class LegacyChat {
   async close() {
     this.closed = true;
     if(this.updateTimer)clearInterval(this.updateTimer);
+    if(this.startTimer)clearTimeout(this.startTimer);
     this.controller.abort();
     await this.logins.close();
     await this.status.close();

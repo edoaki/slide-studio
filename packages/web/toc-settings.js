@@ -16,7 +16,7 @@ export function makeTocSettings(ctx) {
   el.addEventListener('pointerdown', e => e.stopPropagation());
   const toggle = el.querySelector('input'), layouts = [...el.querySelectorAll('[data-layout]')];
   let layout = 'vertical';
-  let dead = false, ticket = 0;
+  let dead = false, ticket = 0, pendingPadding = false;
   async function refresh() {
     const id = ++ticket, text = ctx.text;
     const st = await structureOf(text);
@@ -27,7 +27,8 @@ export function makeTocSettings(ctx) {
     toggle.disabled = ctx.locked;
     attrs = p?.kv ?? {};
     if (!toggle.checked || ctx.locked) clear();
-    format.update(); updatePadding();
+    format.update();
+    if (!pendingPadding && document.activeElement !== padding) updatePadding();
     for (const button of layouts) {
       button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
       button.disabled = ctx.locked || !toggle.checked;
@@ -60,15 +61,24 @@ export function makeTocSettings(ctx) {
   const host = ctx.root.querySelector('#viewport'), bar = document.createElement('div');
   bar.className = 'toolbar toc-text-tools'; bar.hidden = true;
   bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', S.fmt.bar); host.append(bar);
-  let attrs = {}, colors = {}, shown = { px: 30, ink: '' }, chosen = false, client = null, off = null;
+  let attrs = {}, colors = {}, shown = { px: 30, ink: '' }, chosen = false, chosenSlide = null, client = null, off = null;
   const canEdit = () => !ctx.locked && !ctx.conflict && ctx.renderOk && !ctx.blocks?.editing;
-  function clear() { chosen = false; bar.hidden = true; format.close(); }
+  function clear() { if (pendingPadding) savePadding(); chosen = false; chosenSlide = null; bar.hidden = true; format.close(); }
   function place() { bar.style.left = `${Math.max(4, (host.clientWidth - bar.offsetWidth) / 2)}px`; bar.style.top = '8px'; }
-  async function save(patch) {
-    if (!chosen || !canEdit()) return;
-    const text = ctx.text, st = await structureOf(text);
-    if (dead || text !== ctx.text || !chosen || !canEdit()) return;
-    const p = st.pages.find(p => p.generated === 'toc'); if (!p) return;
+  let pendingSave = Promise.resolve();
+  function save(patch) {
+    if (!chosen || ctx.locked || ctx.conflict) return;
+    pendingSave = pendingSave.then(() => applyPatch(patch)).catch(error => { ctx.hint(error.message); return false; });
+  }
+  async function applyPatch(patch) {
+    let text, st;
+    do {
+      if (dead || ctx.locked || ctx.conflict) return;
+      text = ctx.text;
+      st = await structureOf(text);
+    } while (text !== ctx.text);
+    if (dead || ctx.locked || ctx.conflict) return;
+    const p = st.pages.find(p => p.generated === 'toc'); if (!p || p.classes.includes('toc-off')) return;
     const head = text.slice(p.start, p.head_end).replace(/(^ {0,3}:{3,}[ \t]*\{)([^}]*)(\})/m, (_, start, values, end) => {
       for (const [key, value] of Object.entries(patch)) {
         values = values.replace(new RegExp(`\\s+${key}=(?:"[^"]*"|'[^']*'|[^\\s}]+)`, 'g'), '');
@@ -97,10 +107,13 @@ export function makeTocSettings(ctx) {
   paddingLabel.append(padding); bar.append(paddingLabel);
   function updatePadding() { padding.value = String(attrs['toc-padding'] ?? 16); }
   function savePadding() {
+    if (!pendingPadding) return;
+    pendingPadding = false;
     const value = padding.valueAsNumber;
     if (!Number.isFinite(value) || value < 0 || value > 100) { updatePadding(); return; }
-    if (value !== Number(attrs['toc-padding'] ?? 16)) save({ 'toc-padding': value });
+    save({ 'toc-padding': value });
   }
+  padding.addEventListener('input', () => { pendingPadding = true; });
   padding.addEventListener('change', savePadding);
   padding.addEventListener('keydown', event => {
     if (event.key === 'Enter') { event.preventDefault(); savePadding(); }
@@ -111,8 +124,10 @@ export function makeTocSettings(ctx) {
     const offSelect = client.on('toc.select', event => {
       if (event.sourceVersion !== ctx.preview.sourceVersion) return;
       if (!event.selected || !canEdit()) { clear(); return; }
-      ctx.blocks?.select(null); chosen = true; colors = event.colors; shown = { px: event.px, ink: event.ink };
-      bar.hidden = false; format.update(); updatePadding(); place();
+      ctx.blocks?.select(null); chosen = true; chosenSlide = event.index; colors = event.colors; shown = { px: event.px, ink: event.ink };
+      bar.hidden = false; format.update();
+      if (!pendingPadding && document.activeElement !== padding) updatePadding();
+      place();
     });
     const offKey = client.on('edit.intent', event => {
       if (event.sourceVersion === ctx.preview.sourceVersion && event.kind === 'key' && event.code === 'Escape') clear();
@@ -125,8 +140,9 @@ export function makeTocSettings(ctx) {
   const resize = new ResizeObserver(place); resize.observe(host);
   refresh();
   return {
+    flush() { if (pendingPadding) savePadding(); return pendingSave; },
     textChanged: refresh, previewLoaded() { attach(); refresh(); },
-    slideChanged() { clear(); refresh(); },
+    slideChanged(slide) { if (chosen && slide.index !== chosenSlide) clear(); refresh(); },
     destroy() { dead = true; off?.(); resize.disconnect(); host.removeEventListener('pointerdown', outside); window.removeEventListener('keydown', key); format.destroy(); bar.remove(); },
   };
 }

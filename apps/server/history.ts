@@ -8,21 +8,14 @@
  * Deck text uses the same byte-level encoding adapter as the source route:
  * one version is `sha256(bytes)`, and BOM/CRLF are preserved across saves.
  */
-import { randomUUID } from "node:crypto";
+import { atomicWriteBytesSync } from "../../packages/core/src/atomic.js";
 import {
-  chmodSync,
-  closeSync,
-  fsyncSync,
   lstatSync,
-  mkdirSync,
-  openSync,
   readFileSync,
   realpathSync,
-  renameSync,
   unlinkSync,
-  writeFileSync,
 } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { join } from "node:path";
 import type { Workspace } from "../../packages/core/src/workspace.js";
 import { isInsideRoot } from "../../packages/core/src/paths.js";
 import {
@@ -94,48 +87,11 @@ export function set_vars(
   return `${css}${!css || css.endsWith("\n") ? "" : "\n"}${block}`;
 }
 
-function atomicWriteBytes(path: string, data: Buffer, mode: number): void {
-  const directory = dirname(path);
-  mkdirSync(directory, { recursive: true });
-  const temporary = join(
-    directory,
-    `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`,
-  );
-  let descriptor: number | undefined;
-  try {
-    descriptor = openSync(temporary, "wx", mode);
-    writeFileSync(descriptor, data);
-    fsyncSync(descriptor);
-    try {
-      chmodSync(temporary, mode);
-    } catch {
-      // Windows may not support every mode bit; the replacement is still atomic.
-    }
-    closeSync(descriptor);
-    descriptor = undefined;
-    renameSync(temporary, path);
-  } catch (error) {
-    if (descriptor !== undefined) {
-      try {
-        closeSync(descriptor);
-      } catch {
-        // Preserve the original failure.
-      }
-    }
-    try {
-      unlinkSync(temporary);
-    } catch {
-      // The temporary file may not exist.
-    }
-    throw error;
-  }
-}
-
 function atomicWrite(path: string, text: string): void {
   let mode = 0o666 & ~process.umask();
   const existing = lstatSync(path, { throwIfNoEntry: false });
   if (existing?.isFile()) mode = existing.mode & 0o777;
-  atomicWriteBytes(path, Buffer.from(text, "utf8"), mode);
+  atomicWriteBytesSync(path, Buffer.from(text, "utf8"), mode);
 }
 
 function decodeUtf8(bytes: Buffer, label: string): string {
@@ -201,7 +157,7 @@ export function sourceAdapter(workspace: Workspace, deck: string): StyleSourceAd
       if (!link || link.isSymbolicLink() || !link.isFile()) {
         throw new Error("slides.qmd がファイルではありません");
       }
-      atomicWriteBytes(path, encoded, link.mode & 0o777);
+      atomicWriteBytesSync(path, encoded, link.mode & 0o777);
       return { version: sha256(encoded) };
     },
   };
@@ -299,7 +255,7 @@ export function style(
     } catch (error) {
       if (after !== before) {
         try {
-          if (cssBackup) atomicWriteBytes(path, cssBackup.bytes, cssBackup.mode);
+          if (cssBackup) atomicWriteBytesSync(path, cssBackup.bytes, cssBackup.mode);
           else removeCss(path);
         } catch (rollback) {
           throw new AggregateError([error, rollback], "原稿の保存と余白の復元に失敗しました");

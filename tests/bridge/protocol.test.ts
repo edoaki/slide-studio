@@ -26,6 +26,8 @@ interface ProtocolModule {
   parseEditIntent(value: unknown): SelectionIntent | null;
   validateThemeName(name: string): boolean;
   parsePreviewCapability(value: unknown): { url: string; origin: string; version: string };
+  slidePoint(clientX: number, clientY: number, rect: { left: number; top: number; width: number; height: number } | null): { x: number; y: number; visible: boolean };
+  validatePointer(value: unknown): boolean;
 }
 
 interface EditRect { left: number; top: number; right: number; bottom: number }
@@ -119,12 +121,50 @@ test("requests are identity scoped and reject unknown methods or arbitrary URLs"
 test("presentation input only accepts player navigation keys and event types", () => {
   const request = p.makeRequest(identity, 1, "presentationKey", {type:"keydown", key:"o", repeat:false});
   assert.equal(p.validateRequest(request, identity), true);
-  for (const key of ['b','B','Enter','Backspace',...'0123456789']) assert.equal(p.validateRequest({...request,params:{type:'keydown',key,repeat:false}},identity),true);
-  assert.equal(p.validateRequest({...request,method:'setBlackout',params:{value:true}},identity),true);
-  assert.equal(p.validateRequest({...request,method:'setBlackout',params:{value:'true'}},identity),false);
+  for (const key of ['Enter','Backspace',...'0123456789']) assert.equal(p.validateRequest({...request,params:{type:'keydown',key,repeat:false}},identity),true);
+  for (const key of ['b','B']) assert.equal(p.validateRequest({...request,params:{type:'keydown',key,repeat:false}},identity),false);
+  // Presentation remotes (clickers) send PageDown/PageUp.
+  for (const key of ['PageDown','PageUp']) for (const type of ['keydown','keyup']) {
+    assert.equal(p.validateRequest({...request,params:{type,key,repeat:false}},identity),true,`${type} ${key}`);
+  }
+  for (const key of ['Home','End']) assert.equal(p.validateRequest({...request,params:{type:'keydown',key,repeat:false}},identity),false,key);
+  assert.equal(p.validateRequest({...request,params:{type:'keydown',key:'Insert',repeat:false}},identity),false);
+  assert.equal(p.validateRequest({...request,method:'setBlackout',params:{value:true}},identity),false);
   for (const params of [{type:"click",key:"o",repeat:false}, {type:"keydown",key:"F12",repeat:false}, {type:"keyup",key:"ArrowRight",repeat:"yes"}]) {
     assert.equal(p.validateRequest({...request,params}, identity), false);
   }
+});
+
+test("presenter pointer is normalized to the slide and validated on both hops", () => {
+  // A 1280x720 slide drawn at half size with letterbox offsets.
+  const rect = { left: 40, top: 20, width: 640, height: 360 };
+  assert.deepEqual(p.slidePoint(40, 20, rect), { x: 0, y: 0, visible: true });
+  assert.deepEqual(p.slidePoint(680, 380, rect), { x: 1, y: 1, visible: true });
+  assert.deepEqual(p.slidePoint(360, 200, rect), { x: 0.5, y: 0.5, visible: true });
+  assert.deepEqual(p.slidePoint(40 + 640 / 3, 20, rect), { x: 0.3333, y: 0, visible: true });
+  for (const [x, y] of [[39, 100], [681, 100], [100, 19], [100, 381]] as const) assert.deepEqual(p.slidePoint(x, y, rect), { x: 0, y: 0, visible: false });
+  assert.equal(p.slidePoint(100, 100, null).visible, false);
+  assert.equal(p.slidePoint(100, 100, { ...rect, width: 0 }).visible, false);
+  assert.equal(p.slidePoint(Number.NaN, 100, rect).visible, false);
+
+  assert.equal(p.validatePointer({ x: 0.2, y: 0.9, visible: true }), true);
+  assert.equal(p.validatePointer({ x: 0, y: 0, visible: false }), true);
+  for (const bad of [null, { x: 0.2, y: 0.9 }, { x: 1.2, y: 0, visible: true }, { x: -0.1, y: 0, visible: true },
+    { x: "0.2", y: 0, visible: true }, { x: 0, y: 0, visible: 1 }, { x: 0, y: 0, visible: true, html: "<b>" }]) {
+    assert.equal(p.validatePointer(bad), false, JSON.stringify(bad));
+  }
+  const event = p.makeEvent(identity, "pointer", { x: 0.5, y: 0.25, visible: true });
+  assert.equal(p.validateEvent(event, identity), true);
+  assert.equal(p.validateEvent({ ...event, data: { x: 2, y: 0, visible: true } }, identity), false);
+
+  const track = p.makeRequest(identity, 2, "pointer.track", { enabled: true });
+  assert.equal(p.COMMAND_METHODS.includes("pointer.track"), true);
+  assert.equal(p.validateRequest(track, identity), true);
+  assert.equal(p.validateRequest({ ...track, params: { enabled: "yes" } }, identity), false);
+  assert.equal(p.validateRequest({ ...track, params: { enabled: true, selector: "#stage" } }, identity), false);
+  const edges = p.makeRequest(identity, 3, "clicks.edges", { enabled: true });
+  assert.equal(p.validateRequest(edges, identity), true);
+  assert.equal(p.validateRequest({ ...edges, params: { enabled: 1 } }, identity), false);
 });
 
 test("responses and snapshots are validated before they reach the cache", () => {
@@ -159,6 +199,9 @@ test("events only accept known types and safe link targets", () => {
   assert.equal(p.validateEvent(p.makeEvent(identity, "key", key), identity), true);
   assert.equal(p.validateEvent(p.makeEvent(identity, "key", { ...key, key: "f" }), identity), true);
   assert.equal(p.validateEvent(p.makeEvent(identity, "key", { ...key, key: "F" }), identity), false);
+  // 発表者ビューの枠と投影用ウィンドウは、一覧とページ番号の入力のキーも親へ送る
+  for (const name of ["o", "Enter", "Backspace", ..."0123456789"]) assert.equal(p.validateEvent(p.makeEvent(identity, "key", { ...key, key: name }), identity), true, name);
+  for (const name of ["O", "ArrowRight", " ", "b"]) assert.equal(p.validateEvent(p.makeEvent(identity, "key", { ...key, key: name }), identity), false, name);
   assert.equal(p.validateEvent(p.makeEvent(identity, "key", { key: "Escape" }), identity), false);
 });
 
@@ -345,10 +388,11 @@ test("clipboard bridge accepts only trusted bounded image or HTML file payloads"
 
 
 test("TOC selection validates trusted source state and bounded theme colors", () => {
-  const state = { sourceVersion: "v1", trusted: true, selected: true, px: 30, ink: "rgb(0, 0, 0)", colors: { "--good": "#008800" } };
+  const state = { sourceVersion: "v1", trusted: true, selected: true, index: 2, px: 30, ink: "rgb(0, 0, 0)", colors: { "--good": "#008800" } };
   const valid = (data: unknown) => p.validateEvent(p.makeEvent(identity, "toc.select", data), identity);
   assert.equal(valid(state), true);
   assert.equal(valid({ ...state, trusted: false }), false);
+  assert.equal(valid({ ...state, index: -1 }), false);
   assert.equal(valid({ ...state, px: Infinity }), false);
   assert.equal(valid({ ...state, colors: { "--unknown": "red" } }), false);
   assert.equal(valid({ ...state, ink: "x".repeat(257) }), false);

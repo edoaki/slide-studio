@@ -1,5 +1,5 @@
 import { lstatSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CoreError, isNodeError } from "./errors.js";
 
 const MAX_DECK_ID_LENGTH = 120;
@@ -31,6 +31,16 @@ export function isInsideRoot(rootReal: string, candidateReal: string): boolean {
 export function assertInsideRoot(rootReal: string, candidateReal: string, label: string): void {
   if (!isInsideRoot(rootReal, candidateReal)) {
     throw new CoreError("OUTSIDE_ROOT", `refusing to access outside the workspace root: ${label}`);
+  }
+}
+
+/** Validate even when the destination or some parent directories are not created yet. */
+export function assertWorkspacePath(root: string, candidate: string, outside = "置き場の外は操作できません", linked = "シンボリックリンクを経由できません"): void {
+  const boundary = resolve(root);
+  if (!isInsideRoot(boundary, candidate)) throw Error(outside);
+  for (let path = resolve(candidate);; path = dirname(path)) {
+    if (lstatSync(path, {throwIfNoEntry: false})?.isSymbolicLink()) throw Error(linked);
+    if (relative(boundary, path) === "") return;
   }
 }
 

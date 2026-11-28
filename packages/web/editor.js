@@ -28,13 +28,14 @@ import { navigate } from './app.js';
 import { makeThemes } from './themes.js';
 import { makeThemeTab } from './theme-tab.js';
 import { makeHistory } from './history.js';
-import { makeSlideLibrary } from './slide-library.js';
 import { makeTocSettings } from './toc-settings.js';
-import { makeManuscriptSearch } from './manuscript-search.js';
+import { rawStructureOf } from './structure.js';
+import { saveRetryDelay } from './save-retry.js';
+import { fitPanelWidths, panelRange } from './panel-widths.js';
 
 const SAVE_DELAY = 120;
 // 編集画面に機能を登録する（下書きはチャットの後：開いたときにチャットを下書きのチャットにするため）
-export const plugins = [makeThemes, makeTocSettings, makeQmdBlocks, makeBlocks, makeManuscriptSearch, makeOutput, makePresent, makeSpeakerNotes, makePresenter, makeChat, makeMemo, makeAssets, makeMaterials, makeThemeTab, makeBibliography, makeLeftTabs, makeInsert, makeLayoutLint, makePageStrip, makePdfStep, makeChecks, makeSlideLibrary];
+export const plugins = [makeThemes, makeTocSettings, makeQmdBlocks, makeBlocks, makeOutput, makePresent, makeSpeakerNotes, makePresenter, makeChat, makeMemo, makeAssets, makeMaterials, makeThemeTab, makeBibliography, makeLeftTabs, makeInsert, makeLayoutLint, makePageStrip, makePdfStep, makeChecks];
 
 export function mountEditor(root, deck) {
   let alive = true;
@@ -42,8 +43,8 @@ export function mountEditor(root, deck) {
   const pref = k => { try { return localStorage.getItem('slide-studio.' + k); } catch { return null; } };
   const setPref = (k, v) => { try { localStorage.setItem('slide-studio.' + k, v); } catch { /* 保存できなくても動く */ } };
   document.body.className = '';
-  const ew = pref('editorW'); if (ew) document.documentElement.style.setProperty('--editor-w', ew);
-  const cw = pref('chatW'); if (cw) document.documentElement.style.setProperty('--chat-w', cw);
+  // 原稿欄・チャット欄の好みの幅（保存する値）。実際に当てる幅は窓の幅に収めて applyWidths で決める
+  const widths = { editor: parseFloat(pref('editorW')) || 420, chat: parseFloat(pref('chatW')) || 360 };
   root.innerHTML = `
   <div class="app editing">
     <header class="bar">
@@ -70,7 +71,7 @@ export function mountEditor(root, deck) {
         <div class="ed-scroll" id="qscroll"><div id="qblocks"></div><div id="qhost" hidden></div></div>
         <footer class="ed-status" id="qstatus" aria-live="polite"></footer>
       </section>
-      <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" tabindex="0" data-tip="${S.splitEditor}" aria-label="${S.splitEditor}"></div>
+      <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-controls="editor" tabindex="0" data-tip="${S.splitEditor}" data-keys="← →" aria-label="${S.splitEditor}"></div>
       <section class="stage" id="stage">
         <div class="viewport" id="viewport"><div class="slide-box" id="slideBox"></div></div>
         <div class="stepbar">
@@ -81,9 +82,9 @@ export function mountEditor(root, deck) {
         <div class="strip-grip" id="stripGrip" role="separator" aria-orientation="horizontal" tabindex="0"></div>
         <nav class="pagestrip" id="pagestrip" aria-label="ページ"></nav>
       </section>
-      <footer class="hint"><button class="ibtn editor-settings" data-open-settings aria-haspopup="dialog" aria-label="${S.settings.title}" data-tip="${S.settings.title}">${svg('settings')}</button><div class="msg" id="hintMsg"></div><div class="keys" id="hintKeys"></div></footer>
+      <footer class="hint"><button class="ibtn editor-settings" data-open-settings aria-describedby="update-notification" aria-haspopup="dialog" aria-label="${S.settings.title}" data-tip="${S.settings.title}">${svg('settings')}<span class="update-dot" aria-hidden="true"></span></button><div class="msg" id="hintMsg"></div><div class="keys" id="hintKeys"></div></footer>
     </main>
-    <div class="splitter" id="chatSplitter" role="separator" aria-orientation="vertical" tabindex="0" data-tip="${S.splitChat}" aria-label="${S.splitChat}"></div>
+    <div class="splitter" id="chatSplitter" role="separator" aria-orientation="vertical" aria-controls="chat" tabindex="0" data-tip="${S.splitChat}" data-keys="← →" aria-label="${S.splitChat}"></div>
     <section class="panel" id="chat" aria-label="${S.chat}"></section>
   </div>`;
 
@@ -129,10 +130,12 @@ export function mountEditor(root, deck) {
   // ------------------------------------------------------------ 状態の表示（§6.5）
   function showStatus() {
     if (!alive) return;
-    let text, tone, act = null;
+    let text, tone, act = null, actTip = S.checks.list;
     const partial = !ctx.allLocked && lockNames();
     if (ctx.allLocked) [text, tone] = [S.status.ai(ctx.aiTabs || 1), 'ai'];
     else if (ctx.conflict) [text, tone] = [S.status.conflict, 'error'];
+    // 自動の再試行をやめた後は、押すと保存し直す
+    else if (ctx.saveError) [text, tone, act, actTip] = [S.status.saveFailed, 'error', retrySave, S.status.retry];
     else if (partial) [text, tone] = [S.status.aiPart(ctx.aiTabs || 1, partial), ctx.lock.pages?.length ? 'ai' : 'ai-soft'];
     else if (ctx.dirty || ctx.timer || ctx.blocks?.pending) [text, tone] = [S.status.pending, 'busy'];
     else if (ctx.saving || ctx.styleSaving) [text, tone] = [S.status.saving, 'busy'];
@@ -145,7 +148,7 @@ export function mountEditor(root, deck) {
     ctx.plugins.forEach(p => p.statusChanged?.());
     // 検査で問題があれば、押すと問題の一覧
     statusEl.onclick = act; statusEl.classList.toggle('act', !!act);
-    if (act) { statusEl.tabIndex = 0; statusEl.setAttribute('role', 'button'); tip(statusEl, S.checks.list); statusEl.setAttribute('aria-label', `${text}・${S.checks.list}`); }
+    if (act) { statusEl.tabIndex = 0; statusEl.setAttribute('role', 'button'); tip(statusEl, actTip); statusEl.setAttribute('aria-label', `${text}・${actTip}`); }
     else { statusEl.removeAttribute('tabindex'); statusEl.removeAttribute('role'); statusEl.removeAttribute('aria-label'); delete statusEl.dataset.tip; }
     $('#undo', root).disabled = ctx.history.length === 0 || ctx.locked || ctx.historyBusy;
     $('#redo', root).disabled = ctx.future.length === 0 || ctx.locked || ctx.historyBusy;
@@ -229,12 +232,30 @@ export function mountEditor(root, deck) {
   };
 
   // ------------------------------------------------------------ 保存（最後の操作から 120ms 後）
+  // 失敗した保存は 1・2・4・8 秒後に再試行し、それでも失敗したら状態の表示から手動で再試行する。
+  let saveFails = 0, retryTimer = 0, toastedError = '';
   function scheduleSave() {
     ctx.dirty = true;
-    clearTimeout(ctx.timer);
-    ctx.timer = setTimeout(() => { ctx.timer = 0; save(); }, SAVE_DELAY);
+    clearTimeout(ctx.timer); ctx.timer = 0;
+    // 再試行の待ち中・停止中は、入力のたびに保存し直さない
+    if (!retryTimer && !ctx.saveError) ctx.timer = setTimeout(() => { ctx.timer = 0; save(); }, SAVE_DELAY);
     showStatus();
   }
+  function saveFailed(e) {
+    ctx.dirty = true;
+    saveFails++;
+    // 同じ失敗のトーストは繰り返さない
+    if (e.message !== toastedError) { toastedError = e.message; toast(e.message); }
+    const delay = saveRetryDelay(saveFails, e.status);
+    if (delay == null) { ctx.saveError = e.message || true; return; }
+    retryTimer = setTimeout(() => { retryTimer = 0; if (alive) save(); }, delay);
+  }
+  function resetSaveRetry() { clearTimeout(retryTimer); retryTimer = 0; saveFails = 0; toastedError = ''; ctx.saveError = null; }
+  let waitingForUnlock = false;
+  ctx.resumeLockedSave = () => {
+    if (waitingForUnlock && ctx.dirty) { waitingForUnlock = false; resetSaveRetry(); scheduleSave(); }
+  };
+  function retrySave() { resetSaveRetry(); ctx.dirty = true; save(); }
   // 保存待ちを直ちに保存し、版が一致したら true（AI に送る前に使う：§6.4）
   ctx.flush = async () => {
     const results = await Promise.all(ctx.plugins.map(p => p.flush?.()));
@@ -260,9 +281,12 @@ export function mountEditor(root, deck) {
     const text = ctx.text;
     ctx.dirty = false;
     ctx.savingText = text;
+    clearTimeout(retryTimer); retryTimer = 0;
     ctx.saving = (async () => {
       try {
-        const r = await api(`/api/deck/${encodeURIComponent(deck)}/source`, { method: 'PUT', body: { text, base: ctx.version, ...(ctx.mergeable ? { base_text: ctx.saved } : {}) } });
+        const r = await api(`/api/deck/${encodeURIComponent(deck)}/source`, { method: 'PUT', body: { text, base: ctx.version, base_text: ctx.saved } });
+        waitingForUnlock = false;
+        resetSaveRetry();
         if (r.text != null && r.text !== text) {
           // AI の変更と合流した
           dropTextHistory();
@@ -275,16 +299,15 @@ export function mountEditor(root, deck) {
         }
       } catch (e) {
         if (e.status === 409) showConflict(e.data);
-        else if (e.status === 423 && e.data?.partial) { toast(S.locked); ctx.dirty = false; applyServerText(await api(`/api/deck/${encodeURIComponent(deck)}`)); }
-        else if (e.status === 423) { ctx.allLocked = true; ctx.dirty = true; }
-        else { ctx.dirty = true; toast(e.message); }
+        else if (e.status === 423) { waitingForUnlock = true; saveFailed(e); }
+        else saveFailed(e);
       }
     })();
     showStatus();
     await ctx.saving;
     ctx.saving = null; ctx.savingText = null;
     ctx.plugins.forEach(p => p.saved?.());
-    if (ctx.dirty && !ctx.conflict && !ctx.timer && !ctx.allLocked) scheduleSave();
+    if (ctx.dirty && !ctx.conflict && !ctx.timer && !retryTimer && !ctx.saveError && !ctx.allLocked) scheduleSave();
     showStatus();
   }
 
@@ -304,7 +327,7 @@ export function mountEditor(root, deck) {
     if (copy && !await copyWithFallback(ctx.text, $('#edBanner', root))) return;
     const d = await api(`/api/deck/${encodeURIComponent(deck)}`);
     if (!alive) return;
-    ctx.conflict = null; ctx.dirty = false; clearTimeout(ctx.timer); ctx.timer = 0;
+    ctx.conflict = null; ctx.dirty = false; clearTimeout(ctx.timer); ctx.timer = 0; resetSaveRetry();
     $('#edBanner', root).textContent = '';
     applyServerText(d);
   }
@@ -342,11 +365,9 @@ export function mountEditor(root, deck) {
     if (!alive) return;
     if (ticket !== externalGeneration) return;
     if (d.version === ctx.version || (ctx.saving && d.text === ctx.savingText) || (ctx.styleSaving && d.text === ctx.styleSavingText)) return;
-    if (d.text === ctx.text) { ctx.version = d.version; ctx.saved = d.text; ctx.dirty = false; showStatus(); return; }
-    // 入力が残っている（保存待ち・保存中）なら上書きせず競合を出す
+    if (d.text === ctx.text) { ctx.version = d.version; ctx.saved = d.text; ctx.dirty = false; resetSaveRetry(); showStatus(); return; }
+    // 保存待ちの入力は、保存時に外部変更と行単位で合流する。
     if (ctx.dirty || ctx.timer || ctx.saving || ctx.text !== ctx.saved) {
-      if (!ctx.mergeable) { showConflict(d); return; }
-      // AI が別のページを書いた。書きかけは保存のときに合流する
       if (!ctx.saving) { clearTimeout(ctx.timer); ctx.timer = 0; ctx.dirty = true; save(); }
       return;
     }
@@ -453,7 +474,7 @@ export function mountEditor(root, deck) {
   async function refreshStructure() {
     try {
       const text = ctx.text;
-      const structure = await api('/api/structure', { method: 'POST', body: { text } });
+      const structure = await rawStructureOf(text);
       if (!alive || text !== ctx.text) return;
       ctx.structure = structure;
       showStatus();
@@ -471,7 +492,7 @@ export function mountEditor(root, deck) {
       ctx.rendering = false; ctx.renderOk = ev.ok; ctx.render = ev;
       if (ev.ok) {
         // CSS だけ差し替えたときは読み込み直さないので、差し替え後に描いた色を読む機能へ知らせる
-        if (ev.theme_only && preview.frame && !preview.pending && preview.client?.snapshot?.hasReferences === false) preview.setTheme(ev.theme, ev.version).then(() => ctx.plugins.forEach(p => p.previewThemed?.()));
+        if (ev.theme_only && preview.frame && !preview.pending && preview.client?.snapshot?.hasReferences === false) preview.setTheme(ev.theme, ev.version, ev.version).then(() => ctx.plugins.forEach(p => p.previewThemed?.()));
         else preview.load(ev.version);
       }
       await refreshStructure();
@@ -485,11 +506,36 @@ export function mountEditor(root, deck) {
   });
 
   // ------------------------------------------------------------ 上のバーと配置
+  // 左右の欄の幅を窓に収めて当てる。中央のスライドが潰れないよう、狭い窓では欄の方を縮める（好みの幅は変えない）
+  const panels = {
+    editor: { splitter: $('#splitter', root), prop: '--editor-w', key: 'editorW', dir: 1, off: 'editor-off' },
+    chat: { splitter: $('#chatSplitter', root), prop: '--chat-w', key: 'chatW', dir: -1, off: 'chat-off' },
+  };
+  const isOn = which => !document.body.classList.contains(panels[which].off);
+  let applied = { editor: 0, chat: 0 };
+  function rangeOf(which) { return panelRange(which, { total: innerWidth, other: applied[which === 'editor' ? 'chat' : 'editor'] }); }
+  function applyWidths() {
+    applied = fitPanelWidths({ total: innerWidth, editor: widths.editor, chat: widths.chat, editorOn: isOn('editor'), chatOn: isOn('chat') });
+    for (const [which, p] of Object.entries(panels)) {
+      if (applied[which]) document.documentElement.style.setProperty(p.prop, `${applied[which]}px`);
+      const { min, max } = rangeOf(which);
+      p.splitter.setAttribute('aria-valuemin', String(min)); p.splitter.setAttribute('aria-valuemax', String(max));
+      p.splitter.setAttribute('aria-valuenow', String(applied[which] || widths[which]));
+    }
+  }
+  // 好みの幅を変える（ドラッグ・キー）。広げられるのは中央の最小幅を残すところまで
+  function setWidth(which, px) {
+    const { min, max } = rangeOf(which);
+    widths[which] = Math.round(Math.max(min, Math.min(max, px)));
+    applyWidths();
+  }
+  addEventListener('resize', applyWidths);
   function toggles() {
     const eOff = document.body.classList.contains('editor-off'), cOff = document.body.classList.contains('chat-off');
     const e = $('#editorToggle', root), c = $('#chatToggle', root);
     e.innerHTML = svg('panelLeft'); e.setAttribute('aria-pressed', String(!eOff)); tip(e, eOff ? S.editorOff : S.editorOn, eOff ? '' : '0');
     c.innerHTML = svg(cOff ? 'chat' : 'panelRightClose'); tip(c, cOff ? S.chatOff : S.chatOn, cOff ? 'C' : '⌥ C');
+    applyWidths();
   }
   $('#editorToggle', root).onclick = () => {
     document.body.classList.toggle('editor-off'); toggles();
@@ -543,26 +589,39 @@ export function mountEditor(root, deck) {
     editor.revealOffset(x.source_offset, $('#qscroll', root));
   };
   $('#blocksMode', root).onclick = () => setMode(false);
-  // 境界のドラッグ（原稿とスライド、作業域とチャット）。dir は右へ動かしたときに広がるなら 1、狭まるなら -1
-  function dragWidth(splitter, prop, key, dir, min) {
+  // 境界のドラッグとキー操作（原稿とスライド、作業域とチャット）。dir は右へ動かしたときに広がるなら 1、狭まるなら -1
+  for (const [which, { splitter, key, dir }] of Object.entries(panels)) {
     splitter.addEventListener('pointerdown', e => {
       splitter.setPointerCapture(e.pointerId); splitter.classList.add('on'); document.body.classList.add('resizing');
-      const style = document.documentElement.style, w0 = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(prop)), x0 = e.clientX;
+      const w0 = applied[which] || widths[which], x0 = e.clientX;
       const move = ev => {
         const scroller = $('#qscroll', root), before = pageTop();
-        style.setProperty(prop, Math.max(min, Math.min(innerWidth * .6, w0 + dir * (ev.clientX - x0))) + 'px');
+        setWidth(which, w0 + dir * (ev.clientX - x0));
         // 折り返しで前のページの高さが変わっても、現在の見出しを表示範囲に保つ。
         const head = rawMode ? editor.headEl(editor.page) : ctx.qmdBlocks?.headEl();
         if (before == null || !head?.getClientRects().length || !scroller.clientHeight) return;
         const top = Math.max(4, Math.min(before, scroller.clientHeight - head.getBoundingClientRect().height - 4));
         scroller.scrollTop += pageTop() - top;
       };
-      const up = () => { splitter.removeEventListener('pointermove', move); splitter.classList.remove('on'); document.body.classList.remove('resizing'); setPref(key, getComputedStyle(document.documentElement).getPropertyValue(prop).trim()); };
-      splitter.addEventListener('pointermove', move); splitter.addEventListener('pointerup', up, { once: true });
+      // 指を離した・取り消された・捕捉を失った、のどれでも1回だけ終える
+      const up = () => {
+        for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) splitter.removeEventListener(type, up);
+        splitter.removeEventListener('pointermove', move); splitter.classList.remove('on'); document.body.classList.remove('resizing'); setPref(key, `${widths[which]}px`);
+      };
+      splitter.addEventListener('pointermove', move);
+      for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) splitter.addEventListener(type, up);
+    });
+    // ←→ で 16px、⇧ を押しながらで 64px、Home・End で最小・最大
+    splitter.addEventListener('keydown', e => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const step = e.shiftKey ? 64 : 16, { min, max } = rangeOf(which), now = applied[which] || widths[which];
+      const next = e.key === 'ArrowRight' ? now + dir * step : e.key === 'ArrowLeft' ? now - dir * step
+        : e.key === 'Home' ? min : e.key === 'End' ? max : null;
+      if (next == null) return;
+      e.preventDefault(); e.stopPropagation();
+      setWidth(which, next); setPref(key, `${widths[which]}px`);
     });
   }
-  dragWidth($('#splitter', root), '--editor-w', 'editorW', 1, 260);
-  dragWidth($('#chatSplitter', root), '--chat-w', 'chatW', -1, 300);
 
   // ------------------------------------------------------------ キー（↑↓ ページ、←→ step、長押しで最初・最後）
   let held = null, holdTimer = 0, long = false;
@@ -591,7 +650,9 @@ export function mountEditor(root, deck) {
     if (!long) preview.move(e.key === 'ArrowRight' ? 1 : -1);
     held = null;
   }
-  addEventListener('keydown', keydown); addEventListener('keyup', keyup);
+  // 長押し中に窓を離れると keyup が届かないので、押したままの状態を解く
+  function releaseHeld() { clearTimeout(holdTimer); held = null; long = false; }
+  addEventListener('keydown', keydown); addEventListener('keyup', keyup); addEventListener('blur', releaseHeld);
 
   // ------------------------------------------------------------ 読み込み
   (async () => {
@@ -619,8 +680,8 @@ export function mountEditor(root, deck) {
     preview.destroy();
     clearTimeout(holdTimer);
     removeEventListener('beforeunload', beforeUnload);
-    off(); removeEventListener('keydown', keydown); removeEventListener('keyup', keyup);
-    clearTimeout(ctx.timer);
+    off(); removeEventListener('keydown', keydown); removeEventListener('keyup', keyup); removeEventListener('blur', releaseHeld); removeEventListener('resize', applyWidths);
+    clearTimeout(ctx.timer); clearTimeout(retryTimer);
     if (ctx.dirty) ctx.flush();
     ctx.plugins.forEach(p => p.destroy?.());
   };

@@ -7,16 +7,16 @@ import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test, { type TestContext } from "node:test";
 import type {
-  LegacyRenderText,
-  LegacyRendered,
+  RenderText,
+  RenderedDeck,
 } from "../../packages/contracts/src/server.js";
 import { render_text } from "../../packages/core/src/render.js";
 import { parse } from "../../packages/core/src/source.js";
 import { encodeSourceForDeck, sha256 } from "../../packages/core/src/encoding.js";
 import { Workspace } from "../../packages/core/src/workspace.js";
 import {
-  startLegacyHost,
-  type LegacyHost,
+  startStudioHost,
+  type StudioHost,
 } from "../../apps/server/index.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -67,7 +67,7 @@ interface RequestOptions {
 }
 
 function adminRequest(
-  host: LegacyHost,
+  host: StudioHost,
   path: string,
   options: RequestOptions = {},
 ): Promise<ResponseValue> {
@@ -127,12 +127,12 @@ async function createUi(t: TestContext): Promise<string> {
 
 async function launch(
   t: TestContext,
-  renderText: LegacyRenderText = render_text,
-): Promise<{ host: LegacyHost; workspace: Workspace }> {
+  renderText: RenderText = render_text,
+): Promise<{ host: StudioHost; workspace: Workspace }> {
   const root = await scratch(t);
   const workspace = Workspace.open(root);
   const uiDirectory = await createUi(t);
-  const host = await startLegacyHost({
+  const host = await startStudioHost({
     workspace,
     uiDirectory,
     pandocPath: PANDOC,
@@ -374,8 +374,8 @@ test("source saves rebase independent edits and preserve BOM/CRLF bytes", async 
 });
 
 test("deck reads migrate old block design source under the deck lock without changing bytes format", async (t) => {
-  const fake: LegacyRenderText = async (_workspace, _deck, text) => {
-    const rendered: LegacyRendered = {
+  const fake: RenderText = async (_workspace, _deck, text) => {
+    const rendered: RenderedDeck = {
       html: "<!doctype html><html><body><div id=\"stage\"></div></body></html>",
       slides: [],
       doc: parse(text),
@@ -414,7 +414,7 @@ test("deck reads migrate old block design source under the deck lock without cha
 
 test("deck reads use the real warning_issues helper", async (t) => {
   const warning = "[WARNING] Ignoring duplicate attribute data-x=\"2\".";
-  const fake: LegacyRenderText = async (_workspace, _deck, text) => ({
+  const fake: RenderText = async (_workspace, _deck, text) => ({
     html: "<!doctype html><html><body><div id=\"stage\"></div></body></html>",
     slides: [{ index: 0, page: 0, id: "slide", title: "Slide", level: 1, figures: [] }],
     doc: parse(text),

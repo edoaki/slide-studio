@@ -48,7 +48,11 @@ test('original Electron editor renders shared figures, checks all steps and expo
  await page.locator('.deck-card-wrap[data-deck="talk"] .name').filter({hasText:'日本語の発表'}).waitFor();
  await page.goto(new URL('/topic/test',page.url()).href);
  await page.locator('.topic-html .card').filter({hasText:'chart'}).waitFor();
- await page.frameLocator('.topic-step iframe').nth(1).locator('#stage[data-step="1"] svg').waitFor();
+ await page.getByRole('button',{name:'「chart」をプレビュー'}).click();
+ const htmlPreview=page.getByRole('dialog',{name:'素材のプレビュー'});
+ await htmlPreview.frameLocator('iframe').locator('#stage[data-step="0"] svg').waitFor();
+ await htmlPreview.getByRole('button',{name:'次のステップ'}).click();
+ await htmlPreview.frameLocator('iframe').locator('#stage[data-step="1"] svg').waitFor();
  await page.goto(new URL('/deck/talk',page.url()).href);
  await app.evaluate(({BrowserWindow},dir)=>{const win=BrowserWindow.getAllWindows().find(w=>!w.webContents.getURL().startsWith('studio-render:'))!;win.webContents.session.on('will-download',(_e,item)=>item.setSavePath(`${dir}/${item.getFilename()}`));},temp);
  await page.locator('#pagestrip img.shot').first().waitFor({timeout:60000});

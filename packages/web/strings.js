@@ -4,11 +4,22 @@ export const PAGE_PLACEHOLDERS = {
   "body": "本文", "item": "項目", "image": "図・画像", "subhead": "小見出し", "cell": "セル", "note": "注", "summary": "まとめ"
 };
 
+function warningSummary(warnings) {
+  const pages = new Set();
+  let unassigned = 0;
+  for (const warning of warnings) {
+    const page = warning.slide ?? warning.page;
+    if (page == null) unassigned++;
+    else pages.add(page);
+  }
+  return `警告のあるページ ${pages.size}ページ` + (unassigned ? `（ページ指定のない警告 ${unassigned}件）` : '');
+}
+
 export const S = {
   pageActions: {
     title: 'ページの操作', page: (n, title) => `${n}. ${title}`,
     duplicate: 'ページを複製', skip: '発表・PDFから外す', unskip: '発表・PDFに戻す',
-    skipped: 'スキップ', previous: '前へ移動', next: '後ろへ移動', remove: 'ページを削除', close: '閉じる',
+    remove: 'ページを削除', close: '閉じる',
   },
   homeList: {
     sort: 'スライドの並び順', empty: 'スライドはまだありません',
@@ -17,13 +28,6 @@ export const S = {
   homeTrash: {
     title: 'ごみ箱', empty: 'ごみ箱は空です', restore: '復元', restored: '復元しました', loading: '読み込んでいます…',
     kinds: { deck: '発表', theme: 'テーマ', topic: 'トピック' }, deleted: '削除日時',
-  },
-  manuscriptSearch: {
-    title: '原稿全体を検索・置換', query: '検索する文字列', replacement: '置換後の文字列',
-    caseSensitive: '大文字と小文字を区別', prev: '前の一致箇所', next: '次の一致箇所', close: '検索を閉じる',
-    replace: '置換', all: 'すべて置換', prompt: '検索する文字列を入力してください', front: 'ページの前の設定・原稿',
-    count: (current, total) => total ? `${current} / ${total}件` : '一致する文字列がありません',
-    page: (n, title) => `p${n} · ${title}`,
   },
   blockContext: {
     title: 'ブロックの操作', duplicate: '複製', remove: '削除', up: '上へ移動', down: '下へ移動',
@@ -39,14 +43,14 @@ export const S = {
     keyHints: '画面下にキー操作の案内を表示', keyHintsHint: 'ページ移動やチャットなどの操作を編集画面の下部に表示します。',
     tooltips: 'ボタンの説明を表示', tooltipsHint: 'カーソルを重ねたときやキーボードで選んだときに説明を表示します。',
     tooltipKeys: 'ボタンの説明にショートカットを表示', tooltipKeysHint: '操作名と一緒に、その操作のキーを表示します。',
-    shortcutHint: '文字を入力していないときの操作です。Mac以外では⌘をCtrlに読み替えてください。',
+    shortcutHint: '文字を入力していないときの操作です。',
     shortcutGroups: ['全体', '編集・移動', '発表中'],
     shortcuts: [
       [0, '⌘ ,', '設定を開く'], [0, '⌘ + / ⌘ −', 'アプリの表示を拡大・縮小'], [0, '⌘ 0', '表示倍率を100%に戻す'],
       [1, '⌘ Z', '元に戻す'], [1, '⇧ ⌘ Z', 'やり直す'], [1, '↑ / ↓', '前後のページへ'], [1, '← / →', '前後のステップへ'],
       [1, '← / → 長押し', '最初・最後のステップへ'], [1, 'O', 'スライド一覧'], [1, 'C', 'AIチャットの表示切り替え'],
       [1, 'F', '現在のスライドから発表'], [1, '⇧ F', '最初のスライドから発表'], [2, 'Esc', '発表を終了'], [2, 'F', '全画面表示を切り替え'],
-      [1, '⌘ F / Ctrl F', '原稿全体を検索'], [2, 'B', '画面を暗くする・戻す'], [2, '番号 → Enter', '指定ページへ移動'],
+      [2, 'B', '画面を暗くする・戻す'], [2, '番号 → Enter', '指定ページへ移動'],
     ],
     aiHint: 'AIのインストール・ログイン・更新を管理します。', agentsHint: '担当別のモデルや指示は「AIの担当」で設定できます。',
     environment: '動作環境', ready: '正常', needsAttention: '要確認',
@@ -54,53 +58,46 @@ export const S = {
     license: 'ライセンス', licenseText: 'PolyForm Noncommercial 1.0.0',
   },
   speaker: {
-    launchTitle: '発表用メニュー', normal: '通常の発表', normalHelp: '最初のスライドから全画面で発表', presenterHelp: '発表メモ・次のスライド・残り時間を手元に表示', rehearsalHelp: '持ち時間を設定して発表を練習',
-    options: '発表の設定', title: '発表者ビュー', rehearsal: 'リハーサル', notes: '発表メモ', pageNote: 'ページの発表メモ', pageNumber: n => `p${n}`,  globalNote: '全体',
-    notePlaceholder: '話す内容や気づいたことを記入', saving: '保存しています…', pending: '保存待ち', saved: '保存済み',
+    title: '発表者ビュー', notes: '発表メモ', pageNote: 'ページの発表メモ', pageNumber: n => `p${n}`,  globalNote: '全体',
+    pageNoteTitle: n => `p${n} のメモ`, globalNoteTitle: '全体のメモ', noteRatio: 'ページのメモと全体のメモの比率',
+    fontSize: 'メモの文字サイズ', fontSmaller: '文字を小さく', fontLarger: '文字を大きく',
+    saving: '保存しています…', pending: '保存待ち', saved: '保存済み',
     noteError: 'メモを保存できません。入力を残したまま再度編集してください。',
-    current: '現在のスライド', next: '次のスライド', last: '最後のスライド',
-    duration: '持ち時間（分）', countEnd: '枚数を数える範囲', beforeRefs: '参考文献の手前まで', all: '最後まで',
-    start: '計測開始', pause: '一時停止', resume: '再開', finish: '終了', close: '閉じる',
+    current: '現在のスライド', next: '次のスライド', last: '最後のスライド', showNext: '次のスライドを表示', hideNext: '次のスライドを隠す',
+    duration: '持ち時間（分）', durationSeconds: '持ち時間（秒）', durationLabel: '持ち時間', minutes: '分', seconds: '秒', durationTip: '押して持ち時間（分・秒）を入力',
+    countEnd: '進捗に数えるページ', countTip: '押して進捗に数えるページを選ぶ', countValue: '数えるページ数',
+    countHint: n => `ページ目まで（全 ${n} ページ）`, countHelp: '一覧でページを押すと、そのページまでを数えます。章扉と参考文献は数えません。',
+    countEmpty: '数えられるページがありません',
+    start: '計測開始', pause: '一時停止', resume: '再開', finish: '発表を終了', close: '閉じる',
     remaining: '残り', overtime: '超過', elapsed: '経過', progress: '進捗',
     projection: '投影用ウィンドウを開く', projectionHelp: '投影先の画面へウィンドウを移動し、全画面にしてください。画面共有では投影用ウィンドウを選びます。',
     projectionBlocked: '投影用ウィンドウを開けませんでした。ポップアップの設定を確認してください。',
     projectionClosed: '投影用ウィンドウは閉じています', projectionTitle: '投影用スライド', fullscreen: '全画面',
-    prev: '戻る', forward: '進む',
-    finishError: '発表を終了できませんでした。もう一度「終了」を押してください。',
-    fontSize: 'メモの文字サイズ', width: 'スライドとメモの幅', ratio: '現在と次のスライドの比率', startError: '発表者ビューを開けませんでした',
-    result: 'リハーサルの結果', page: 'ページ', thisRun: '今回', previous: '前回', difference: '前回との差', unvisited: '未訪問', noPrevious: '前回の記録はありません', recordError: '練習記録を読み書きできませんでした。今回の結果はこの画面で確認できます。', shortcuts: 'B: 暗転・解除 / 数字 → Enter: ページへ移動',
-    stages: n => `あと${n}段階`, total: '合計',
+    projectionFocus: '投影用ウィンドウを前面に表示',
+    pointer: 'ポインター', pointerOn: 'ON', pointerOff: 'OFF', pointerHelp: '現在のスライド上のカーソルを、投影画面にポインターとして表示します',
+    pointerStyle: 'ポインターの形', pointerColor: 'ポインターの色', pointerSize: 'ポインターの大きさ',
+    pointerLabels: {style:'形', color:'色', size:'大きさ'}, pointerStyles: {dot:'点', glow:'光', highlight:'マーカー'}, pointerColors: {red:'赤', green:'緑', blue:'青', yellow:'黄'},
+    pointerSizes: {small:'小', medium:'中', large:'大'},
+    prev: '戻る', forward: '進む', prevPage: '前のページ', nextPage: '次のページ',
+    prevTip: '1つ戻る', forwardTip: '1つ進む',
+    prevPageTip: '前のページへ', nextPageTip: '次のページへ',
+    pageJump: '移動するページ番号', pageJumpHelp: 'ページ番号を入力して Enter で移動',
+    finishError: '発表を終了できませんでした。もう一度「発表を終了」を押してください。',
+    showElapsed: '経過時間を大きく表示', showRemaining: '残り時間を大きく表示',
+    width: 'スライドとメモの幅', ratio: '現在と次のスライドの比率', startError: '発表者ビューを開けませんでした',
+    stages: n => `あと${n}段階`,
+    steps: '段階', stepCount: (k, n) => `段階 ${k} / ${n}`, stepPreview: k => `段階 ${k} をプレビュー中・押すと投影に反映`,
   },
 
-  slideLibrary: {
-    subtitle: '取り込み元のスライドを選択',
-    pages: 'ページを選択', back: 'スライドの選択に戻る',
-    decks: n => `${n} 件のスライド`, pageCount: n => `${n} ページ`,
-    choosePosition: '指定位置に挿入', append: '末尾に挿入', insert: 'ここに挿入',
-    before: n => `${n} ページ目の前に挿入`, end: '最後のページの後に挿入',
-    invalidPosition: 'この位置には挿入できません。本文のページ間を選んでください。',
-    positionChanged: '取り込み先が変更されました。挿入位置を選び直してください。',
-    selection: n => n ? `${n} ページを選択中` : '取り込むページを選択',
-    destination: deck => `「${deck}」へ取り込む`,
-    clear: '選択を解除', empty: 'スライドが見つかりません', emptyHint: '別の言葉や文献キーで検索してみてください。',
-    open: 'スライドを探す', close: '閉じる', search: '検索',
-    placeholder: '本文・タイトル・文献キーで検索', searching: '検索しています…',
-    take: '選んだページを取り込む', importing: '素材と文献を取り込んでいます…',
-    changed: '原稿が変更されました。検索し直してください。',
-    noThumb: 'サムネイルを準備中', count: n => n ? `${n} ページ見つかりました` : '一致するページがありません',
-    skipped: n => `（${n} 件の発表を読み込めませんでした）`, imported: n => `${n} ページを取り込みました`,
-  },
   updates: {
-    title: 'アプリの更新', automatic: '新しいバージョンを自動で更新する',
-    hint: '自動更新はダウンロード後、アプリを終了するときに適用します。チェックを外すと手動で更新できます。',
-    check: '更新を確認', download: '更新する', install: '再起動して更新',
+    title: 'アプリの更新',
+    hint: '新しいバージョンがあれば設定に通知します。GitHub Releases からダウンロードし、アプリを終了して手動で入れ替えてください。',
+    notice: '更新あり', check: '更新を確認', download: 'ダウンロードページを開く',
     version: version => `バージョン ${version}`, available: version => `バージョン ${version} に更新できます。`,
     idle: '新しいバージョンを確認できます。', checking: '更新を確認しています…', current: '最新のバージョンです。',
-    progress: value => `更新をダウンロードしています… ${value}%`,
-    readyAutomatic: '更新の準備ができました。アプリの終了時に適用します。',
-    ready: '更新の準備ができました。「再起動して更新」で適用します。',
-    error: '更新を取得できませんでした。時間をおいて「更新を確認」を押してください。',
-    disabled: 'このビルドはアプリ内更新に対応していません。',
+    unpublished: 'ダウンロードできるリリースはまだ公開されていません。',
+    error: '更新を確認できませんでした。時間をおいて「更新を確認」を押してください。',
+    disabled: 'この環境では更新を確認できません。',
   },
   pageDrag: 'ドラッグでページを移動',
   externalLinkError: 'ブラウザーでリンクを開けませんでした。',
@@ -165,7 +162,7 @@ export const S = {
     renamed: '発表の名前を変更しました', moved: 'フォルダ名を変更しました', deleted: '発表をゴミ箱に移しました', restored: '元に戻しました',
     confirm: title => `「${title}」を削除しますか？参考資料・チャットの記録・控えもゴミ箱に移します。`,
   },
-  present: { exitHint: 'Escで戻る', progress: '発表の進行状況', overview: 'スライド一覧', fullscreen: '全画面', title: '発表する', menu: '発表用メニュー', current: '今のページから', error: '発表を始められませんでした。描画の状態を確認してください。' },
+  present: { exitHint: 'Escで戻る', progress: '発表の進行状況', overview: 'スライド一覧', fullscreen: '全画面', title: '発表する', current: '今のページから', error: '発表を始められませんでした。描画の状態を確認してください。' },
   pageTemplates: { title: 'ページのひな形', blank: '白紙', chapter: '章扉', references: '参考文献', appendix: 'Appendix', preview: { chapter: '章扉', references: 'Reference', appendix: 'Appendix' }, textImage: '文と図', imageBullets: '図と箇条書き', table: '表', comparison: '2つの比較' },
   appName: 'Slide Studio',
   authLost: '認証が切れました。アプリを開き直してください。',
@@ -173,21 +170,21 @@ export const S = {
     duplicateAttribute: (key, value, line) => `${line}行目：${key} が重複しています。後の指定（${value}）は無視されます。属性を1つにまとめてください。`,
     openSource: '原稿の該当箇所へ',
     busy: '検査中', stale: '検査が古い', ok: '検査：問題なし',
-    count: (n, m) => `検査：エラー ${n}・警告 ${m}`,
+    count: (n, warnings) => `検査：エラー ${n}件・${warningSummary(warnings)}`,
     proceed: 'このまま書き出す', blocked: '検査にエラーがあります',
     title: '検査の結果', list: '押すと問題の一覧を表示', open: 'このページへ',
+    askAi: 'AI に修正を頼む', askAiTip: 'この一覧を直す依頼をチャットの入力欄に入れます（送信はまだしません）', askAiText: '検査で次の問題が出ています。直してください。', askAiMore: n => `ほか ${n} 件`,
     level: { error: 'エラー', warning: '警告' }, page: n => `${n}ページ`,
   },
   topic: {
     remove: 'トピックを削除', removed: 'トピックを削除しました',
     removeConfirm: name => `「${name}」を削除しますか？素材と文献は .slide-studio/trash/topics/ に移します。発表で使用中のトピックは削除できません。`,
-    errors: { htmlInUse: '使用中の HTML が含まれています。選択を外してから削除してください。', htmlMissing: 'HTML が見つからないか、安全に削除できない場所です。', topicMissing: 'トピックが見つからないか、安全に削除できない場所です。', topicInUse: 'このトピックを使用している発表があります。発表を削除するか、トピックの割り当てと素材への参照を変更してから、もう一度お試しください。' },
+    errors: { htmlInUse: 'この HTML は発表で使用中です。', htmlMissing: 'HTML が見つからないか、安全に削除できない場所です。', topicMissing: 'トピックが見つからないか、安全に削除できない場所です。', topicInUse: 'このトピックを使用している発表があります。発表を削除するか、トピックの割り当てと素材への参照を変更してから、もう一度お試しください。' },
     new: '＋ 新しいトピック…', create: '新しいトピック', name: 'トピック名（英小文字・数字・ハイフン）',
     open: name => `${name} を開く`, newDeck: 'このトピックのスライドを作る',
     html: 'HTML', noHtml: 'HTML はまだありません', noDecks: '発表はまだありません',
-    shared: n => `_lib のファイル ${n}件`, step: n => `step ${n}`, htmlOpen: '開く',
-    selectHtml: name => `「${name}」を選択`, selected: n => `${n}件選択`, deleteHtml: '選択した HTML を削除',
-    deleteHtmlConfirm: '選択した HTML をごみ箱に移します。使用中のものは削除できません。',
+    shared: n => `_lib のファイル ${n}件`, htmlOpen: name => `「${name}」をプレビュー`,
+    deleteHtml: name => `「${name}」を削除`, deleteHtmlConfirm: name => `「${name}」をごみ箱に移しますか？`,
     unused: '未使用', used: names => `使用中 · ${names.join('・')}`,
     // 文献（topics/<トピック>/reference.bib）。Zotero のように一覧と詳細を並べる
     bib: '文献', bibCount: n => `${n}件`, noBib: '文献はまだありません', bibError: 'reference.bib を読めません（BibTeX の書き方を確認してください）',
@@ -305,9 +302,10 @@ export const S = {
     openApp: '既定のアプリで開く', noPreview: 'このアプリでは表示できません。ダブルクリックで既定のアプリで開けます',
     tooBig: '大きいので表示しません。ダブルクリックで既定のアプリで開けます', firstLines: n => `最初の ${n} 行だけ表示しています`,
     drop: 'ファイルやフォルダをドロップして追加（押すとファイルを選べます）',
+    empty: ['実験結果・論文の PDF・PowerPoint の雛形などを置けます。', 'ここに置いたファイルは AI が読めます。チャットで「測定結果を表にして」のように頼めます。'],
     rename: '名前を変更', remove: '削除', name: '名前', badName: '名前に / や \\ は使えません。先頭の . も使えません',
     removeTitle: '参考資料を削除', removeText: (path, dir) => `${dir ? 'フォルダ' : ''}「${path}」${dir ? 'と中身' : ''}を削除します。`,
-    removeHint: '削除した参考資料は一時保管され、取り消し（⌘Z / Ctrl+Z）で元に戻せます。', removed: '削除しました',
+    removeHint: '削除した参考資料は一時保管され、取り消し（⌘Z）で元に戻せます。', removed: '削除しました',
     more: n => `ほか ${n} 件（フォルダを開いて見てください）`,
     uploading: n => `${n}個を参考資料に追加しています…`,
     added: n => `${n}個を参考資料に追加しました`, reused: '同じものがすでにあるので、それを使いました',
@@ -336,7 +334,7 @@ export const S = {
     removeText: names => names.length === 1 ? `「${names[0]}」を削除します。` : `${names.length}個の素材（${names.slice(0, 3).join('、')}${names.length > 3 ? ' ほか' : ''}）を削除します。`,
     removeUsed: pages => `この発表の ${pages.map(n => `p${n}`).join('・')} で使っています。原稿の参照は残るので、そこには表示されなくなります。`,
     removeOthers: decks => `ほかの発表（${decks.join('・')}）でも使っています。`,
-    removeHint: '削除した素材は一時保管され、取り消し（⌘Z / Ctrl+Z）で元に戻せます。',
+    removeHint: '削除した素材は一時保管され、取り消し（⌘Z）で元に戻せます。',
     removed: n => `${n}個の素材を削除しました`,
   },
   // 挿入（上のバーの ＋ と、原稿の行頭の /）
@@ -365,6 +363,7 @@ export const S = {
   status: {
     saved: '保存済み', pending: '保存待ち', saving: '保存中', rendering: '変換中', stale: '表示が古い（変換に失敗）',
     ai: n => `AI 作業中 ${n}タブ（編集ロック）`, aiPart: (n, names) => `AI 作業中 ${n}タブ（${names} をロック）`, conflict: '外で変更されました', loading: '読み込み中',
+    saveFailed: '保存できません', retry: '押すと保存を再試行',
   },
   // 上のバー
   editorOn: '原稿を閉じる', editorOff: '原稿を開く', chatOn: 'AI チャットを閉じる', chatOff: 'AI チャットを開く',
@@ -372,7 +371,7 @@ export const S = {
   undo: '元に戻す', redo: 'やり直す', build: '書き出し', buildTip: 'HTML と PDF に書き出す',
   // 編集中のレイアウトの検査（layout-lint.js）。件数は全ページの分
   lint: {
-    badge: n => `レイアウトの問題 ${n}件（押すと次のページへ）`,
+    badge: n => `レイアウトの問題があるページ ${n}ページ（押すと次のページへ）`,
   },
   // 下のヒント（キー操作）
   keys: [['↑↓', 'ページ'], ['←→', '進む/戻る'], ['←→ 長押し', '最初/最後のステップへ移動'], ['O', '一覧'], ['C', 'チャット']],
@@ -420,6 +419,35 @@ export const S = {
     tabAwaiting: '確認待ち', openHistory: '会話の履歴', showTab: name => `「${name}」タブを表示`,
     // チャットにまだ何も無いときの説明
     intro: ['AI にページや発表全体の修正を頼めます。'],
+    // 空のチャットに並べるボタン。押すと依頼文が入力欄に入る（送るのは利用者）
+    starters: 'できること',
+    starter: { reviseMemo: '下書きを推敲する', fromMemo: '下書きからスライドを作る', template: 'PowerPoint の雛形を使う', theme: 'テーマを直す', script: '話す台本を作る', fix: '検査の問題を直す' },
+    starterTip: {
+      reviseMemo: '意味を保ちながら、下書きの文章を読みやすく整えます',
+      fromMemo: '下書きの内容をスライドにまとめます',
+      template: '送った PowerPoint の配色やレイアウトをスライドに取り入れます',
+      theme: 'スライド全体の色やフォントを変えられます',
+      script: '各スライドで話す内容を発表メモにまとめます',
+      fix: '検査で見つかった問題を AI が直します',
+    },
+    starterText: {
+      reviseMemo: '下書きの意味を変えずに、文章を読みやすく整えてください。',
+      fromMemo: '下書き（memo.md）をもとにスライドを作ってください。',
+      template: {
+        new: name => `添付した PowerPoint の雛形「${name}」の背景色・配色・書体・見出しの配置・帯・罫線・ロゴを取り入れた新しいテーマを作り、この発表で使ってください。今のテーマは変えないでください。`,
+        current: name => `添付した PowerPoint の雛形「${name}」に合わせて、今のテーマの背景色・配色・書体・見出しの配置・帯・罫線・ロゴを直してください。`,
+      },
+      script: '/発表原稿 ',
+    },
+    templateTitle: '雛形をどのテーマに反映しますか',
+    templateLead: name => `「${name}」の配色・書体・見出しの配置・帯・罫線・ロゴをテーマに取り入れます。`,
+    templateChoice: {
+      new: ['新しいテーマを作る', 'この発表だけ新しいテーマに切り替えます。今のテーマと、それを使う他の発表は変わりません。'],
+      current: ['今のテーマを直す', '同じテーマを使う他の発表も変わります。'],
+    },
+    starterNoMemo: '先に［下書き］に文章を入力してください',
+    starterReady: '入力欄に依頼を入れました。確かめてから送信してください',
+    attachNote: '送信すると参考資料に保存され、AI が読めるようになります',
     memoIntro: ['AI と相談しながら下書きを整えられます。'],
     draftsTip: 'ページごとに書きためた指示。［送信］でまとめて送ります',
     memoModeTip: '［下書き］タブを見ている間は、下書きについての会話です。ほかのタブに移るとスライドのチャットに戻ります',
@@ -437,7 +465,7 @@ export const S = {
     noFiles: 'ファイルの変更なし', more: n => `ほか${n}件`,
     resultOk: '対応した', resultNg: '対応できなかった', resultAsk: '確認待ち',
     answerPick: '選ぶ', answerSendTip: 'この回答を送る', answerSendAll: '回答を送る', answerOther: '選択肢にない答えを書く',
-    checkOk: '検査：問題なし', checkWarn: n => `検査：エラーなし（警告 ${n}件）`, checkFail: n => `検査：要修正（エラー ${n}件）`,
+    checkOk: '検査：問題なし', checkWarn: warnings => `検査：エラーなし・${warningSummary(warnings)}`, checkFail: n => `検査：要修正（エラー ${n}件）`,
     outside: '範囲の外で変わったファイル（戻しません）',
     restore: 'この送信の前に戻す', restored: 'この送信の前に戻しました',
     restoreTip: 'この送信で変わったファイルを、送信の前に戻す（戻すファイルを確認してから）',
@@ -487,12 +515,9 @@ export const S = {
     effortChar: { minimal: '微', low: '低', medium: '中', high: '高', xhigh: '特', max: '最', ultra: '超' },
     effortName: { minimal: '最小', low: '低', medium: '中', high: '高', xhigh: '特に高い', max: '最大', ultra: '超（作業を分担）' },
     effortPreview: name => `クリックで「${name}」に変更`, effortLabel: '思考量', effort: name => `思考量：${name}`, effortNone: 'このモデルは思考量を選べません',
-    chooseModel: 'モデルを選ぶ',
-    back: '戻る', search: 'モデルを検索', favorites: 'よく使うモデル', modelList: 'モデル一覧', otherModels: 'ほかのモデル',
-    noFavorites: 'モデルを追加して選んでください。', addModel: 'モデルを追加', closeCatalog: 'モデルの追加を閉じる',
+    chooseModel: 'モデルを選ぶ', chatModel: 'チャットのモデル',
+    roleModel: name => `${name}のモデル`, backToChat: 'チャットのモデルに戻る', noModels: '使えるモデルがありません',
     savingSettings: 'AI の設定を保存しています', subagents: 'サブエージェント', roleOn: 'オン', roleOff: 'オフ', roleToggle: name => `${name}を使う`, roleInherited: 'モデルはチャットと共通、思考量は個別',
-    favoriteLimit: n => `表示するモデルは ${n} 件までです`, addFavorite: '表示するモデルに追加', noMatch: '見つかりません', removeFavorite: '表示するモデルから外す',
-    unavailableFavorites: '登録済み・現在使えないモデル', unavailable: '使えない AI', current: '選んでいるモデル',
     reason: { missing: '未取得', login: 'ログインしていません', error: '確かめられません' },
     onboard: {
       codex: { title: 'Codex でスライドをつくる', body: 'ChatGPT アカウントで始めましょう。', login: 'ChatGPT でログイン', done: 'ChatGPT にログインしました。' },
@@ -542,12 +567,32 @@ export const S = {
     handoffBlocked: '下書きの確認で直す所が見つかったため、まだスライドにしていません',
     handoffForce: '確認の指摘はそのままで、スライドのチャットに引き渡してスライドにする',
     handoffRetry: 'もう一度スライドのチャットに引き渡す',
+    slideDiff: 'スライド原稿の変更', slideDiffTip: 'この送信中に変わった原稿の行を表示します',
     memoDiff: '下書きの変わった所', memoDiffTip: '押すと、この送信で AI が下書きのどこを変えたかを開く・閉じる',
     memoWorking: '考えています', memoChanged: '下書きを書き換えました', memoUnchanged: '下書きは変えていません',
     memoStray: '下書きのほかに変わったファイル（戻しません。同じ時間に動いた他の作業の変更も含みます）',
     sentAt: time => `送信 ${time}`,
   },
 };
+
+// キーの表記。Mac 以外では ⌘→Ctrl・⌥→Alt・⇧→Shift・⌫→Backspace にする（文言とツールチップで共通）。
+// 記号の直後にキーが続くとき（⌘Z）は「Ctrl+Z」、空白で区切ったとき（⌘ Z）は「Ctrl Z」。
+const KEY_NAMES = { '⌘': 'Ctrl', '⌥': 'Alt', '⇧': 'Shift', '⌫': 'Backspace' };
+export const MAC_KEYS = typeof document === 'undefined'
+  || /mac|iphone|ipad/i.test((/** @type {Navigator & {userAgentData?:{platform?:string}}} */ (globalThis.navigator))?.userAgentData?.platform || globalThis.navigator?.platform || '');
+export function keyLabel(text, mac = MAC_KEYS) {
+  if (mac || typeof text !== 'string') return text;
+  return text.replace(/([⌘⌥⇧])(?=[\x21-\x7e⌘⌥⇧⌫↑↓←→＋−])|[⌘⌥⇧⌫]/gu, (m, mod) => mod ? `${KEY_NAMES[mod]}+` : KEY_NAMES[m]);
+}
+// 画面の文言（S）は読み込んだときに一度だけ置き換える。関数の文言は返した文字を置き換える
+function localizeKeys(value) {
+  if (typeof value === 'string') return keyLabel(value);
+  if (typeof value === 'function') return function (...args) { return localizeKeys(value.apply(this, args)); };
+  if (Array.isArray(value)) { value.forEach((v, i) => { value[i] = localizeKeys(v); }); return value; }
+  if (value && Object.getPrototypeOf(value) === Object.prototype) { for (const k of Object.keys(value)) value[k] = localizeKeys(value[k]); }
+  return value;
+}
+if (!MAC_KEYS) localizeKeys(S);
 
 // サーバーの環境診断も読むため、この定数は JSON 構文を保つ。
 export const THEME_PREPARATION = {

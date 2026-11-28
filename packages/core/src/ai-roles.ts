@@ -1,7 +1,8 @@
 /** Shared role definitions for chat settings, instruction UI and native runs. */
-import { readFileSync, lstatSync } from 'node:fs';
+import { assertWorkspacePath } from "./paths.js";
+import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
+import { join } from 'node:path';
 import type { Workspace } from './workspace.js';
 export const SUPPORTED_PROVIDERS=['codex','claude'] as const;
 export const MODES={slides:'chat',memo:'draft',theme:'theme'} as const;
@@ -26,7 +27,7 @@ export function migrate(settings:RoleSettings & Record<string,unknown>,mode:Mode
  const legacy={slides:['slide_review','html_review'],memo:['draft_review'],theme:['html_review']};
  if(!out.review)for(const key of legacy[mode])if(settings[key]){out.review=structuredClone(settings[key]) as RoleSetting;break;}return out;
 }
-function safeRead(ws:Workspace,rel:string){const path=join(ws.root,rel);for(let p=path;;p=dirname(p)){try{if(lstatSync(p).isSymbolicLink())throw Error('シンボリックリンクを経由できません');}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}if(p===resolve(ws.root))break;}try{return readFileSync(path,'utf8');}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return '';throw e;}}
+function safeRead(ws:Workspace,rel:string){const path=join(ws.root,rel);assertWorkspacePath(ws.root,path);try{return readFileSync(path,'utf8');}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return '';throw e;}}
 export function extra(ws:Workspace,role:string):string{get(role);const saved=ws.prefs().ai_instructions;const value=saved&&typeof saved==='object'?(saved as Record<string,unknown>)[role]:'';return typeof value==='string'?value:'';}
 export function set_extra(ws:Workspace,role:string,text:unknown){get(role);if(typeof text!=='string')throw Error('追加指示の形式が正しくありません');text=text.trim();if(Array.from(text as string).length>EXTRA_LIMIT)throw Error(`追加指示は ${EXTRA_LIMIT} 文字までです`);const saved=ws.prefs().ai_instructions;const values=saved&&typeof saved==='object'&&!Array.isArray(saved)?{...saved as Record<string,unknown>} : {};if(text)values[role]=text;else delete values[role];ws.set_prefs({ai_instructions:values});return text as string;}
 export function catalog(ws:Workspace){return {roles:ROLES.map(role=>({...role,revision:createHash('sha256').update(JSON.stringify(['electron-native-1',role])).digest('hex'),base:['AGENTS.md',...(role.skill?[`.agents/skills/${role.skill}/SKILL.md`]:[])].map(path=>({path,text:safeRead(ws,path)})),extra:extra(ws,role.id)})),supported_providers:[...SUPPORTED_PROVIDERS],extra_limit:EXTRA_LIMIT};}

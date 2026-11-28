@@ -10,6 +10,7 @@ export interface RenderJob {
   /** Capture every PDF-selected step at 1280x720. Default true. */
   screenshots?: boolean;
   allSteps?: boolean;
+  priorityIndices?: number[];
   pdf?: boolean;
 }
 

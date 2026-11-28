@@ -28,3 +28,7 @@ test('pooled connections reuse idle workers, isolate concurrent owners and disca
  assert.equal(two.final,'完了');await pool.close();assert.equal(concurrent.client.alive,false);
  await assert.rejects(pool.acquire(options),/終了/);
 });
+
+test('silent Codex turns expire and release the connection', async t => {
+  await assert.rejects(runCodex({...fixture(t,'wait'),prompt:'test',model:'fixture',idleTimeoutMs:150}),/時間切れ/);
+});

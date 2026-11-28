@@ -1,5 +1,6 @@
 import { THEME_KEYS } from './bridge/theme-contract.js';
 import { colorPicker } from './color-picker.js';
+import { studioSelect } from './custom-select.js';
 // 左の欄の［テーマ］タブ（設計書 §10.10）。今のテーマの色・フォントを直す。
 // - 欄を動かしている間は見本・スライドの :root に直接当て、確定したらすぐ themes/<テーマ>.css に書く（1回の確定を ⌘Z の1回に）
 // - 実スライドを絞り込み、該当がない表現だけ見本に自動で切り替える
@@ -270,9 +271,9 @@ export function makeThemeTab(ctx) {
     ]) {
       const label = document.createElement('label'); label.dataset.key = key;
       const title = document.createElement('span'); title.textContent = S.themes.vars[key];
-      const input = document.createElement(choices ? 'select' : 'input'); input.name = key; input.setAttribute('aria-label', S.themes.vars[key]);
-      if (choices) for (const [value, text] of choices) input.add(new Option(text, value));
-      else { input.type = 'number'; input.min = '8'; input.max = '60'; input.step = '1'; input.placeholder = N.standard; input.title = N.sizeHint; }
+      const input = choices ? studioSelect({ label: S.themes.vars[key], name: key, size: 'sm', options: choices.map(([value, label]) => ({ value, label })) }) : document.createElement('input');
+      if (!choices) { input.name = key; input.setAttribute('aria-label', S.themes.vars[key]);
+        input.type = 'number'; input.min = '8'; input.max = '60'; input.step = '1'; input.placeholder = N.standard; input.title = N.sizeHint; }
       input.onchange = () => { if (!input.checkValidity()) { input.reportValidity(); return; } saveField(key, choices ? input.value : input.value ? `${input.value}px` : 'theme'); };
       label.append(title, input); numberFields.push(label);
     }
@@ -284,7 +285,7 @@ export function makeThemeTab(ctx) {
     defaultButton.disabled = !modified || locked;
     tip(defaultButton, modified ? S.themes.reset(name) : modified === false ? S.themes.resetNone(name) : S.themes.resetMissing(name));
     view.querySelectorAll('label[data-key]').forEach(l => {
-      const key = l.dataset.key, input = l.querySelector('input, select');
+      const key = l.dataset.key, input = l.querySelector('input, studio-select');
       l.classList.toggle('on', key === focusKey);
       if (!input) {
         l.querySelectorAll('[data-font]').forEach(b => { b.disabled = locked; b.setAttribute('aria-pressed', String(b.dataset.font === (live.get(key) ?? vars[key]))); });

@@ -1,95 +1,73 @@
-import { readFile } from 'node:fs/promises';
-import { atomicWriteFile } from '../../packages/core/src/atomic.js';
-
-export interface UpdateDriver {
-  autoRunAppAfterInstall?: boolean;
-  autoDownload: boolean;
-  autoInstallOnAppQuit: boolean;
-  on(event: string, listener: (...args: any[]) => void): unknown;
-  checkForUpdates(): Promise<unknown>;
-  downloadUpdate(): Promise<unknown>;
-  quitAndInstall(isSilent?: boolean, isForceRunAfter?: boolean): void;
-}
-export type UpdatePhase = 'disabled' | 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error';
+const LATEST_RELEASE_API = 'https://api.github.com/repos/edoaki/slide-studio/releases/latest';
+export type UpdatePhase = 'idle' | 'checking' | 'current' | 'unpublished' | 'available' | 'error';
 export interface UpdateState {
   version: string;
   availableVersion?: string;
-  automatic: boolean;
   phase: UpdatePhase;
-  progress: number;
   error?: string;
 }
 
-/** Owns update policy; the native driver owns download verification and installation. */
+function stableVersion(value: string): number[] | undefined {
+  const match = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[\w.-]+)?$/.exec(value);
+  if (!match) return;
+  const parts = match.slice(1, 4).map(Number);
+  return parts.every(Number.isSafeInteger) ? parts : undefined;
+}
+export function isNewerRelease(candidate: string, installed: string): boolean {
+  const next = stableVersion(candidate), current = stableVersion(installed);
+  if (!next || !current) return false;
+  for (let i = 0; i < 3; i++) {
+    if (next[i] !== current[i]) return next[i]! > current[i]!;
+  }
+  return false;
+}
+
+/** Checks public releases only. Downloads and installation are always manual. */
 export class DesktopUpdates {
   private state: UpdateState;
   private busy = false;
-  private downloaded = false;
   private timer?: ReturnType<typeof setInterval>;
-  private writes: Promise<void> = Promise.resolve();
-  constructor(private driver: UpdateDriver | undefined, private settingsPath: string, version: string) {
-    this.state = { version, automatic: true, phase: driver ? 'idle' : 'disabled', progress: 0 };
-    if (!driver) return;
-    driver.autoDownload = false;
-    driver.autoInstallOnAppQuit = false;
-    driver.on('update-available', info => { this.state.availableVersion = info.version; this.state.phase = 'available'; });
-    driver.on('update-not-available', () => { this.state.phase = 'current'; delete this.state.availableVersion; });
-    driver.on('download-progress', info => { this.state.progress = Math.max(0, Math.min(100, Math.round(info.percent))); });
-    driver.on('update-downloaded', () => { this.downloaded = true; this.state.phase = 'ready'; this.state.progress = 100; });
-    driver.on('error', error => this.fail(error));
-  }
-  async initialize() {
-    try {
-      const saved = JSON.parse(await readFile(this.settingsPath, 'utf8'));
-      if (typeof saved.automatic === 'boolean') this.state.automatic = saved.automatic;
-    }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.error('[updates] cannot read preferences', error); }
+  constructor(version: string, private request: typeof fetch = fetch) {
+    this.state = { version, phase: 'idle' };
   }
   snapshot(): UpdateState { return { ...this.state }; }
-  private fail(error: unknown) {
-    this.state.phase = 'error';
-    this.state.error = error instanceof Error ? error.message : String(error);
-  }
-  async setAutomatic(automatic: boolean) {
-    const write = this.writes.then(async () => {
-      await atomicWriteFile(this.settingsPath, JSON.stringify({ automatic }), 0o600);
-      this.state.automatic = automatic;
-    });
-    this.writes = write.catch(() => {});
-    await write;
-    if (automatic && this.state.phase === 'available') void this.download();
-    return this.snapshot();
-  }
   async check() {
-    if (!this.driver || this.busy || this.downloaded) return this.snapshot();
-    this.busy = true; this.state.phase = 'checking'; delete this.state.error;
-    try { await this.driver.checkForUpdates(); }
-    catch (error) { this.fail(error); }
-    finally { this.busy = false; }
-    if (this.state.automatic && this.snapshot().phase === 'available') await this.download();
-    return this.snapshot();
-  }
-  async download() {
-    if (!this.driver || this.busy || this.state.phase !== 'available') return this.snapshot();
-    this.busy = true; this.state.phase = 'downloading'; this.state.progress = 0; delete this.state.error;
-    try { await this.driver.downloadUpdate(); }
-    catch (error) { this.fail(error); }
-    finally { this.busy = false; }
+    if (this.busy) return this.snapshot();
+    this.busy = true;
+    this.state.phase = 'checking'; delete this.state.error;
+    try {
+      const response = await this.request(LATEST_RELEASE_API, {
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Slide-Studio', 'X-GitHub-Api-Version': '2022-11-28' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (response.status === 404) {
+        this.state.phase = this.state.availableVersion ? 'available' : 'unpublished';
+        return this.snapshot();
+      }
+      if (!response.ok) throw new Error(`GitHub Releases: HTTP ${response.status}`);
+      const release = await response.json() as { tag_name?: unknown; draft?: boolean; prerelease?: boolean; assets?: { name?: string }[] };
+      if (typeof release.tag_name !== 'string' || !stableVersion(release.tag_name) || release.draft || release.prerelease || !Array.isArray(release.assets)) {
+        throw new Error('Invalid stable release');
+      }
+      if (!release.assets.some(asset => typeof asset?.name === 'string' && /\.(dmg|exe)$/.test(asset.name))) {
+        this.state.phase = 'unpublished'; delete this.state.availableVersion;
+      } else if (isNewerRelease(release.tag_name, this.state.version)) {
+        this.state.availableVersion = release.tag_name.replace(/^v/, '');
+        this.state.phase = 'available';
+      } else {
+        this.state.phase = 'current'; delete this.state.availableVersion;
+      }
+    } catch (error) {
+      this.state.phase = 'error';
+      this.state.error = error instanceof Error ? error.message : String(error);
+    } finally { this.busy = false; }
     return this.snapshot();
   }
   start() {
-    if (!this.driver || this.timer) return;
+    if (this.timer) return;
     void this.check();
     this.timer = setInterval(() => { void this.check(); }, 4 * 60 * 60 * 1000);
     this.timer.unref();
   }
-  stop() { clearInterval(this.timer); }
-  canInstall() { return this.downloaded; }
-  installOnQuit(manual: boolean) {
-    this.stop();
-    if (!this.driver || !this.downloaded || (!manual && !this.state.automatic)) return false;
-    this.driver.autoRunAppAfterInstall = manual;
-    this.driver.quitAndInstall(!manual, manual);
-    return true;
-  }
+  stop() { clearInterval(this.timer); this.timer = undefined; }
 }

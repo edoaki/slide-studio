@@ -13,61 +13,38 @@ import {
   requestPreviewCapability,
   unregisterFrameClient,
 } from './bridge/agent-client.js';
+import { PRESENTATION_KEYS } from './bridge/protocol.js';
 
 export function makePresent(ctx) {
   const host = document.createElement('span'); host.className = 'present-tools';
   host.setAttribute('role', 'group'); host.setAttribute('aria-label', S.present.title);
   const buttons = [];
-  const menu = tip(document.createElement('button'), S.present.menu);
-  menu.type = 'button'; menu.className = 'ibtn present-menu';
-  menu.setAttribute('aria-haspopup', 'dialog');
-  menu.innerHTML = svg('speakerView');
-  const chevron = document.createElement('span'); chevron.className = 'present-menu-chevron'; chevron.innerHTML = svg('chevD');
-  menu.append(chevron); menu.onclick = () => chooseStart(menu);
+  // 発表者ビューはメニューを挟まず、押したらすぐ開く。最初のページからの通常の発表は Shift+F。
+  const presenter = tip(document.createElement('button'), S.speaker.title);
+  presenter.type = 'button'; presenter.className = 'ibtn'; presenter.innerHTML = svg('speakerView');
+  presenter.onclick = () => { if (!busy && !session && !ctx.presenting) void ctx.openPresenter?.(); };
   const current = tip(document.createElement('button'), S.present.current, 'F');
   current.type = 'button'; current.className = 'ibtn'; current.innerHTML = svg('play');
   current.setAttribute('aria-keyshortcuts', 'F'); current.onclick = () => start('current', current);
-  host.append(menu, current); buttons.push(menu, current);
+  host.append(presenter, current); buttons.push(presenter, current);
   ctx.root.querySelector('#barExtra').before(host);
-  let alive = true, busy = false, session = null, trigger = null, chooser = null;
-  function chooseStart(button) {
-    if (busy || session || ctx.presenting || chooser) return;
-    const dialog = document.createElement('dialog'); chooser = dialog;
-    dialog.className = 'presentation-launcher'; dialog.setAttribute('aria-label', S.speaker.launchTitle);
-    const heading = document.createElement('h2'); heading.textContent = S.speaker.launchTitle;
-    const close = document.createElement('button'); close.type = 'button'; close.className = 'ibtn'; close.innerHTML = svg('x'); close.setAttribute('aria-label', S.speaker.close); close.onclick = () => dialog.close();
-    const header = document.createElement('header'); header.append(heading, close); dialog.append(header);
-    const choices = [
-      [S.speaker.normal, S.speaker.normalHelp, 'play', () => start('first',button)],
-      [S.speaker.title, S.speaker.presenterHelp, 'speakerView', () => ctx.openPresenter?.(false)],
-      [S.speaker.rehearsal, S.speaker.rehearsalHelp, 'stopwatch', () => ctx.openPresenter?.(true)],
-    ];
-    for (const [title, description, icon, action] of choices) {
-      const row = document.createElement('button'); row.type = 'button'; row.className = 'presentation-choice'; row.setAttribute('aria-label', title);
-      const mark = document.createElement('span'); mark.className = 'presentation-choice-icon'; mark.innerHTML = svg(icon);
-      const text = document.createElement('span'), name = document.createElement('strong'), help = document.createElement('small'); name.textContent = title; help.textContent = description; text.append(name,help);
-      const arrow = document.createElement('span'); arrow.className = 'presentation-choice-arrow'; arrow.innerHTML = svg('chevR'); row.append(mark,text,arrow);
-      row.onclick = () => { dialog.close(); void action(); }; dialog.append(row);
-    }
-    dialog.addEventListener('keydown', e => e.stopPropagation()); dialog.addEventListener('keyup', e => e.stopPropagation());
-    dialog.onclick = e => { if (e.target === dialog) { const r = dialog.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close(); } };
-    dialog.onclose = () => { dialog.remove(); if (chooser === dialog) chooser = null; };
-    document.body.append(dialog); dialog.showModal(); dialog.querySelector('.presentation-choice').focus();
-  }
+  let alive = true, busy = false, session = null, trigger = null;
   function shortcut(e) {
-    if (chooser?.open) return;
     if (e.key.toLowerCase() !== 'f' || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
     if (ctx.blocks?.selected) return; // 選択中の F はブロックの外側余白。
     if (e.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    if (!e.repeat) start(e.shiftKey ? 'first' : 'current', buttons[e.shiftKey ? 0 : 1]);
+    if (!e.repeat) start(e.shiftKey ? 'first' : 'current', current);
     return true;
   }
 
   async function toggleFullscreen() {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
-      else if (session) await document.documentElement.requestFullscreen();
+      else if (session) {
+        await document.documentElement.requestFullscreen();
+        if (!session && document.fullscreenElement === document.documentElement) await document.exitFullscreen();
+      }
     } catch { /* 拒否・非対応なら、同じタブ内の全画面を使う */ }
   }
   function finish(sync = true) {
@@ -96,10 +73,10 @@ export function makePresent(ctx) {
   const keys = e => {
     if (!session) { if (ctx.presenting) return; if (e.type === 'keydown') shortcut(e); return; }
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); finish(); }
-    else if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    else if (e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.isComposing) {
       e.preventDefault(); e.stopImmediatePropagation();
-      if (e.type === 'keydown' && !e.repeat) toggleFullscreen();
-    } else if (['ArrowRight','ArrowDown','ArrowLeft','ArrowUp',' ','o','b','B','Enter','Backspace'].includes(e.key) || /^[0-9]$/.test(e.key)) {
+      if (e.type === 'keydown' && !e.repeat) finish();
+    } else if (PRESENTATION_KEYS.includes(e.key)) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
       e.preventDefault(); e.stopImmediatePropagation();
       session.client.api.presentationKey(e.type,e.key,e.repeat).catch(() => {});
@@ -114,8 +91,10 @@ export function makePresent(ctx) {
     if (!session || (data?.type !== 'keydown' && data?.type !== 'keyup')) return;
     if (data.key === 'Escape') { finish(); return; }
     const mods = data.mods || {};
-    if (data.key === 'f' && !mods.meta && !mods.ctrl && !mods.alt) {
-      if (data.type === 'keydown' && !data.repeat) toggleFullscreen();
+    if (data.key === 'f' && !mods.meta && !mods.ctrl && !mods.alt && !data.isComposing
+        && data.type === 'keydown' && !data.repeat) {
+      if (data.kind === 'fullscreen') void toggleFullscreen();
+      else finish();
     }
   };
 
@@ -188,7 +167,7 @@ export function makePresent(ctx) {
   return {
     keydown: shortcut,
     destroy() {
-      alive = false; chooser?.remove(); chooser = null; finish(false); host.remove();
+      alive = false; finish(false); host.remove();
       document.removeEventListener('fullscreenchange', fullscreenChanged);
       removeEventListener('keydown', keys, true); removeEventListener('keyup', keys, true);
     },

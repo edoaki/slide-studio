@@ -16,6 +16,7 @@ import { DESIGN_VARS } from '../block-design.js';
 // only; no write intent crosses the port.
 import {
   PROTOCOL,
+  HOST_KEYS,
   createIdentity,
   makeEvent,
   makeHello,
@@ -24,6 +25,7 @@ import {
   validateRequest,
   validateSnapshot,
   validateThemeName,
+  slidePoint,
 } from './protocol.js';
 import { createFrameText } from './frame-text.js';
 import { createFrameSelection } from './frame-selection.js';
@@ -64,6 +66,17 @@ function detectMode(win, script) {
     if (params.get('edit') === '0') return 'present';
   } catch { /* about:srcdoc or an opaque URL */ }
   return 'edit';
+}
+
+// 発表者ビューは操作バーをスライドの外に自分で置くため、スライドの上に重ねるバーを出さない
+function hostOwnsFooter(win) {
+  try { return new URL(win.location.href).searchParams.get('studio-footer') === 'off'; } catch { return false; }
+}
+
+// 発表者ビューの枠と投影用ウィンドウでは、一覧（o）とページ番号の入力を親が受け持つ。
+// 投影には一覧も入力中の番号も出さず、発表者ビューの一覧・ページ番号の欄で扱う
+function hostOwnsKeys(win) {
+  try { return new URL(win.location.href).searchParams.get('studio-keys') === 'host'; } catch { return false; }
 }
 
 export function bootstrapFrameAgent(win = globalThis.window) {
@@ -161,6 +174,8 @@ export function bootstrapFrameAgent(win = globalThis.window) {
 
   const identity = Object.freeze(createIdentity(deckName, version, generation));
   const presenting = detectMode(win, script) === 'present';
+  const ownFooter = presenting && !hostOwnsFooter(win);
+  const hostKeys = presenting && hostOwnsKeys(win);
   if (presenting) {
     // Legacy presentation set this before the runtime started; do the same in
     // the first head agent so the authored runtime sees it immediately.
@@ -186,6 +201,9 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   let slidesDirty = true;
   let stageObserver = null;
   let overviewObserver = null;
+  // Laser pointer: only the presenter's current-slide frame turns this on.
+  let pointerTracking = false;
+  let lastPointerKey = '';
 
   function currentDeck() {
     try {
@@ -223,7 +241,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   }
 
   function snapshotKey(snapshot) {
-    return `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${snapshot.overviewOpen}/${snapshot.blackout}/${snapshot.pageInput}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
+    return `${snapshot.index}/${snapshot.step}/${snapshot.maxStep}/${snapshot.slides.length}/${snapshot.background}/${snapshot.scale}/${snapshot.stageAt}/${snapshot.sourceVersion}/${snapshot.overviewOpen}/${snapshot.pageInput}/${JSON.stringify([snapshot.slides, snapshot.stageNumbers])}`;
   }
 
   function clampString(value, max) {
@@ -333,7 +351,6 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       sourceVersion: liveSourceVersion,
       hasReferences: !!querySelector('.references-slide .csl-entry'),
       overviewOpen: !!querySelector('#overview:not([hidden])'),
-      blackout: !!readProperty(currentDeck(), 'blackout'),
       pageInput: clampString(readProperty(currentDeck(), 'pageInput') || '',6),
     };
     return validateSnapshot(snapshot, identity) ? snapshot : null;
@@ -350,31 +367,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
   }
 
   let overviewEscape = false;
-  function presentationKey(event) {
-    if (!presenting) return;
-    const key = typeof event.key === 'string' ? event.key : '';
-    // Number entry and blackout also work while a same-origin figure has focus.
-    if (event.currentTarget !== win && !event.isComposing && !event.metaKey && !event.ctrlKey && !event.altKey
-        && !event.target?.closest?.('input,textarea,select,[contenteditable="true"]')
-        && (['b','B','Enter','Backspace'].includes(key) || /^[0-9]$/.test(key))) {
-      event.preventDefault(); event.stopImmediatePropagation();
-      (doc.body || doc.documentElement).dispatchEvent(new win.KeyboardEvent(event.type, {key,repeat:!!event.repeat,bubbles:true,cancelable:true}));
-      return;
-    }
-    const fullscreen = key === 'f' && !event.metaKey && !event.ctrlKey && !event.altKey;
-    if (key !== 'Escape' && !fullscreen) return;
-    // Let the player close its overview before the shell exits presentation.
-    if (key === 'Escape' && event.type === 'keyup' && overviewEscape) {
-      overviewEscape = false; event.preventDefault(); event.stopImmediatePropagation(); return;
-    }
-    if (key === 'Escape' && readProperty(currentDeck(), 'pageInput')) return;
-    if (key === 'Escape' && win.document.querySelector('#overview:not([hidden])')) {
-      overviewEscape = true; return;
-    }
-    // The parent decides what to do. The agent only blocks the content-side
-    // default for the two presentation keys the legacy shell owns.
-    event.preventDefault();
-    event.stopImmediatePropagation();
+  function forwardKey(event, key) {
     sendEvent('key', {
       type: event.type,
       key,
@@ -388,6 +381,96 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         meta: !!event.metaKey,
       },
     });
+  }
+
+  function presentationKey(event) {
+    if (!presenting) return;
+    const key = typeof event.key === 'string' ? event.key : '';
+    // 親が受け持つキー（一覧とページ番号の入力）は、プレイヤーより先に止めて親へ送る。
+    // 親が presentationKey で送り直したキー（isTrusted が false）はプレイヤーに渡す
+    if (hostKeys && event.isTrusted !== false && HOST_KEYS.includes(key) && !event.isComposing
+        && !event.metaKey && !event.ctrlKey && !event.altKey
+        && !event.target?.closest?.('input,textarea,select,[contenteditable="true"]')
+        && !(key === 'Enter' && event.target?.closest?.('button,a'))) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      forwardKey(event, key);
+      return;
+    }
+    // Number entry and presentation-remote keys (PageDown/PageUp)
+    // also work while a same-origin figure has focus. The figure
+    // runtime handles the arrows itself, so only these are re-dispatched.
+    if (event.currentTarget !== win && !event.isComposing && !event.metaKey && !event.ctrlKey && !event.altKey
+        && !event.target?.closest?.('input,textarea,select,[contenteditable="true"]')
+        && (['Enter','Backspace','PageDown','PageUp'].includes(key) || /^[0-9]$/.test(key))) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      (doc.body || doc.documentElement).dispatchEvent(new win.KeyboardEvent(event.type, {key,repeat:!!event.repeat,bubbles:true,cancelable:true}));
+      return;
+    }
+    const fullscreen = key.toLowerCase() === 'f' && !event.metaKey && !event.ctrlKey && !event.altKey
+      && !event.isComposing && !event.target?.closest?.('input,textarea,select,[contenteditable="true"]');
+    if (key !== 'Escape' && !fullscreen) return;
+    // Let the player close its overview before the shell exits presentation.
+    if (key === 'Escape' && event.type === 'keyup' && overviewEscape) {
+      overviewEscape = false; event.preventDefault(); event.stopImmediatePropagation(); return;
+    }
+    if (key === 'Escape' && readProperty(currentDeck(), 'pageInput')) return;
+    if (key === 'Escape' && win.document.querySelector('#overview:not([hidden])')) {
+      overviewEscape = true; return;
+    }
+    // The parent decides what to do. The agent only blocks the content-side
+    // default for the two presentation keys the legacy shell owns.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    forwardKey(event, fullscreen ? 'f' : key);
+  }
+
+  function pointerHidden() {
+    try { return !!querySelector('#overview:not([hidden])'); } catch { return true; }
+  }
+
+  function reportPointer(clientX, clientY, inside) {
+    if (!pointerTracking) return;
+    let point = { x: 0, y: 0, visible: false };
+    if (inside && !pointerHidden()) {
+      let stage = null;
+      try { stage = querySelector('#stage'); } catch { stage = null; }
+      let rect = null;
+      try { rect = stage ? (elementRect ? elementRect.call(stage) : stage.getBoundingClientRect()) : null; } catch { rect = null; }
+      point = slidePoint(clientX, clientY, rect);
+    }
+    const key = point.visible ? `${point.x}/${point.y}` : 'hidden';
+    if (key === lastPointerKey) return;
+    lastPointerKey = key;
+    sendEvent('pointer', point);
+  }
+
+  function pointerMove(event) {
+    if (event.pointerType === 'touch') return;
+    reportPointer(event.clientX, event.clientY, true);
+  }
+
+  function pointerOut(event) {
+    if (!event.relatedTarget) reportPointer(0, 0, false);
+  }
+
+  function trackPointer(enabled) {
+    pointerTracking = !!enabled;
+    lastPointerKey = '';
+    if (!pointerTracking) {
+      sendEvent('pointer', { x: 0, y: 0, visible: false });
+    }
+  }
+
+  function attachFigurePointer(frame, frameWindow) {
+    // Same-origin figures swallow pointer events; map them back to this document.
+    const move = event => {
+      if (!pointerTracking || event.pointerType === 'touch') return;
+      let rect;
+      try { rect = elementRect ? elementRect.call(frame) : frame.getBoundingClientRect(); } catch { return; }
+      const scale = frame.offsetWidth > 0 ? rect.width / frame.offsetWidth : 1;
+      reportPointer(rect.left + (frame.clientLeft + event.clientX) * scale, rect.top + (frame.clientTop + event.clientY) * scale, true);
+    };
+    try { frameWindow.addEventListener('pointermove', move, { capture: true, passive: true }); } catch { /* the figure navigated */ }
   }
 
   function attachFigureKeys(frame) {
@@ -407,6 +490,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       frameWindow.addEventListener('keydown', presentationKey, true);
       frameWindow.addEventListener('keyup', presentationKey, true);
     } catch { /* the figure navigated */ }
+    attachFigurePointer(frame, frameWindow);
   }
 
   function attachNestedFrames(root = doc) {
@@ -426,6 +510,10 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       kind: 'fullscreen',
       mods: { shift: false, alt: false, ctrl: false, meta: false },
     });
+  }
+
+  function hideToolbar() {
+    try { const style = doc.createElement('style'); style.textContent = '#toolbar{display:none!important}'; doc.head.append(style); } catch { /* no head */ }
   }
 
   function installFullscreenButton() {
@@ -482,12 +570,15 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       }
       addWindowListener('keydown', presentationKey, true);
       addWindowListener('keyup', presentationKey, true);
+      addWindowListener('pointermove', pointerMove, { capture: true, passive: true });
+      addWindowListener('pointerout', pointerOut, { capture: true, passive: true });
       addWindowListener('load', event => {
         const frame = event.target;
         if (frame?.tagName === 'IFRAME') attachFigureKeys(frame);
       }, true);
       attachNestedFrames();
-      installPresentationFooter(win, currentDeck);
+      if (ownFooter) installPresentationFooter(win, currentDeck);
+      else hideToolbar();
       installFullscreenButton();
     }
     installLinkInterception();
@@ -513,7 +604,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
         const target = event.target?.closest?.('.toc-list li');
         const style = target && getComputedStyle(target);
         const root = getComputedStyle(doc.documentElement);
-        sendEvent('toc.select', { sourceVersion: liveSourceVersion, trusted: true, selected: !!target,
+        sendEvent('toc.select', { sourceVersion: liveSourceVersion, trusted: true, selected: !!target, index: win.deck?.index ?? 0,
           px: style ? parseFloat(style.fontSize) : 30, ink: style?.color || '',
           colors: Object.fromEntries(['--ink','--accent','--good','--warn','--mark'].map(k => [k, root.getPropertyValue(k).trim()])) });
       }, true);
@@ -559,9 +650,13 @@ export function bootstrapFrameAgent(win = globalThis.window) {
     if (!target) throw errorWithCode('not-ready', 'deck is not ready');
     const params = request.params || {};
     switch (request.method) {
-      case 'setBlackout':
+      case 'pointer.track':
         if (!presenting) throw errorWithCode('forbidden', 'presentation input only');
-        return Promise.resolve(invokeDeck('setBlackout', params.value));
+        trackPointer(params.enabled);
+        return Promise.resolve(null);
+      case 'clicks.edges':
+        if (!presenting) throw errorWithCode('forbidden', 'presentation input only');
+        return Promise.resolve(invokeDeck('edgeClicks', !!params.enabled)).then(() => null);
       case 'presentationKey':
         if (!presenting) throw errorWithCode('forbidden', 'presentation input only');
         // Dispatch below Window so its capture handlers run before the player.
@@ -831,6 +926,7 @@ export function bootstrapFrameAgent(win = globalThis.window) {
       stageObserver = null;
       try { overviewObserver?.disconnect(); } catch { /* already gone */ }
       overviewObserver = null;
+      pointerTracking = false;
       try { selection?.destroy(); } catch { /* already gone */ }
       selection = null;
       inflightTheme?.cancel();

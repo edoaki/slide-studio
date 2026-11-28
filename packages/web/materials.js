@@ -111,7 +111,7 @@ export function makeMaterials(ctx) {
     if (data.more) list.append(Object.assign(document.createElement('div'), { className: 'mt-more', textContent: M.more(data.more) }));
     const out = [top, list];
     if (!data.entries.length && !creating) {
-      const drop = tip(document.createElement('button'), M.drop); drop.type = 'button'; drop.className = 'mt-drop'; drop.innerHTML = svg('upload');
+      const drop = tip(document.createElement('button'), M.drop); drop.type = 'button'; drop.className = 'mt-drop'; drop.innerHTML = `${svg('upload')}${M.empty.map(x => `<span>${esc(x)}</span>`).join('')}`;
       out.push(drop);
     }
     view.replaceChildren(...out);

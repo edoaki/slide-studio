@@ -15,7 +15,7 @@ import {
   to_markdown,
   type ChunkEditInfo,
   type ChunkEditMap,
-  type LegacyEditOptions,
+  type EditOptions,
 } from "../../packages/core/src/edit.js";
 import {
   image_options,
@@ -107,7 +107,7 @@ function requirePandoc(): string {
   return PANDOC!;
 }
 
-function editOptions(cwd = ROOT): LegacyEditOptions {
+function editOptions(cwd = ROOT): EditOptions {
   return { pandocPath: requirePandoc(), cwd };
 }
 
@@ -552,7 +552,7 @@ const TABLE = `## 表
 
 async function tableFixture(
   ws: Workspace,
-  options: LegacyEditOptions,
+  options: EditOptions,
 ): Promise<{ doc: Doc; info: ChunkEditInfo; html: string }> {
   const rendered = await render_text(ws, "test", TABLE, { pandocPath: options.pandocPath });
   const info = await chunk_info(rendered, options);
@@ -664,7 +664,7 @@ test("chunk_info matches all committed chunk goldens", async () => {
   const edit = JSON.parse(readFileSync(EDIT_GOLDEN, "utf8")) as EditGolden;
   const render = JSON.parse(readFileSync(RENDER_GOLDEN, "utf8")) as RenderGolden[];
   const byName = new Map(render.map((entry) => [entry.name, entry]));
-  const options: LegacyEditOptions = { pandocPath: PANDOC ?? "", cwd: ROOT };
+  const options: EditOptions = { pandocPath: PANDOC ?? "", cwd: ROOT };
   for (const entry of edit.chunks) {
     const sourceEntry = byName.get(entry.name);
     assert.notEqual(sourceEntry, undefined, `${entry.name} source HTML`);

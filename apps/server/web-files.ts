@@ -12,22 +12,22 @@ export interface FeatureRoute {
 }
 
 /** Allowed UI assets served under `/web`. Unknown files are never served. */
-export const LEGACY_WEB_FILES: readonly string[] = Object.freeze([
+export const WEB_FILES: readonly string[] = Object.freeze([
   "bridge/agent-client.js", "bridge/protocol.js", "bridge/theme-contract.js",
   "agents.js", "ai-model.js", "api.js", "app.css", "app.html", "app.js",
   "asset-preview.js", "assets.js", "bib-view.js", "bibliography.js",
   "block-design.js", "block-drag.js", "block-handles.js", "block-nav.js",
-  "block-ops.js", "block-context-menu.js", "block-context-model.js", "blocks.js", "chat.js", "checks.js", "clipboard.js",
-  "color-picker.js", "cover-authors.js", "cover-form.js", "decoration.js",
+  "block-ops.js", "block-context-menu.js", "block-context-model.js", "block-toolbar.js", "blocks.js", "chat-activity.js", "chat.js", "checks.js", "clipboard.js",
+  "color-picker.js", "cover-authors.js", "cover-form.js", "custom-select.js", "decoration.js",
   "editor.js", "external-links.js", "history.js",
   "home-updates.js", "home-list.js", "home-trash.js", "home-ai.js", "home-manage.js", "home.js", "icons.js", "inject/edit.css",
   "inject/layout-check.js", "inject/link.js",
-  "slide-library.js", "slide-insertion.js", "insert.js", "layout-lint.js", "left-tabs.js",
+  "insert.js", "layout-lint.js", "left-tabs.js",
   "link-input.js", "location.css", "location.html", "location.js",
-  "materials.js", "memo.js", "overview.js", "output.js", "page-reorder.js",
+  "materials.js", "memo.js", "modal-focus.js", "overview.js", "output.js", "page-reorder.js", "panel-widths.js",
   "page-strip.js", "page-operations.js", "source-prose.js", "page-actions.js", "page-templates.js", "pdf-step.js", "present.js", "preview.js",
   "presenter.js", "presentation-model.js", "speaker-notes.js", "projection.html", "projection.js", "presenter.css",
-  "manuscript-search.js", "manuscript-search-model.js", "qmd-scan.js", "qmd-blocks.js", "qmd-editor.js", "scroll-anchor.js", "shared.css",
+  "qmd-scan.js", "qmd-blocks.js", "qmd-editor.js", "save-retry.js", "scroll-anchor.js", "shared.css",
   "settings.js", "settings.css", "preferences.js",
   "shot-thumbs.js", "step-badge.js", "structure.js", "strings.js",
   "table-tools.js", "text-format.js", "text-tools.js", "theme-tab.js",
@@ -44,8 +44,6 @@ export const IMPLEMENTED_FEATURES: readonly string[] = Object.freeze([
 ]);
 
 export const FEATURE_ROUTES: readonly FeatureRoute[] = Object.freeze([
-  { name: "slide-search", methods: ["GET"], pattern: /^\/api\/slides\/search$/u },
-  { name: "slide-take", methods: ["POST"], pattern: /^\/api\/deck\/[^/]+\/slides\/take$/u },
   { name: "topic", methods: ["GET"], pattern: /^\/api\/topic\/[^/]+$/u },
   { name: "topic", methods: ["POST"], pattern: /^\/api\/topic\/[^/]+\/html\/delete$/u },
   { name: "topic", methods: ["DELETE"], pattern: /^\/api\/topic\/[^/]+$/u },

@@ -19,7 +19,10 @@ function fixture(t: TestContext, runner: Runner, check: () => Promise<Check> = a
   const ws = Workspace.open(join(root, 'workspace')); ws.new_deck('demo', 'topic');
   const status = new AIStatus(new FakeProviders(join(root, 'ai')));
   const store = new ChatStore(ws, {providerOf: key => status.providerOf(key), defaultModel: () => status.cached(ws).default, status: () => status.cached(ws), broadcast() {}});
-  const workflow = new Workflow(ws, store, status, {runner, check, changed() {}});
+  const workflow = new Workflow(ws, store, status, {runner, check, changed() {}, async saveScript(deck, base, text) {
+    assert.equal(createHash('sha256').update(readFileSync(ws.qmd(deck))).digest('hex'), base);
+    writeFileSync(ws.qmd(deck), text);
+  }});
   t.after(async () => { try { await workflow.close(); } finally { rmSync(root, {recursive: true, force: true}); } });
   const base = () => createHash('sha256').update(readFileSync(ws.qmd('demo'))).digest('hex');
   const send = () => workflow.send('demo', store.state('demo').tabs[0]!.id, {base: base(), items: [{key: 'deck', text: '直してください'}]});
@@ -124,4 +127,46 @@ test('a new instruction after cancellation carries prior targets forward in the 
   const first=await f.send();while(!calls)await new Promise(resolve=>setTimeout(resolve,5));await f.workflow.cancel('demo',first.id);
   const next=await f.workflow.send('demo',tab.id,{base:f.base(),items:[{key:'deck',text:'追加の修正'}]});await settled(next);
   assert.equal(next.state,'done');assert.equal(next.resumed_from,first.id);assert.equal(next.items.length,2);
+});
+
+test('speaker script fills only empty visible pages and preserves the rest of the source', async t => {
+  let calls = 0;
+  const f = fixture(t, async (_id, _ws, options) => {
+    calls++;
+    assert.equal(options.readonly, true);
+    assert.ok(options.outputSchema?.properties);
+    assert.match(options.prompt, /"page":2,"title":"図😀"/);
+    return {final: {notes: [{page: 2, text: 'この図をご覧ください。\n\n## 説明\n:::'}]}};
+  });
+  const original = '---\ntitle: 発表\ntopic: topic\n---\n\n::: {.note .presentation-note}\n5分\n:::\n\n## はじめに\n\n::: {.notes}\n手書きの原稿\n:::\n\n## 図😀\n\n結果。\n\n## 予備 {.studio-skip}\n\n資料。\n';
+  const path = f.ws.qmd('demo');
+  writeFileSync(path, original);
+  const generate = () => f.workflow.send('demo', f.store.state('demo').tabs[0]!.id, {base: f.base(), items: [{key: 'deck', text: '/発表原稿\n5分で'}]});
+  const round = await generate(); await settled(round);
+  assert.equal(round.error, null); assert.equal(round.state, 'done');
+  const output = readFileSync(path, 'utf8');
+  assert.ok(output.startsWith(original.split('## 予備')[0]!));
+  assert.ok(output.endsWith('## 予備 {.studio-skip}\n\n資料。\n'));
+  assert.match(output, /この図をご覧ください/);
+  const second = await generate(); await settled(second);
+  assert.equal(calls, 1); assert.equal(second.state, 'done');
+  assert.equal(readFileSync(path, 'utf8'), output);
+  await f.workflow.restore('demo', round.id);
+  assert.equal(readFileSync(path, 'utf8'), original);
+});
+
+test('a natural language script request rejects incomplete output without changing the deck', async t => {
+  const f = fixture(t, async (_id, _ws, options) => {
+    assert.equal(options.readonly, true);
+    return {final: {notes: []}};
+  });
+  const path = f.ws.qmd('demo');
+  writeFileSync(path, '---\ntopic: topic\n---\n\n## 本文\n\n説明。\n');
+  const before = readFileSync(path, 'utf8');
+  const round = await f.workflow.send('demo', f.store.state('demo').tabs[0]!.id, {
+    base: f.base(), items: [{key: 'deck', text: '発表原稿を考えて'}],
+  });
+  await settled(round);
+  assert.equal(round.state, 'error'); assert.match(round.error!, /原稿がそろいません/);
+  assert.equal(readFileSync(path, 'utf8'), before);
 });

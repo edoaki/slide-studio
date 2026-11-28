@@ -11,9 +11,9 @@ import { lstat, readFile, realpath, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type {
-  LegacyFeatureRequest,
-  LegacyFeatureResponse,
-  LegacyRendered,
+  FeatureRequest,
+  FeatureResponse,
+  RenderedDeck,
 } from "../../packages/contracts/src/server.js";
 import { atomicWriteFile } from "../../packages/core/src/atomic.js";
 import {
@@ -35,6 +35,7 @@ import {
   ValueError,
 } from "../../packages/core/src/source.js";
 import type { Doc } from "../../packages/core/src/source.js";
+import { themeName } from "../../packages/core/src/workspace-utils.js";
 import { isInsideRoot } from "../../packages/core/src/paths.js";
 import {
   decodeDeckBytes,
@@ -54,16 +55,17 @@ import * as homeTrash from "../../packages/core/src/trash.js";
 import * as deckManage from "../../packages/core/src/deck-manage.js";
 import { MAX_BYTES as MATERIALS_MAX_BYTES } from "../../packages/core/src/materials.js";
 import { RequestBridge } from "../../packages/ai/src/bridge.js";
-import { LegacyOutput } from "./output.js";
-import { LegacyChat } from "./chat.js";
+import { OutputService, warningSummary } from "./output.js";
+import { ChatService } from "./chat.js";
 import * as audit from "./audit.js";
-import { LegacyInsertion } from "./insertion.js";
+import { InsertionService } from "./insertion.js";
+import { serveUi } from "./ui-routes.js";
+import { handleAuthoringRoute } from "./authoring-routes.js";
 import { handleAssets } from "./assets.js";
 import { handleMaterials } from "./materials.js";
-import { LegacyThemes } from "./themes.js";
+import { ThemeService } from "./themes.js";
 import * as memo from "./memo.js";
 import * as history from "./history.js";
-import { readRehearsal, saveRehearsal, validRehearsal } from "./rehearsal-store.js";
 import { UiSettingsStore, validateSettings } from "./ui-settings.js";
 import { cpSlice, migrateBlockDesign } from "./block-migrate.js";
 import { createContentHandler } from "./content.js";
@@ -71,29 +73,26 @@ import {
   baseState,
   type ChunkEntry,
   type DeckState,
-  type LegacyDiagnosticItem,
-  type LegacyDiagnostics,
-  type LegacyExportDocument,
-  type LegacyExportDocumentInput,
-  type LegacyHost,
-  type LegacyHostHandoff,
-  type LegacyHostOptions,
-  type LegacyOpenExternal,
-  type LegacySelectWorkspace,
-  type LegacyWorkspace,
-  type LegacyWorkspaceChanged,
+  type DiagnosticItem,
+  type Diagnostics,
+  type ExportDocument,
+  type ExportDocumentInput,
+  type StudioHost,
+  type HostOptions,
+  type OpenExternal,
+  type SelectWorkspace,
+  type HostWorkspace,
+  type WorkspaceChanged,
   type PreviewCapability,
   type SourceSnapshot,
   type SseClient,
 } from "./host-types.js";
 import {
   absolutizeContentUrls,
-  adminCsp,
   beginClose,
   BoundedQueue,
   BoundedQueueEvents,
   cloneHeaders,
-  contentTypeFor,
   decodeName,
   decodeSegment,
   errorCode,
@@ -102,7 +101,7 @@ import {
   isDeckName,
   isMutation,
   isRecord,
-  LegacyHttpError,
+  HttpError,
   listen,
   LOOPBACK,
   mediaTypeOf,
@@ -123,24 +122,22 @@ import {
   type FeatureRoute,
   IMPLEMENTED_FEATURES,
   isShellPath,
-  LEGACY_WEB_FILES,
   matchesFeature,
   PREVIEW_FILE,
 } from "./web-files.js";
 
-export { LEGACY_WEB_FILES };
+export { WEB_FILES } from "./web-files.js";
 export type {
-  LegacyDiagnosticItem,
-  LegacyDiagnostics,
-  LegacyExportDocument,
-  LegacyExportDocumentInput,
-  LegacyHost,
-  LegacyHostHandoff,
-  LegacyHostOptions,
-  LegacyOpenExternal,
-  LegacySelectWorkspace,
-  LegacyWorkspace,
-  LegacyWorkspaceChanged,
+  DiagnosticItem,
+  Diagnostics,
+  ExportDocument,
+  ExportDocumentInput,
+  StudioHost,
+  HostOptions,
+  OpenExternal,
+  SelectWorkspace,
+  HostWorkspace,
+  WorkspaceChanged,
 };
 
 const DEFAULT_MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -158,7 +155,7 @@ const CHUNK_VERSIONS = 4;
  * Start the admin and content HTTP hosts. The caller owns the workspace lock
  * and remains responsible for closing the workspace after this host is closed.
  */
-export async function startLegacyHost(options: LegacyHostOptions): Promise<LegacyHost> {
+export async function startStudioHost(options: HostOptions): Promise<StudioHost> {
   if (typeof options.renderText !== "function") {
     throw new TypeError("renderText is required");
   }
@@ -176,7 +173,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   const maxPreviews = options.maxPreviewCapabilities ?? DEFAULT_MAX_PREVIEW_CAPABILITIES;
   const maxSseConnections = options.maxSseConnections ?? DEFAULT_MAX_SSE_CONNECTIONS;
   const keepAliveMs = options.keepAliveMs ?? DEFAULT_KEEP_ALIVE_MS;
-  const renderQueue = new BoundedQueue<LegacyRendered>(
+  const renderQueue = new BoundedQueue<RenderedDeck>(
     options.renderConcurrency ?? DEFAULT_RENDER_CONCURRENCY,
     options.renderPending ?? DEFAULT_RENDER_PENDING,
   );
@@ -192,8 +189,10 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   const mutations = new Set<IncomingMessage>();
   const pendingRenders = new Set<Promise<unknown>>();
   const deckLocks = new Map<string, Promise<unknown>>();
-  let envCache: LegacyDiagnosticItem[] | null = null;
+  let envCache: DiagnosticItem[] | null = null;
   let watcher: FSWatcher | undefined;
+  let watchRetry: NodeJS.Timeout | undefined;
+  let watchDelay = 250;
   let watchTimer: NodeJS.Timeout | undefined;
   const watchPaths = new Set<string>();
   let closed = false;
@@ -205,9 +204,18 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   let shutdownPromise: Promise<void> | undefined;
   let cliBridge: RequestBridge | undefined;
 
-  const output = new LegacyOutput({ pandocPath: options.pandocPath, inspect: options.inspect, broadcast });
-  const chat = new LegacyChat({
+  const output = new OutputService({ pandocPath: options.pandocPath, inspect: options.inspect, broadcast });
+  const chat = new ChatService({
     storage: options.aiStorage ?? join(homedir(), ".slide-studio", "ai"), providers: options.aiProviders, runner: options.aiRunner, broadcast, openExternal: async url => await options.openExternal?.(url) ?? false,
+    saveScript: (ws, deck, base, text, signal) => withDeckLock(ws, deck, async () => {
+      const source = await readSource(ws, deck);
+      if (source.version !== base) throw Error('作成中にスライドが変わりました。最新の内容で再送信してください。');
+      const path = ws.qmd(deck), encoded = encodeSourceForDeck(text, source);
+      if (encoded.length > maxSourceBodyBytes) throw Error('原稿が大きすぎます');
+      const info = await stat(path);
+      signal.throwIfAborted();
+      await atomicWriteFile(path, encoded, info.mode & 0o777);
+    }),
     check: async (ws, deck, mode) => {
       if (mode !== "theme") return output.check(ws, deck);
       const name = ws.deck_theme(deck), css = await readFile(join(ws.themes, `${name}.css`), "utf8");
@@ -221,8 +229,8 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       for (const deck of affectedDecks(ws, paths)) scheduleRender(ws, deck, true, true);
     },
   });
-  const insertion = new LegacyInsertion({ pandocPath: options.pandocPath, changed: path => broadcast({ type: "files", paths: [path] }) });
-  const themes = new LegacyThemes({
+  const insertion = new InsertionService({ pandocPath: options.pandocPath, changed: path => broadcast({ type: "files", paths: [path] }) });
+  const themes = new ThemeService({
     contentOrigin: () => contentOrigin,
     shots: options.inspect ? (ws,name) => output.scheduleTheme(ws,name) : undefined,
     locked: (ws, name) => chat.existing(ws)?.themeLocked(name) ?? false,
@@ -233,8 +241,9 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       for (const deck of affectedDecks(ws, paths)) scheduleRender(ws, deck, true, true);
     },
   });
-  const pending = options.inspect ? [] : ["theme-shots", "checks", "shots", "export", "download", "home-shots-running"];
-  async function startCliBridge(ws: LegacyWorkspace) {
+  const inspectionFeatures = ["theme-shots", "checks", "shots", "export", "download", "home-shots-running"];
+  const pending = options.inspect ? [] : inspectionFeatures;
+  async function startCliBridge(ws: HostWorkspace) {
     cliBridge = await new RequestBridge(ws.root, async (body, signal) => {
       if (body.operation === "audit_tools") return {result: audit.TOOLS};
       if (body.operation === "consult") {
@@ -255,25 +264,10 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       const result = typeof body.figure === "string" ? await output.checkFigure(ws as Workspace, body.figure) : await output.check(ws as Workspace, body.deck as string);
       const errors = body.page ? result.errors.filter(i => !i.page_id || i.page_id === body.page) : result.errors;
       const warnings = body.page ? result.warnings.filter(i => !i.page_id || i.page_id === body.page) : result.warnings;
-      return {result: {...result, errors, warnings}, errors: errors.length, summary: `検査：エラー ${errors.length}・警告 ${warnings.length}\n` + [...errors, ...warnings].map(i => i.message).join("\n")};
+      return {result: {...result, errors, warnings}, errors: errors.length, summary: `検査：エラー ${errors.length}件・${warningSummary(warnings)}\n` + [...errors, ...warnings].map(i => i.message).join("\n")};
     }).start();
   }
-  const handoff: LegacyHostHandoff = {
-    status: "in_progress",
-    pending: [...pending],
-    implemented: [...IMPLEMENTED_FEATURES, ...(options.inspect ? ["theme-shots", "checks", "shots", "export", "download", "home-shots-running"] : [])],
-    notes: [
-      "Feature routes are explicit dispatches; unregistered groups return 501 instead of empty success.",
-      "Authored HTML is served only from the content origin; the admin origin never serves /files.",
-      "The caller owns the workspace lock; close() drains accepted writes and listeners but not the workspace.",
-      "Chunk GET/POST includes markdown/cell/html/delete/move/image conversion with a four-version render cache keyed by raw source bytes.",
-      "Deck reads migrate legacy block styles under the per-deck lock and preserve BOM/CRLF bytes; raw byte hashes remain the source revision.",
-      "Original UI handlers are connected; output routes require the caller's Electron inspection service. Full legacy test parity and live provider verification remain separate validation gates.",
-      "Content origin authentication (Electron secret header) and non-loopback frame navigation blocking belong to desktop integration and are not enabled here.",
-      "Content CSP is stricter than the legacy service: remote images/fonts/frames are blocked pending a parity decision.",
-      "Desktop download handling and the full output/export bridge remain pending.",
-    ],
-  };
+
 
   function expectedHost(origin: string): string {
     return origin.replace(/^http:\/\//u, "");
@@ -329,13 +323,13 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   function generationFor(value: unknown): string {
     if (value === undefined) return randomBytes(8).toString("hex");
     if (typeof value !== "string" || !/^[A-Za-z0-9_-]{1,64}$/u.test(value)) {
-      throw new LegacyHttpError(400, "generationが正しくありません");
+      throw new HttpError(400, "generationが正しくありません");
     }
     return value;
   }
 
   function withDeckLock<T>(
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
     operation: () => Promise<T>,
   ): Promise<T> {
@@ -349,15 +343,15 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     return run;
   }
 
-  async function readSource(ws: LegacyWorkspace, deck: string): Promise<SourceSnapshot> {
+  async function readSource(ws: HostWorkspace, deck: string): Promise<SourceSnapshot> {
     if (!ws.has_deck(deck)) {
-      throw new LegacyHttpError(404, `発表がありません: ${deck}`);
+      throw new HttpError(404, `発表がありません: ${deck}`);
     }
     const file = ws.qmd(deck);
     const bytes = await readFile(file);
     const encoding = decodeDeckBytes(bytes);
     if (!encoding.validUtf8) {
-      throw new LegacyHttpError(
+      throw new HttpError(
         422,
         "原稿が UTF-8 ではないため読み書きできません",
         { code: "INVALID_UTF8" },
@@ -433,7 +427,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   }
 
   function themeOnlyRender(
-    previous: LegacyRendered | null,
+    previous: RenderedDeck | null,
     text: string,
     requested: boolean,
   ): boolean {
@@ -447,7 +441,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     }
   }
 
-  function warnIssues(rendered: LegacyRendered | null): unknown[] {
+  function warnIssues(rendered: RenderedDeck | null): unknown[] {
     if (rendered === null) return [];
     try {
       return options.warningIssues === undefined
@@ -460,10 +454,10 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   }
 
   function chunkInfoFor(
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
     state: DeckState,
-    rendered: LegacyRendered,
+    rendered: RenderedDeck,
     version: string,
   ): Promise<ChunkEditMap> {
     const found = state.chunks.get(version);
@@ -488,12 +482,12 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   }
 
   async function renderDeck(
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
     optionsForRender: { force?: boolean; themeOnly?: boolean; source?: SourceSnapshot } = {},
   ): Promise<DeckState> {
     if (draining) {
-      throw new LegacyHttpError(503, "サーバーを終了しています");
+      throw new HttpError(503, "サーバーを終了しています");
     }
     const state = stateFor(deck);
     const renderEpoch = epoch;
@@ -551,7 +545,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
               ok: true,
               version: source.version,
               theme_only: themeOnlyRender(previous, source.text, themeOnly),
-              theme: String(renderedDoc.doc?.meta?.theme ?? "default"),
+              theme: themeName(renderedDoc.doc?.meta?.theme),
               ms: Date.now() - started,
               timing: rendered.timing ?? {},
               slides: rendered.slides ?? [],
@@ -588,7 +582,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     return promise;
   }
 
-  async function ensureRendered(ws: LegacyWorkspace, deck: string): Promise<DeckState> {
+  async function ensureRendered(ws: HostWorkspace, deck: string): Promise<DeckState> {
     const source = await readSource(ws, deck);
     const state = stateFor(deck);
     if (state.html === null || state.version !== source.version) {
@@ -598,19 +592,19 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   }
 
   function scheduleRender(
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
     force: boolean,
     themeOnly: boolean,
   ): void {
     if (draining) return;
     void renderDeck(ws, deck, { force, themeOnly }).catch((error: unknown) => {
-      if (error instanceof LegacyHttpError && error.status === 503) return;
+      if (error instanceof HttpError && error.status === 503) return;
       console.error(`[legacy] cannot render ${deck}`, error);
     });
   }
 
-  function affectedDecks(ws: LegacyWorkspace, paths: string[]): Set<string> {
+  function affectedDecks(ws: HostWorkspace, paths: string[]): Set<string> {
     const affected = new Set<string>();
     for (const path of paths) {
       const parts = path.split("/");
@@ -629,7 +623,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     return affected;
   }
 
-  function flushWatch(ws: LegacyWorkspace): void {
+  function flushWatch(ws: HostWorkspace): void {
     watchTimer = undefined;
     if (closed) return;
     const paths = [...watchPaths];
@@ -646,11 +640,22 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     }
   }
 
-  function startWatch(ws: LegacyWorkspace): void {
+  function startWatch(ws: HostWorkspace): void {
     if (options.watch === false) return;
+    const retry = (error: unknown) => {
+      if (closed || workspace !== ws || watchRetry) return;
+      console.error("[server] workspace watcher failed", error);
+      watchRetry = setTimeout(() => {
+        watchRetry = undefined;
+        startWatch(ws);
+      }, watchDelay);
+      watchRetry.unref();
+      watchDelay = Math.min(30_000, watchDelay * 2);
+    };
     try {
-      watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
-        if (closed || filename === null) return;
+      const active = watch(ws.root, { recursive: true }, (_event, filename) => {
+        if (closed || active !== watcher || filename === null) return;
+        watchDelay = 250;
         const name = String(filename);
         if (name.includes(`.slide-studio${process.platform === "win32" ? "\\" : "/"}`)) return;
         const base = name.split(/[\\/]/u).at(-1) ?? "";
@@ -658,15 +663,22 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         watchPaths.add(resolve(ws.root, name));
         if (watchTimer === undefined) watchTimer = setTimeout(() => flushWatch(ws), 50);
       });
-      watcher.on("error", (error) => {
-        console.error("[legacy] workspace watcher failed", error);
+      watcher = active;
+      active.on("error", error => {
+        if (watcher !== active) return;
+        watcher = undefined;
+        active.close();
+        retry(error);
       });
     } catch (error) {
-      console.error("[legacy] cannot watch workspace", error);
+      retry(error);
     }
   }
 
   function stopWatch(): void {
+    clearTimeout(watchRetry);
+    watchRetry = undefined;
+    watchDelay = 250;
     if (watchTimer !== undefined) {
       clearTimeout(watchTimer);
       watchTimer = undefined;
@@ -694,7 +706,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       headers: cloneHeaders(request),
       route: feature.name,
       ...extras,
-    } as LegacyFeatureRequest & { route: string; deck?: string; op?: string };
+    } as FeatureRequest & { route: string; deck?: string; op?: string };
     for (const handler of options.featureHandlers ?? []) {
       const result = await handler(featureRequest);
       if (result !== null) {
@@ -733,7 +745,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
 
   function sendFeatureResponse(
     response: ServerResponse,
-    result: LegacyFeatureResponse,
+    result: FeatureResponse,
     contentOriginValue: string,
   ): void {
     const requestedStatus = result.status ?? 200;
@@ -772,7 +784,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     sendEmpty(response, status, headers);
   }
 
-  async function readThemeCss(ws: LegacyWorkspace, name: string): Promise<Buffer | null> {
+  async function readThemeCss(ws: HostWorkspace, name: string): Promise<Buffer | null> {
     if (!safeName(name)) return null;
     const path = join(ws.themes, `${name}.css`);
     const link = await lstat(path, { throwIfNoEntry: false }).catch(() => undefined);
@@ -792,20 +804,20 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   async function handleDeckPreview(
     request: IncomingMessage,
     response: ServerResponse,
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
     body: Record<string, unknown>,
   ): Promise<void> {
     const requestedMode = body.mode ?? "edit";
     if (requestedMode !== "edit" && requestedMode !== "present") {
-      throw new LegacyHttpError(400, "表示モードが正しくありません");
+      throw new HttpError(400, "表示モードが正しくありません");
     }
     const source = await readSource(ws, deck);
     let state = stateFor(deck);
     if (requestedMode === "present") {
       state = await renderDeck(ws, deck, { source });
       if (state.error !== null || state.html === null) {
-        throw new LegacyHttpError(500, state.error ?? "変換できません");
+        throw new HttpError(500, state.error ?? "変換できません");
       }
     } else if (state.html === null) {
       state = await renderDeck(ws, deck, { source });
@@ -813,7 +825,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     // Edit mode serves the last good render, matching the legacy behaviour when
     // the current source cannot be converted.
     if (state.html === null) {
-      throw new LegacyHttpError(500, state.error ?? "変換できません");
+      throw new HttpError(500, state.error ?? "変換できません");
     }
     const version = state.version;
     const generation = generationFor(body.generation);
@@ -835,23 +847,23 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   async function handleThemePreview(
     request: IncomingMessage,
     response: ServerResponse,
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     name: string,
     body: Record<string, unknown>,
   ): Promise<void> {
     if (!safeName(name) || !ws.themes_list().includes(name)) {
-      throw new LegacyHttpError(400, `テーマがありません: themes/${name}.css`);
+      throw new HttpError(400, `テーマがありません: themes/${name}.css`);
     }
     const css = await readThemeCss(ws, name);
-    if (css === null) throw new LegacyHttpError(400, `テーマがありません: themes/${name}.css`);
+    if (css === null) throw new HttpError(400, `テーマがありません: themes/${name}.css`);
     let sample: string;
     try {
       sample = await readFile(join(TEMPLATES, "theme-editor-sample.qmd"), "utf8");
     } catch {
-      throw new LegacyHttpError(500, "テーマの見本を読み込めません");
+      throw new HttpError(500, "テーマの見本を読み込めません");
     }
     const text = set_front(sample, { theme: name });
-    let rendered: LegacyRendered;
+    let rendered: RenderedDeck;
     try {
       rendered = await renderQueue.run(() =>
         options.renderText(ws as Workspace, "__theme-sample__", text, {
@@ -859,7 +871,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
           wrap: true,
         }));
     } catch (error) {
-      throw new LegacyHttpError(
+      throw new HttpError(
         500,
         `テーマの見本を表示できません: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -885,7 +897,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
 
   async function handleDeckGet(
     response: ServerResponse,
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
   ): Promise<void> {
     await withDeckLock(ws, deck, async () => {
@@ -906,7 +918,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
           eol: source.eol,
         });
         if (encoded.byteLength > maxSourceBodyBytes) {
-          throw new LegacyHttpError(413, "原稿が大きすぎます");
+          throw new HttpError(413, "原稿が大きすぎます");
         }
         await atomicWriteFile(path, encoded, info.mode & 0o777);
         source = {
@@ -940,7 +952,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
 
   async function handleDeckSource(
     response: ServerResponse,
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
     body: Record<string, unknown>,
   ): Promise<void> {
@@ -954,29 +966,30 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         sendApiError(response, 400, "原稿がありません");
         return;
       }
+      if (Buffer.byteLength(text) > maxSourceBodyBytes || (typeof body.base_text === "string" && Buffer.byteLength(body.base_text) > maxSourceBodyBytes)) {
+        sendApiError(response, 413, "原稿が大きすぎます");
+        return;
+      }
       const current = await readSource(ws, deck);
       const base = body.base;
       const rebased = base !== current.version;
       const baseText = rebased ? body.base_text : current.text;
-      if (typeof baseText !== "string") {
+      const merged = typeof baseText !== "string" ? null
+        : rebased ? merge3(baseText, text, current.text) : text;
+      const workflow = chat.existing(ws as Workspace);
+      function rejectLocked(before: string | undefined, after: string): boolean {
+        const lock = workflow?.slideSaveLock(deck, before, after);
+        if (!lock) return false;
+        sendApiError(response, 423, "この対象は AI が作業中です", lock === "partial" ? { partial: true } : {});
+        return true;
+      }
+      if (merged === null) {
+        if (rejectLocked(typeof baseText === "string" ? baseText : undefined, text)) return;
         sendApiError(response, 409, "外で変更されました", {
           version: current.version,
           text: current.text,
         });
         return;
-      }
-      let merged: string | null;
-      if (rebased) {
-        merged = merge3(baseText, text, current.text);
-        if (merged === null) {
-          sendApiError(response, 409, "外で変更されました", {
-            version: current.version,
-            text: current.text,
-          });
-          return;
-        }
-      } else {
-        merged = text;
       }
       let final: string;
       try {
@@ -987,22 +1000,20 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
 
       let version = current.version;
       if (final !== current.text) {
-        if (chat.existing(ws as Workspace)?.locked(deck, "slides", current.text, final)) {
-          sendApiError(response, 409, "この対象は AI が作業中です"); return;
-        }
+        if (rejectLocked(current.text, final)) return;
         const path = ws.qmd(deck);
         const info = await stat(path);
         let encoded: Buffer;
         try {
           encoded = encodeSourceForDeck(final, { bom: current.bom, eol: current.eol });
         } catch (error) {
-          throw new LegacyHttpError(
+          throw new HttpError(
             400,
             error instanceof Error ? error.message : "原稿を保存できません",
           );
         }
         if (encoded.byteLength > maxSourceBodyBytes) {
-          throw new LegacyHttpError(413, "原稿が大きすぎます");
+          throw new HttpError(413, "原稿が大きすぎます");
         }
         await chat.existing(ws as Workspace)?.userSaved(deck, current.text, final);
         await atomicWriteFile(path, encoded, info.mode & 0o777);
@@ -1021,7 +1032,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   async function handleChunks(
     request: IncomingMessage,
     response: ServerResponse,
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
     body: unknown,
   ): Promise<void> {
@@ -1170,7 +1181,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
   async function handleMemo(
     request: IncomingMessage,
     response: ServerResponse,
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
     body: unknown,
   ): Promise<void> {
@@ -1190,7 +1201,10 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
           return;
         }
         const values = recordBody(body);
-        if (chat.existing(ws as Workspace)?.locked(deck, "memo")) {sendApiError(response, 409, "下書きは AI が作業中です"); return;}
+        if (chat.existing(ws as Workspace)?.locked(deck, "memo")) {
+          sendApiError(response, 423, "下書きは AI が作業中です");
+          return;
+        }
         if (typeof values.text !== "string") {
           sendApiError(response, 400, "下書きがありません");
           return;
@@ -1221,7 +1235,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
 
   async function handleStyle(
     response: ServerResponse,
-    ws: LegacyWorkspace,
+    ws: HostWorkspace,
     deck: string,
     body: Record<string, unknown>,
   ): Promise<void> {
@@ -1337,7 +1351,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     }
 
     const limit = method === "PUT" && /^\/api\/deck\/[^/]+\/source$/u.test(pathname)
-      ? maxSourceBodyBytes
+      ? 2 * maxSourceBodyBytes + 1024
       : /^\/api\/deck\/[^/]+\/materials$/u.test(pathname)
         ? (options.maxUploadBodyBytes ?? MATERIALS_MAX_BYTES)
         : feature?.bodyLimit !== undefined ? maxUploadBodyBytes : maxBodyBytes;
@@ -1360,18 +1374,12 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     }
 
     if (pathname === '/api/updates') {
-      if (!options.updates) { sendJson(response, 200, { phase: 'disabled', automatic: false, version: '' }); return; }
+      if (!options.updates) { sendJson(response, 200, { phase: 'disabled', version: '' }); return; }
       if (method === 'GET') { sendJson(response, 200, options.updates.state()); return; }
       if (method !== 'POST') { sendApiError(response, 405, 'method not allowed'); return; }
       const values = recordBody(body);
-      if (values.action === 'automatic' && typeof values.value === 'boolean') {
-        sendJson(response, 200, await options.updates.automatic(values.value));
-      } else if (values.action === 'check') {
+      if (values.action === 'check') {
         void options.updates.check(); sendJson(response, 200, options.updates.state());
-      } else if (values.action === 'download') {
-        void options.updates.download(); sendJson(response, 200, options.updates.state());
-      } else if (values.action === 'install') {
-        options.updates.install(); sendJson(response, 200, options.updates.state());
       } else sendApiError(response, 400, 'invalid update action');
       return;
     }
@@ -1459,11 +1467,11 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       try {
         await Promise.allSettled([...requestTasks].filter(([other]) => other !== request && !((other.method === "GET" || other.method === "HEAD") && /^\/api\/ai\//u.test(other.url ?? ""))).map(([, task]) => task));
         await Promise.allSettled([...pendingRenders]);await output.settle();
-        if (pendingRenders.size || output.busy || chat.busy || cliBridge?.busy) throw new LegacyHttpError(409, "処理中のためワークスペースを切り替えできません");
+        if (pendingRenders.size || output.busy || chat.busy || cliBridge?.busy) throw new HttpError(409, "処理中のためワークスペースを切り替えできません");
         const previous = workspace;
         const values=body as Record<string,unknown>|undefined;
-        if(pathname === "/api/location" && (!values || typeof values.path !== "string" || !["new","existing"].includes(String(values.mode)))) throw new LegacyHttpError(400,"保管場所を指定してください");
-        if(pathname === "/api/location" && !options.openWorkspace) throw new LegacyHttpError(503,"保管場所の切り替えが接続されていません");
+        if(pathname === "/api/location" && (!values || typeof values.path !== "string" || !["new","existing"].includes(String(values.mode)))) throw new HttpError(400,"保管場所を指定してください");
+        if(pathname === "/api/location" && !options.openWorkspace) throw new HttpError(503,"保管場所の切り替えが接続されていません");
         const next = pathname === "/api/location" ? await options.openWorkspace!(values!.path as string,values!.mode as "new"|"existing") : options.selectWorkspace === undefined
           ? null
           : await options.selectWorkspace();
@@ -1505,6 +1513,17 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       } finally {
         switching = false;
       }
+      return;
+    }
+
+    if (pathname === "/api/desktop/projection/focus") {
+      if (method !== "POST") {
+        sendApiError(response, 405, "method not allowed");
+        return;
+      }
+      let focused = false;
+      try { focused = await options.focusProjection?.() ?? false; } catch { focused = false; }
+      sendJson(response, 200, { ok: focused });
       return;
     }
 
@@ -1605,7 +1624,7 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       }
       const recent: Array<Record<string, unknown>> = ws.recent().map((item) => {
         const deck = String(item.deck ?? "");
-        const shots: unknown[] = options.inspect ? output.saved(ws as Workspace, deck).slides.map(row => row[0]).filter(Boolean) : [];
+        const shots: unknown[] = options.inspect ? output.saved(ws as Workspace, deck, false).slides.map(row => row[0]).filter(Boolean) : [];
         return {
           ...item,
           blank: ws.is_untouched(deck),
@@ -1705,20 +1724,6 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       return;
     }
 
-    const rehearsal = /^\/api\/deck\/([^/]+)\/rehearsals$/u.exec(pathname);
-    if (rehearsal) {
-      if (method !== 'GET' && method !== 'PUT') { sendApiError(response,405,'method not allowed'); return; }
-      const deck = decodeName(rehearsal[1]!, '発表名');
-      await withDeckLock(ws,deck,async () => {
-        if (!ws.has_deck(deck)) { sendApiError(response,404,'発表がありません'); return; }
-        if (method === 'PUT' && !validRehearsal(body)) { sendApiError(response,400,'invalid rehearsal record'); return; }
-        const previous = await readRehearsal(ws.deck_dir(deck));
-        if (method === 'PUT') await saveRehearsal(ws.deck_dir(deck),body as import('./rehearsal-store.js').RehearsalRecord);
-        sendJson(response,200,{previous});
-      });
-      return;
-    }
-
     const deckMemo = /^\/api\/deck\/([^/]+)\/memo$/u.exec(pathname);
     if (deckMemo) {
       if (method !== "GET" && method !== "HEAD" && method !== "PUT") {
@@ -1779,129 +1784,8 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
       return;
     }
 
-    if (pathname === "/api/structure") {
-      if (method !== "POST") {
-        sendApiError(response, 405, "method not allowed");
-        return;
-      }
-      const values = recordBody(body);
-      const text = values.text ?? "";
-      if (typeof text !== "string") {
-        sendApiError(response, 400, "操作が正しくありません");
-        return;
-      }
-      sendJson(response, 200, parse(text).to_json());
-      return;
-    }
-
-    if (pathname === "/api/new") {
-      if (method !== "POST") {
-        sendApiError(response, 405, "method not allowed");
-        return;
-      }
-      const values = recordBody(body);
-      try {
-        ws.new_deck(
-          typeof values.name === "string" ? values.name : "",
-          typeof values.shelf === "string" ? values.shelf : "",
-          typeof values.theme === "string" && values.theme.length > 0 ? values.theme : "default",
-          typeof values.from === "string" && values.from.length > 0 ? values.from : null,
-          typeof values.title === "string" && values.title.length > 0 ? values.title : null,
-        );
-      } catch (error) {
-        sendApiError(response, 400, error instanceof Error ? error.message : String(error));
-        return;
-      }
-      sendJson(response, 200, { deck: values.name });
-      return;
-    }
-
-    if (pathname === "/api/topics") {
-      if (method !== "POST") {
-        sendApiError(response, 405, "method not allowed");
-        return;
-      }
-      const values = recordBody(body);
-      try {
-        ws.new_topic(typeof values.name === "string" ? values.name : "");
-      } catch (error) {
-        sendApiError(response, 400, error instanceof Error ? error.message : String(error));
-        return;
-      }
-      sendJson(response, 200, { topic: values.name });
-      return;
-    }
-
+    if (handleAuthoringRoute(pathname, method, body, ws, response)) return;
     sendApiError(response, 404, "not found");
-  }
-
-  async function handleShell(
-    request: IncomingMessage,
-    response: ServerResponse,
-  ): Promise<void> {
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      sendEmpty(response, 405);
-      return;
-    }
-    let html: Buffer;
-    try {
-      html = await readFile(join(options.uiDirectory, new URL(request.url ?? "/", adminOrigin).pathname === "/location" ? "location.html" : "app.html"));
-    } catch {
-      sendApiError(response, 404, "not found");
-      return;
-    }
-    response.writeHead(200, {
-      "content-type": "text/html; charset=utf-8",
-      "content-length": String(html.byteLength),
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff",
-      "referrer-policy": "no-referrer",
-      "content-security-policy": adminCsp(contentOrigin),
-    });
-    response.end(request.method === "HEAD" ? undefined : html);
-  }
-
-  async function handleWeb(
-    request: IncomingMessage,
-    response: ServerResponse,
-    pathname: string,
-  ): Promise<void> {
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      sendEmpty(response, 405);
-      return;
-    }
-    const suffix = pathname.slice("/web/".length);
-    let decoded: string;
-    try {
-      decoded = decodeURIComponent(suffix);
-    } catch {
-      sendApiError(response, 404, "not found");
-      return;
-    }
-    const parts = decoded.split("/");
-    if (
-      parts.some((part) => part === "" || part === "." || part === ".." || part.includes("\\"))
-      || !LEGACY_WEB_FILES.includes(decoded)
-    ) {
-      sendApiError(response, 404, "not found");
-      return;
-    }
-    let bytes: Buffer;
-    try {
-      bytes = await readFile(join(options.uiDirectory, ...parts));
-    } catch {
-      sendApiError(response, 404, "not found");
-      return;
-    }
-    response.writeHead(200, {
-      "content-type": contentTypeFor(decoded),
-      "content-length": String(bytes.byteLength),
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff",
-      "referrer-policy": "no-referrer",
-      "content-security-policy": adminCsp(contentOrigin),
-    });
-    response.end(request.method === "HEAD" ? undefined : bytes);
   }
 
   const handleContent = createContentHandler({
@@ -1949,12 +1833,8 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
         sendApiError(response, 404, "not found");
         return;
       }
-      if (pathname.startsWith("/web/")) {
-        await handleWeb(request, response, pathname);
-        return;
-      }
-      if (isShellPath(pathname)) {
-        await handleShell(request, response);
+      if (pathname.startsWith("/web/") || isShellPath(pathname)) {
+        await serveUi(request, response, pathname, options.uiDirectory, contentOrigin);
         return;
       }
       sendApiError(response, 404, "not found");
@@ -2070,6 +1950,6 @@ export async function startLegacyHost(options: LegacyHostOptions): Promise<Legac
     close,
     pending,
     pendingFeatures: pending,
-    handoff,
+    implemented: [...IMPLEMENTED_FEATURES, ...(options.inspect ? inspectionFeatures : [])],
   };
 }

@@ -200,7 +200,7 @@ for(const action of ['export','present'] as const)for(const failFirst of [false,
   if(action==='export'){
    if(!await page.locator('.output-popover').count())await page.locator('[data-output=build]').evaluate((e:HTMLButtonElement)=>e.click());
    await page.locator('[data-format=html]').evaluate((e:HTMLButtonElement)=>e.click());
-  }else { await page.locator('.present-tools button').first().evaluate((e:HTMLButtonElement)=>e.click());await page.getByRole('button',{name:'通常の発表',exact:true}).evaluate((e:HTMLButtonElement)=>e.click()); }
+  }else { await page.getByRole('button',{name:'今のページから',exact:true}).evaluate((e:HTMLButtonElement)=>e.click()); }
  };
  await activate();
  if(failFirst){

@@ -31,7 +31,10 @@ export class AIStatus {
     };
   }
 
-  async read(ws: Workspace, refresh = false) {
+  /** Last detected list, or null before the first detection finishes (an empty list would read as "no AI"). */
+  known(ws: Workspace) { return this.checked ? this.cached(ws) : null; }
+
+  private detect(refresh: boolean) {
     if (this.controller.signal.aborted) throw Error('アプリを終了しています');
     if (!this.pending && (refresh || Date.now() - this.checked > 300000)) {
       this.pending = this.providers.detectAll(this.controller.signal).then(found => {
@@ -39,8 +42,23 @@ export class AIStatus {
         this.checked = Date.now();
       }).finally(() => { this.pending = null; });
     }
-    await this.pending;
+    return this.pending;
+  }
+
+  async read(ws: Workspace, refresh = false) {
+    await this.detect(refresh);
     return this.cached(ws);
+  }
+
+  /**
+   * Re-detect after an executable or login changed, then tell open screens.
+   * A probe already running may have used the previous executable, so it is not reused.
+   * Without a workspace the event carries no list and screens fetch /api/ai/status themselves.
+   */
+  async refresh(ws?: Workspace) {
+    await this.pending?.catch(() => {});
+    await this.detect(true);
+    this.broadcast(ws ? {type: 'ai-status', ai: this.cached(ws)} : {type: 'ai-status'});
   }
 
   providerOf(key: string) {

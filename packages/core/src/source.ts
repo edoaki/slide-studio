@@ -23,7 +23,7 @@ import {
 } from "./cover.js";
 
 export { authors, html_block } from "./cover.js";
-export type { LegacyAuthor } from "./cover.js";
+export type { CoverAuthor } from "./cover.js";
 
 // ---------------------------------------------------------------- 正規表現
 //
@@ -127,7 +127,7 @@ function utf16ToCodePoint(value: string, index: number): number {
   return codePoints;
 }
 
-function codePointToUtf16(value: string, index: number): number {
+export function codePointToUtf16(value: string, index: number): number {
   if (index <= 0) return 0;
   let codePoints = 0;
   let position = 0;
@@ -138,6 +138,10 @@ function codePointToUtf16(value: string, index: number): number {
     codePoints += 1;
   }
   return value.length;
+}
+
+export function cpSlice(value: string, start: number, end: number): string {
+  return value.slice(codePointToUtf16(value, start), codePointToUtf16(value, end));
 }
 
 function fullMatch(expression: RegExp, value: string): boolean {
@@ -273,22 +277,22 @@ export class Chunk {
     for (const child of this.children) yield* child.walk();
   }
 
-  to_json(text: string): Record<string, unknown> {
+  to_json(text: string, lines = new SourceLines(text)): Record<string, unknown> {
     const result: Record<string, unknown> = {
       kind: this.kind,
       path: this.path,
       start: this.start,
       end: this.end,
-      text: new _Lines(text).slice(this.start, this.end),
+      text: lines.slice(this.start, this.end),
     };
     if (this.attrs !== null) result.attrs = this.attrs.to_json();
     if (this.open) {
-      result.open = new _Lines(text).slice(this.open[0], this.open[1]);
+      result.open = lines.slice(this.open[0], this.open[1]);
       result.close = this.close
-        ? new _Lines(text).slice(this.close[0], this.close[1])
+        ? lines.slice(this.close[0], this.close[1])
         : "";
     }
-    if (this.children.length) result.children = this.children.map((child) => child.to_json(text));
+    if (this.children.length) result.children = this.children.map((child) => child.to_json(text, lines));
     return result;
   }
 }
@@ -316,7 +320,7 @@ export class Page {
     for (const chunk of this.chunks) yield* chunk.walk();
   }
 
-  to_json(text: string): Record<string, unknown> {
+  to_json(text: string, lines = new SourceLines(text)): Record<string, unknown> {
     return {
       index: this.index,
       level: this.level,
@@ -331,7 +335,7 @@ export class Page {
       generated: this.generated,
       raw_only: this.raw_only,
       unclosed: this.unclosed,
-      chunks: this.chunks.map((chunk) => chunk.to_json(text)),
+      chunks: this.chunks.map((chunk) => chunk.to_json(text, lines)),
     };
   }
 }
@@ -352,7 +356,7 @@ export class Doc {
 
   get preamble(): string {
     const end = this.pages.length ? this.pages[0]!.start : codePointLength(this.text);
-    return new _Lines(this.text).slice(this.body_start, end);
+    return new SourceLines(this.text).slice(this.body_start, end);
   }
 
   page_of(offset: number): Page | null {
@@ -363,17 +367,18 @@ export class Doc {
   }
 
   to_json(): Record<string, unknown> {
+    const lines = new SourceLines(this.text);
     return {
       front: [this.front[0], this.front[1]],
       meta: this.meta,
       meta_error: this.meta_error,
       authors: authors(this.meta),
-      pages: this.pages.map((page) => page.to_json(this.text)),
+      pages: this.pages.map((page) => page.to_json(this.text, lines)),
     };
   }
 }
 
-class _Lines {
+export class SourceLines {
   readonly text: string;
   readonly starts: number[] = [];
   readonly ends: number[] = [];
@@ -448,10 +453,10 @@ class _Lines {
 }
 
 function sliceText(text: string, start: number, end: number): string {
-  return new _Lines(text).slice(start, end);
+  return new SourceLines(text).slice(start, end);
 }
 
-function allBlank(lines: _Lines, start: number, end: number): boolean {
+function allBlank(lines: SourceLines, start: number, end: number): boolean {
   for (let index = start; index < end; index += 1) {
     if (!lines.blank(index)) return false;
   }
@@ -629,7 +634,7 @@ class _Scan {
   readonly in_code: boolean[];
   readonly depth: number[];
 
-  constructor(lines: _Lines, first: number) {
+  constructor(lines: SourceLines, first: number) {
     const count = lines.length;
     const inCode = new Array<boolean>(count).fill(false);
     const depth = new Array<number>(count).fill(0);
@@ -682,7 +687,7 @@ class _Scan {
 
 export function parse(text: string): Doc {
   const [frontEnd, meta, metaError] = frontMatter(text);
-  const lines = new _Lines(text);
+  const lines = new SourceLines(text);
   let first = frontEnd < lines.total ? lines.index_at(frontEnd) : lines.length;
   if (first < 0) first = 0;
   if (frontEnd && first < lines.length && lines.starts[first]! < frontEnd) first += 1;
@@ -806,7 +811,7 @@ function listKind(value: string): string | null {
   return match[1] ? "-" : match[2]!;
 }
 
-function blocks(lines: _Lines, scan: _Scan, start: number, end: number): Array<[number, number]> {
+function blocks(lines: SourceLines, scan: _Scan, start: number, end: number): Array<[number, number]> {
   const out: Array<[number, number]> = [];
   let current: number | null = null;
   let last = -1;
@@ -869,12 +874,12 @@ function blocks(lines: _Lines, scan: _Scan, start: number, end: number): Array<[
   return out;
 }
 
-function chunks(lines: _Lines, scan: _Scan, start: number, end: number, prefix: string): Chunk[] {
+function chunks(lines: SourceLines, scan: _Scan, start: number, end: number, prefix: string): Chunk[] {
   return blocks(lines, scan, start, end).map(([first, last], index) =>
     classify(lines, scan, first, last, `${prefix}${index}`));
 }
 
-function classify(lines: _Lines, scan: _Scan, first: number, last: number, path: string): Chunk {
+function classify(lines: SourceLines, scan: _Scan, first: number, last: number, path: string): Chunk {
   const start = lines.starts[first]!;
   const end = lines.ends[last]!;
   const firstLine = lines.line(first);
@@ -996,7 +1001,7 @@ class _Emitter {
   readonly lines: string[] = [];
   readonly origin: Array<number | null> = [];
 
-  constructor(readonly L: _Lines) {}
+  constructor(readonly L: SourceLines) {}
 
   raw(start: number, end: number): void {
     const first = this.L.index_at(start);
@@ -1071,7 +1076,7 @@ function emitText(emitter: _Emitter, start: number, end: number): void {
 }
 
 export function wrapped_source(doc: Doc, wrap = true): [string, Array<number | null>] {
-  const lines = new _Lines(doc.text);
+  const lines = new SourceLines(doc.text);
   const emitter = new _Emitter(lines);
   if (doc.front[1]) emitter.raw(0, doc.front[1]);
   if (doc.pages.length) {
@@ -1150,7 +1155,7 @@ function emitChunk(emitter: _Emitter, chunk: Chunk, page: number): void {
 
 export function unsupported(doc: Doc): Array<{ page: number; message: string }> {
   const out: Array<{ page: number; message: string }> = [];
-  const lines = new _Lines(doc.text);
+  const lines = new SourceLines(doc.text);
   for (const page of doc.pages) {
     const body = lines.slice(page.head_end, page.end);
     for (const match of findAll(SHORTCODE, body)) {
@@ -1230,7 +1235,7 @@ export function rewrite(doc: Doc, replacements: Record<string, string> | null = 
   let text = doc.text;
   for (let index = edits.length - 1; index >= 0; index -= 1) {
     const [start, end, value] = edits[index]!;
-    const current = new _Lines(text);
+    const current = new SourceLines(text);
     text = current.slice(0, start) + value + current.slice(end, Number.POSITIVE_INFINITY);
   }
   return text;
@@ -1270,7 +1275,7 @@ export function move_chunk(
 
   let text = doc.text;
   for (const [start, end, value] of edits) {
-    const current = new _Lines(text);
+    const current = new SourceLines(text);
     text = current.slice(0, start) + value + current.slice(end, Number.POSITIVE_INFINITY);
   }
   return text;

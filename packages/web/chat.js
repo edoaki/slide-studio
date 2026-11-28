@@ -4,6 +4,7 @@
 // 入力欄は Codex と同じ形：添付（＋・貼り付け・落とす）、コンテキストの円、モデルと思考量、送信。
 // 左の欄で［下書き］を見ている間は「下書きのチャット」（mode "memo"。設計書 §8.8）：タブ・会話を分け、対象を選ばず、
 // 書いて送るとすぐ1回の実行になる。AI は memo.md だけを直し、返事は普通の文章（検査も ✓／✗ も無い）。
+import { mdLite, workHtml } from './chat-activity.js';
 import { makeModelPicker, lookup, helpHtml, loginAi } from './ai-model.js';
 import { api, uploadFetch, esc, onEvent, toast as showToast } from './api.js';
 import { svg } from './icons.js';
@@ -18,31 +19,13 @@ const DRAFT_DELAY = 400;
 const TARGET_KEYS = { Digit1: 'fig', Digit2: 'page', Digit3: 'deck' }; // ⌥1 図・⌥2 ページ・⌥3 発表全体
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
 const fmtTokens = n => n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n);
-// 下書きのチャットの返事（Markdown）の一部だけを表示に使う：見出し・箇条書き・太字・コード。ほかは文字のまま
-function mdLite(text) {
-  const inline = s => (s.includes(T.decisionMarker) ? `<span class="decision-needed">${format(s)}</span>` : format(s));
-  const format = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  const out = [];
-  let list = null;
-  for (const line of String(text || '').split('\n')) {
-    const li = line.match(/^\s*(?:[-*]|\d+\.)\s+(.*)$/);
-    if (li) { (list ||= []).push(`<li>${inline(li[1])}</li>`); continue; }
-    if (list) { out.push(`<ul>${list.join('')}</ul>`); list = null; }
-    const h = line.match(/^#{1,6}\s+(.*)$/);
-    if (h) out.push(`<p class="h">${inline(h[1])}</p>`);
-    else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
-  }
-  if (list) out.push(`<ul>${list.join('')}</ul>`);
-  return out.join('');
-}
-
 export function makeChat(ctx) {
   const deck = ctx.deck;
   const base = `/api/deck/${encodeURIComponent(deck)}/chat`;
   const panel = ctx.root.querySelector('#chat');
   const side = ctx.root.querySelector('#stepSide');
   const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(`slide-studio.chat.${deck}.${k}`)); localStorage.setItem(`slide-studio.chat.${deck}.${k}`, JSON.stringify(v)); } catch { return null; } return null; };
-  let alive = true, st = null, ai = null, histOpen = false, sending = false, shownKey = null, dialog = null, settingSaves = 0, favoritesWanted = null, favoritesSaving = false;
+  let alive = true, st = null, ai = null, histOpen = false, sending = false, shownKey = null, dialog = null, settingSaves = 0;
   let submission = null; // HTTP の応答前も、送ろうとしている内容を会話欄に表示する
   const submitting = t => !!t && submission?.tab === t.id;
   const pending = {}; // タブごとの、まだ送っていない添付（送信のときに保存する）
@@ -84,6 +67,7 @@ export function makeChat(ctx) {
           </div>
         </div>
         <input class="chat-file" type="file" multiple hidden>
+        <input class="chat-template-file" type="file" accept=".pptx,.potx" hidden>
       </div>
     </div>`;
   const $ = s => panel.querySelector(s);
@@ -96,8 +80,9 @@ export function makeChat(ctx) {
     onModel: key => { const t = tab(); if (t) return patchTab(t, { model: key, effort: null }).then(() => loadAi()); },
     onEffort: effort => { const t = tab(); if (t) return patchTab(t, { effort }); },
     onRole: (role, value) => { const t = tab(); if (t) return patchRole(t, role, value); },
-    onFavorites: saveFavorites,
     onRecheck: () => loadAi(true),
+    // 開くたびに裏で読み直す。サーバーは5分以内の結果をそのまま返し、更新直後や古いときだけ検出し直す
+    onOpen: () => { aiReload ||= loadAi(false, true).finally(() => { aiReload = null; }); },
   });
 
   // ------------------------------------------------------------ ページ・対象
@@ -292,10 +277,10 @@ export function makeChat(ctx) {
     const n = new Set((st?.rounds || []).filter(r => r.state === 'run' && (r.mode || 'slides') === 'slides' && !r.talk).map(r => r.tab)).size;
     const any = () => ctx.allLocked || !!(ctx.lock.pages?.length || ctx.lock.figures?.length);
     const was = any();
-    ctx.allLocked = !!locked; ctx.lock = lock || {}; ctx.aiTabs = n;
+    ctx.allLocked = !!(lock?.all ?? locked); ctx.lock = lock || {}; ctx.aiTabs = n;
     if (ctx.lock.pages?.length || ctx.lock.figures?.length) ctx.mergeable = true;
     ctx.showStatus();
-    if (was && !any()) ctx.reloadText?.();
+    if (was && !any()) { ctx.resumeLockedSave?.(); ctx.reloadText?.(); }
   }
   function saveDrafts(t) {
     clearTimeout(timers[t.id]);
@@ -327,21 +312,6 @@ export function makeChat(ctx) {
     patches[t.id] = job;
     return job;
   }
-  // 表示するモデル：チェックは先に変え、保存は最後の状態だけを順に送る
-  async function saveFavorites(favorites) {
-    ai = { ...ai, favorites }; favoritesWanted = favorites; render();
-    if (favoritesSaving) return;
-    favoritesSaving = true;
-    try {
-      while (favoritesWanted) {
-        const body = { favorites: favoritesWanted };
-        favoritesWanted = null;
-        const a = await api('/api/ai/favorites', { method: 'PUT', body });
-        if (alive && !favoritesWanted) { ai = a; render(); }
-      }
-    } catch (e) { favoritesWanted = null; toast(e.message); favoritesSaving = false; await loadAi(); }
-    finally { favoritesSaving = false; }
-  }
   function patchRole(t, role, value) {
     settingSaves++;
     const assign = v => {
@@ -368,11 +338,12 @@ export function makeChat(ctx) {
     try { const s = await api(opening ? `${base}/open` : base, opening ? { method: 'POST' } : undefined); if (alive) { if (s.ai && !ai) ai = s.ai; applyState(s, opening); } } catch (e) { toast(e.message); }
   }
   // AI の検出（CLI・ログイン・モデル）。数秒かかるので、チャットの状態とは別に読む
-  async function loadAi(refresh = false) {
+  let aiReload = null;
+  async function loadAi(refresh = false, quiet = false) {
     try {
       const a = await api(`/api/ai/status${refresh ? '?refresh=1' : ''}`);
-      if (alive) { ai = favoritesSaving ? { ...a, favorites: ai.favorites } : a; render(); }
-    } catch (e) { toast(e.message); }
+      if (alive) { ai = a; render(); }
+    } catch (e) { if (!quiet) toast(e.message); }
   }
 
   // ------------------------------------------------------------ 添付（写真は images/、ほかは materials/）
@@ -406,9 +377,9 @@ export function makeChat(ctx) {
     for (const p of list) if (id == null || p.id === id) { if (p.url) URL.revokeObjectURL(p.url); }
     pending[t.id] = id == null ? [] : list.filter(p => p.id !== id);
   }
-  const fileUrl = path => `/files/${path.startsWith('images/') ? `topics/${encodeURIComponent(st?.topic || '')}` : `decks/${encodeURIComponent(deck)}`}/${path.split('/').map(encodeURIComponent).join('/')}`;
-  const attachChip = (a, removable) => `<span class="chat-att${a.kind === 'image' ? ' img' : ''}" data-tip="${esc(`${a.name} — ${a.kind === 'image' ? T.attachImage : T.attachFile}`)}">
-    ${a.kind === 'image' ? `<img src="${esc(fileUrl(a.path))}" alt="">` : svg('file')}<span class="nm">${esc(a.name)}</span>
+  // 添付の画像は配信元の絶対 URL（サーバーが a.url に付ける）で読む。管理側の /files/ は 404 になる
+  const attachChip = (a, removable) => `<span class="chat-att${a.kind === 'image' && a.url ? ' img' : ''}" data-tip="${esc(`${a.name} — ${a.kind === 'image' ? T.attachImage : T.attachFile}`)}">
+    ${a.kind === 'image' && a.url ? `<img src="${esc(a.url)}" alt="">` : svg('file')}<span class="nm">${esc(a.name)}</span>
     ${removable ? `<button class="x" data-act="unattach" data-path="${esc(a.path)}" aria-label="${esc(T.removeAttach(a.name))}" data-tip="${esc(T.removeAttach(a.name))}">${svg('x')}</button>` : ''}</span>`;
   const pendingChip = (p, removable = true) => `<span class="chat-att${p.kind === 'image' ? ' img' : ''}" data-tip="${esc(`${p.name} — ${p.kind === 'image' ? T.attachImagePending : T.attachFilePending}`)}">
     ${p.kind === 'image' ? `<img src="${esc(p.url)}" alt="">` : svg('file')}<span class="nm">${esc(p.name)}</span>
@@ -523,6 +494,62 @@ export function makeChat(ctx) {
       return t;
     } catch (e) { toast(e.message); return null; }
   }
+  // ------------------------------------------------------------ はじめの依頼（空のチャットに並べるボタン）
+  // 押すと依頼文を入力欄に入れるか、必要な画面を開く。送るのは利用者
+  const STARTERS = { slides: ['fromMemo', 'template', 'theme', 'script', 'fix'], memo: ['reviseMemo', 'fromMemo', 'template', 'theme', 'script'], theme: ['template'] };
+  const STARTER_ICONS = { reviseMemo: 'pencil', fromMemo: 'notebookPen', template: 'presentation', theme: 'palette', script: 'speakerView', fix: 'warn' };
+  const startersHtml = () => `<div class="chat-starters" role="group" aria-label="${T.starters}">${STARTERS[mode].filter(k => k !== 'fix' || ctx.checkIssuesText?.()).map(k =>
+    `<button type="button" class="chat-starter" data-act="starter" data-starter="${k}" data-tip="${esc(T.starterTip[k])}">${svg(STARTER_ICONS[k])}<span>${esc(T.starter[k])}</span></button>`).join('')}</div>`;
+  const openEditor = () => { if (document.body.classList.contains('editor-off')) ctx.root.querySelector('#editorToggle')?.click(); };
+  // 依頼文を入力欄に入れる。会話・書きかけのあるタブには足さず、空のタブを使う（一緒に送られないように）
+  async function prepare(to, text, { files = null } = {}) {
+    if (!st || !text) return false;
+    if (mode !== to) { ctx.leftTabs?.show(to === 'slides' ? 'qmd' : to); setMode(to); }
+    if (document.body.classList.contains('chat-off')) ctx.root.querySelector('#chatToggle')?.click();
+    let t = tab();
+    // 作ったタブは、先に届いた状態の通知で別のオブジェクトになっていることがあるので取り直す
+    if (!t || !fresh(t)) t = await addTab() && tab();
+    if (!t || !alive) return false;
+    if (files) {
+      attach(files);
+      if (to === 'slides') { delete talks[t.id]; store('talk', talks); }
+    }
+    const key = to === 'slides' ? 'deck' : to;
+    if (to === 'slides') { fixedPages.delete(t.id); pins[t.id] = 'deck'; store('pins', pins); }
+    t.drafts = { ...t.drafts, [key]: text };
+    shownKey = null; saveDrafts(t); render(); fit();
+    input.focus();
+    input.setSelectionRange(text.length, text.length);
+    toast(T.starterReady);
+    return true;
+  }
+  async function starter(kind) {
+    const text = T.starterText;
+    if (kind === 'theme') { openEditor(); ctx.leftTabs?.show('theme'); }
+    else if (kind === 'template') $('.chat-template-file').click();
+    else if (kind === 'fromMemo' || kind === 'reviseMemo') {
+      if (ctx.memo && !ctx.memo.hasBody()) { openEditor(); ctx.leftTabs?.show('memo'); toast(T.starterNoMemo); return; }
+      await prepare(kind === 'reviseMemo' ? 'memo' : 'slides', text[kind]);
+    }
+    else if (kind === 'script') await prepare('slides', text.script);
+    else if (kind === 'fix') await prepare('slides', ctx.checkIssuesText?.() || '');
+  }
+  // 雛形をどのテーマに反映するかを選ぶ（'new'・'current'。やめたら null）
+  function chooseTemplateTarget(name) {
+    return new Promise(resolve => {
+      dialog?.remove();
+      dialog = document.createElement('div'); dialog.className = 'dialog-back';
+      dialog.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(T.templateTitle)}">
+        <div class="dh"><h3>${esc(T.templateTitle)}</h3></div><div class="chat-dialog-body"><p>${esc(T.templateLead(name))}</p>
+        <div class="chat-choices">${['new', 'current'].map(k => `<button type="button" class="chat-choice" data-a="${k}"><strong>${esc(T.templateChoice[k][0])}</strong><span>${esc(T.templateChoice[k][1])}</span></button>`).join('')}</div></div>
+        <div class="df"><button class="btn" data-a="no">${S.cancel}</button></div></div>`;
+      document.body.append(dialog);
+      const done = v => { dialog?.remove(); dialog = null; resolve(v); };
+      dialog.onclick = e => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) done(a === 'no' ? null : a); else if (e.target === dialog) done(null); };
+      dialog.onkeydown = e => { if (e.key === 'Escape') done(null); };
+      dialog.querySelector('[data-a=new]').focus();
+    });
+  }
   function confirmDialog(title, body, ok) {
     return new Promise(resolve => {
       dialog?.remove();
@@ -613,45 +640,6 @@ export function makeChat(ctx) {
     const names = [...(f?.modified || []), ...(f?.added || []), ...(f?.deleted || [])].map(n => n.replace(`decks/${deck}/`, ''));
     if (!names.length) return T.noFiles;
     return names.slice(0, 2).join('、') + (names.length > 2 ? ` ${T.more(names.length - 2)}` : '');
-  }
-  function stepsHtml(steps, last) {
-    const shown = last ? steps.slice(-last) : steps;
-    return shown.map(s => `<div class="chat-step k-${esc(s.kind)}${s.exit ? ' bad' : ''}">${s.role ? esc(S.agents.names[s.role]) + '：' : ''}${esc(s.text)}</div>`).join('');
-  }
-  // 主の担当（チャット・テーマ編集・下書き）の返事には名前を付けない。HTML 実装や確認役の返事だけ誰のものか示す
-  const MAIN_ROLES = new Set(['chat', 'theme', 'draft']);
-  const replyHtml = s => `<div class="chat-reply">${s.role && !MAIN_ROLES.has(s.role) ? `<p class="h">${esc(S.agents.names[s.role])}</p>` : ''}${mdLite(s.text)}</div>`;
-  // 作業中：AI の返事はそのまま出し、その間の作業（コマンド・ファイル・考え）はまとめて畳む。最後の作業の新しい3行だけ見せる
-  // 終わった後：途中の返事も作業も1つにまとめて畳む（最後の返事と結果だけ見せる）
-  function workHtml(r, active) {
-    if (!active) {
-      // 最後の返事（r.summary）と同じ文は、別に出すので重ねない
-      const steps = r.steps.filter(s => s.kind !== 'message' || s.text !== r.summary);
-      if (!steps.length) return '';
-      const body = [];
-      for (const s of steps) {
-        if (s.kind === 'message') body.push(replyHtml(s));
-        else if (typeof body[body.length - 1] === 'object') body[body.length - 1].push(s);
-        else body.push([s]);
-      }
-      return `<details class="chat-log-steps chat-log-all" data-key="w"><summary data-tip="${esc(T.stepsTip)}">${T.steps(steps.length)}</summary>
-        <div class="chat-log-body">${body.map(x => typeof x === 'string' ? x : `<div class="chat-steps">${stepsHtml(x)}</div>`).join('')}</div></details>`;
-    }
-    const out = [];
-    let run = [];
-    const flush = last => {
-      if (!run.length) return;
-      out.push(`<details class="chat-log-steps" data-key="w${out.length}"><summary data-tip="${esc(T.stepsTip)}">${T.steps(run.length)}</summary><div class="chat-steps">${stepsHtml(run)}</div></details>`
-        + (active && last ? `<div class="chat-steps chat-tail">${stepsHtml(run, 3)}</div>` : ''));
-      run = [];
-    };
-    for (const s of r.steps) {
-      if (s.kind !== 'message') { run.push(s); continue; }
-      flush(false);
-      out.push(replyHtml(s));
-    }
-    flush(true);
-    return out.join('');
   }
   // 検査のエラーを同じ会話で直させている途中・終わった後（設計書 §8.1.2）
   // 確認役の指摘を直させているときは r.fixing === 'review'（指摘は r.review_fixes）
@@ -804,12 +792,13 @@ export function makeChat(ctx) {
       }
       const changed = changedOf(r);
       parts.push(filesRow(r, filesText(r.files), changed));
+      if (r.slide_diff) parts.push(`<details class="chat-diff"><summary data-tip="${esc(T.slideDiffTip)}">${T.slideDiff}</summary><pre>${diffHtml(r.slide_diff)}</pre></details>`);
       parts.push(fixesHtml(r), reviewFixesHtml(r));
       // ファイルが変わっていなければ検査の結果は出さない
       const c = changed ? r.check : null, errs = c ? newErrors(r) : [], old = (c?.errors || []).filter(x => x.old);
       const errorList = list => `${list.slice(0, 8).map(x => `<div class="chat-item">${chip(x.key, x.label)}<span>${esc(x.text)}</span></div>`).join('')}
           ${list.length > 8 ? `<span>${T.more(list.length - 8)}</span>` : ''}`;
-      if (c && !errs.length) parts.push(`<div class="chat-ok">${svg('check')}${c.warnings.length ? T.checkWarn(c.warnings.length) : T.checkOk}</div>`);
+      if (c && !errs.length) parts.push(`<div class="chat-ok">${svg('check')}${c.warnings.length ? T.checkWarn(c.warnings) : T.checkOk}</div>`);
       if (errs.length) parts.push(`<div class="chat-box bad"><strong>${svg('alert')}${T.checkFail(errs.length)}</strong>${errorList(errs)}</div>`);
       if (old.length) parts.push(`<details class="chat-box warn"><summary>${T.checkOld(old.length)}</summary>${errorList(old)}</details>`);
       const outside = r.restored?.outside || r.files?.outside || [];
@@ -882,7 +871,7 @@ export function makeChat(ctx) {
       ${submission.items.map(it => `<div class="chat-item">${plain() ? '' : chip(it.key, it.label)}<span>${esc(it.text)}</span></div>`).join('')}
       <div class="chat-attach sent">${submission.attach.map(a => attachChip(a, false)).join('')}${submission.pending.map(p => pendingChip(p, false)).join('')}</div>
       </div></div>` : '';
-    box.innerHTML = rounds.length || waiting ? rounds.map(roundHtml).join('') + pendingHtml : `<div class="chat-intro">${svg('chat')}${intro.map(x => `<p>${esc(x)}</p>`).join('')}</div>`;
+    box.innerHTML = rounds.length || waiting ? rounds.map(roundHtml).join('') + pendingHtml : `<div class="chat-intro">${svg('chat')}${intro.map(x => `<p>${esc(x)}</p>`).join('')}${startersHtml()}</div>`;
     opened.forEach(([id, key]) => { const d = box.querySelector(`.chat-round[data-round="${id}"] details${key ? `[data-key="${key}"]` : ':not([data-key])'}`); if (d) d.open = true; });
   }
   function renderDrafts() {
@@ -944,7 +933,8 @@ export function makeChat(ctx) {
     talkBtn.setAttribute('aria-label', T.talk);
     tip(talkBtn, talkOf(t) ? T.talkOff : T.talkOn);
     input.disabled = !t || submitting(t);
-    $('.chat-field > .chat-attach').innerHTML = submitting(t) ? '' : (t?.attach || []).map(x => attachChip(x, true)).join('') + pendingOf(t).map(p => pendingChip(p)).join('');
+    $('.chat-field > .chat-attach').innerHTML = submitting(t) ? '' : (t?.attach || []).map(x => attachChip(x, true)).join('') + pendingOf(t).map(p => pendingChip(p)).join('')
+      + (pendingOf(t).some(p => p.kind === 'file') ? `<span class="chat-att-note">${T.attachNote}</span>` : '');
     $('[data-act=attach]').disabled = !t || submitting(t);
     picker.render({ ai, key: modelKey(t), effort: t?.effort || null, locked: started(t), busy: !t || submitting(t) || busy(t.id),
       contextKey: t?.id || mode, mode, roles: st?.role_modes?.[mode] || [], roleProviders: st?.role_providers || [], roleDefaults: st?.role_defaults || {}, roleSettings: t?.ai_roles || {} });
@@ -1083,6 +1073,7 @@ export function makeChat(ctx) {
     else if (act === 'page') toggle('page');
     else if (act === 'send') send();
     else if (act === 'attach') $('.chat-file').click();
+    else if (act === 'starter') await starter(el.dataset.starter);
     else if (act === 'talk') { const t = tab(); if (t) { if (talks[t.id]) delete talks[t.id]; else talks[t.id] = true; store('talk', talks); renderCompose(); } }
     else if (act === 'unattach' && t && el.dataset.pending) { dropPending(t, el.dataset.pending); render(); }
     else if (act === 'unattach' && t) patchTab(t, { attach: (t.attach || []).filter(x => x.path !== el.dataset.path) });
@@ -1132,6 +1123,11 @@ export function makeChat(ctx) {
     b.disabled = true; b.lastChild.textContent = T.rechecking; await loadAi(true);
   });
   $('.chat-file').addEventListener('change', e => { attach(e.target.files); e.target.value = ''; });
+  $('.chat-template-file').addEventListener('change', async e => {
+    const file = e.target.files[0]; e.target.value = '';
+    const to = file && await chooseTemplateTarget(file.name);
+    if (to && alive) prepare(to === 'current' ? 'theme' : 'slides', T.starterText.template[to](file.name), { files: [file] });
+  });
   input.addEventListener('paste', e => {
     const files = [...(e.clipboardData?.files || [])];
     if (files.length) { e.preventDefault(); attach(files); }
@@ -1160,6 +1156,8 @@ export function makeChat(ctx) {
   const off = onEvent(ev => {
     if (alive && ev.type === 'files') { load(); return; }
     if (alive && ev.type === 'ai-limits' && ai) { ai.limits = ev.limits; renderContext(tab()); return; }
+    // AI の更新・ログインの後。一覧が付いていなければ（検出済みなので）すぐ返る状態を読み直す
+    if (alive && ev.type === 'ai-status') { if (ev.ai) { ai = ev.ai; render(); } else loadAi(false, true); return; }
     if (!alive || ev.deck !== deck || !st) return;
     if (ev.type === 'chat') applyState(ev.state);
     if (ev.type === 'chat-round') {
@@ -1195,6 +1193,8 @@ export function makeChat(ctx) {
       render();
     },
     keydown: targetKey,
+    // 検査の一覧などから、スライドのチャットの空のタブに依頼文を入れる（送るのは利用者）
+    ask(text) { return prepare('slides', text); },
     // 素材の画面などから、発表全体への未送信の指示を足す（送るのは利用者）
     draft(text) {
       const t = tab(); if (!t || plain()) { toast(T.noTab); return false; }

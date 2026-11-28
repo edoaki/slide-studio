@@ -1,7 +1,8 @@
 import { api, esc, toast } from './api.js';
 import { S } from './strings.js';
 import { svg } from './icons.js';
-import { homeUpdates } from './home-updates.js';
+import './custom-select.js';
+import { homeUpdates, installUpdateNotifications } from './home-updates.js';
 import { homeAi } from './home-ai.js';
 import { openLocationDialog } from './location.js';
 import { preferences, savePreferences } from './preferences.js';
@@ -14,7 +15,7 @@ export function openSettings(tab = 'general') {
   if (currentDialog?.open) { currentDialog.focus(); return; }
   const d = document.createElement('dialog'); currentDialog = d;
   d.className = 'settings-dialog'; d.setAttribute('aria-labelledby', 'settings-title');
-  d.innerHTML = `<aside class="settings-nav"><h2 id="settings-title">${T.title}</h2><nav aria-label="${T.title}">${Object.entries(T.tabs).map(([key,label]) => `<button data-tab="${key}" aria-current="false">${label}</button>`).join('')}</nav></aside><main class="settings-main"><header><h2></h2><button class="ibtn settings-close" data-close aria-label="${S.close}">${svg('x')}</button></header><div class="settings-content"></div><p class="settings-status" role="status"></p></main>`;
+  d.innerHTML = `<aside class="settings-nav"><h2 id="settings-title">${T.title}</h2><nav aria-label="${T.title}">${Object.entries(T.tabs).map(([key,label]) => `<button data-tab="${key}" aria-current="false">${label}${key === 'general' ? `<span class="update-badge" aria-hidden="true">${S.updates.notice}</span>` : ''}</button>`).join('')}</nav></aside><main class="settings-main"><header><h2></h2><button class="ibtn settings-close" data-close aria-label="${S.close}">${svg('x')}</button></header><div class="settings-content"></div><p class="settings-status" role="status"></p></main>`;
   document.body.append(d);
   const content = d.querySelector('.settings-content');
   let stop = () => {}, generation = 0;
@@ -34,7 +35,7 @@ export function openSettings(tab = 'general') {
         ]);
       },
     },
-    appearance: { html: () => `<p class="settings-intro">${T.appearanceHint}</p>` + row(T.theme, '', `<select data-setting="theme" aria-label="${T.theme}">${Object.entries(T.themes).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}</select>`) + row(T.zoom, T.zoomHint, `<select data-setting="zoom" aria-label="${T.zoom}">${Array.from({length:16},(_,i)=>75+i*5).map(n=>`<option value="${n}">${n}%</option>`).join('')}</select><button class="btn" data-reset>${T.reset}</button>`) + toggle('keyHints') + toggle('tooltips') + toggle('tooltipKeys') },
+    appearance: { html: () => `<p class="settings-intro">${T.appearanceHint}</p>` + row(T.theme, '', `<studio-select variant="segmented" data-setting="theme" aria-label="${T.theme}">${Object.entries(T.themes).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}</studio-select>`) + row(T.zoom, T.zoomHint, `<studio-select data-setting="zoom" aria-label="${T.zoom}">${Array.from({length:16},(_,i)=>75+i*5).map(n=>`<option value="${n}">${n}%</option>`).join('')}</studio-select><button class="btn" data-reset>${T.reset}</button>`) + toggle('keyHints') + toggle('tooltips') + toggle('tooltipKeys') },
     shortcuts: { html: () => `<p class="settings-intro">${T.shortcutHint}</p>` + T.shortcutGroups.map((group,i)=> `<h3>${group}</h3>` + T.shortcuts.filter(r=>r[0]===i).map(([,key,label])=>`<div class="setting-row shortcut-row"><b>${label}</b><kbd>${key}</kbd></div>`).join('')).join('') },
     ai: { html: () => `<p class="settings-intro">${T.aiHint}</p><ul class="env-list env-ai"></ul>` + row(S.agents.title,T.agentsHint,`<button class="btn" data-agents>${S.agents.open}</button>`), mount: () => {
       const ai = homeAi(content.querySelector('.env-ai')); stop = () => ai.destroy();
@@ -93,6 +94,7 @@ export function openSettings(tab = 'general') {
   d.showModal(); show(tab); d.querySelector('[data-tab][aria-current=true]').focus();
 }
 export function installSettings() {
+  installUpdateNotifications();
   addEventListener('studio-settings-command', e => {
     if (document.querySelector('.speaker-screen,.present-screen')) return;
     if (e.detail === 'open') { openSettings(); return; }

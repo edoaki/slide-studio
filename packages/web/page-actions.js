@@ -1,16 +1,71 @@
+// ページの操作（複製・発表と PDF から外す・削除）。縮小画像の上には操作を置かない。
+// 今のページは、外す・戻すをページ番号の横、削除を一覧のボタンの横で操作する。並べ替えは縮小画像を持って動かす（page-reorder.js）。
+// 縮小画像と原稿のページを右クリックすると、そのページの操作を出す。
 import { S } from './strings.js';
 import { toast } from './api.js';
+import { svg } from './icons.js';
+import { tip } from './tip.js';
 import { structureOf } from './structure.js';
-import { movePage, removePage } from './block-ops.js';
+import { removePage } from './block-ops.js';
 import { duplicatePage, togglePageSkip } from './page-operations.js';
 
 export function makePageActions(ctx) {
   let dialog = null, alive = true, busy = false, follow = null;
   const blocked = () => busy || ctx.locked || ctx.allLocked || ctx.lock.pages?.length || ctx.conflict || ctx.historyBusy || ctx.presenting;
+  // プレビューのページ番号が今の原稿と同じ版のときだけ操作する
+  const stale = () => ctx.dirty || ctx.saving || ctx.preview.version !== ctx.version;
   function close() { dialog?.close(); dialog?.remove(); dialog = null; }
+
+  // 原稿を書き換え、描き直した後で結果のページへ移る
+  async function run(index, text, st, edit) {
+    if (blocked() || text !== ctx.text) return false;
+    busy = true; refresh();
+    try {
+      if (!await ctx.flush() || !alive || text !== ctx.text || ctx.locked || ctx.allLocked || ctx.lock.pages?.length) return false;
+      const r = edit(text, st, index); if (!r) return false;
+      ctx.setText(r.text);
+      if (ctx.text !== r.text) return false;
+      follow = { text: r.text, page: r.page ?? Math.min(index, st.pages.length - 2) };
+      return true;
+    } catch (e) { toast(e.message); return false; }
+    finally { busy = false; refresh(); }
+  }
+
+  // ------------------------------------------------------------ 今のページ（ページ番号の横と一覧のボタンの横）
+  const skipButton = Object.assign(document.createElement('button'), { type: 'button', className: 'ibtn page-skip' });
+  const removeButton = tip(Object.assign(document.createElement('button'), { type: 'button', className: 'ibtn page-remove', innerHTML: svg('trash') }), S.pageActions.remove);
+  ctx.root.querySelector('#pageCount')?.before(skipButton);
+  ctx.root.querySelector('#stripTools')?.append(removeButton);
+  const currentPage = () => ctx.preview.pageOfSlide(ctx.preview.index);
+  async function onCurrent(edit) {
+    const index = currentPage();
+    if (blocked() || stale() || index == null) return false;
+    const text = ctx.text, st = await structureOf(text);
+    if (!alive || !st.pages[index]) return false;
+    return run(index, text, st, edit);
+  }
+  skipButton.onclick = () => onCurrent(togglePageSkip);
+  removeButton.onclick = async () => { if (await onCurrent(removePage)) toast(S.qb.deleted); };
+  let shownSkip = null;
+  function refresh() {
+    if (!alive) return;
+    const index = currentPage(), p = index == null ? null : ctx.structure?.pages[index];
+    const skipped = !!p?.skipped, off = !p || blocked() || stale();
+    if (shownSkip !== skipped) {
+      shownSkip = skipped;
+      skipButton.innerHTML = svg(skipped ? 'eyeOff' : 'eye');
+      skipButton.classList.toggle('on', skipped);
+      skipButton.parentElement?.classList.toggle('skipped', skipped);
+      tip(skipButton, skipped ? S.pageActions.unskip : S.pageActions.skip);
+    }
+    skipButton.disabled = off || !!p.raw_only;
+    removeButton.disabled = off;
+  }
+
+  // ------------------------------------------------------------ 右クリック
   async function open(index) {
     if (blocked() || index == null) return;
-    if (ctx.dirty || ctx.saving || ctx.preview.version !== ctx.version) { toast(S.saveFirst); return; }
+    if (stale()) { toast(S.saveFirst); return; }
     close();
     const text = ctx.text;
     const st = await structureOf(text);
@@ -19,24 +74,16 @@ export function makePageActions(ctx) {
     const d = document.createElement('dialog'); dialog = d; d.className = 'page-actions-dialog';
     d.setAttribute('aria-label', S.pageActions.title);
     const title = document.createElement('h2'); title.textContent = S.pageActions.page(index + 1, p.title); d.append(title);
-    const act = (label, fn, disabled = false) => {
+    const act = (label, edit, disabled = false) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = label; b.disabled = disabled;
       b.onclick = async () => {
         if (blocked() || text !== ctx.text) { close(); return; }
-        busy = true;
-        try {
-          if (!await ctx.flush() || text !== ctx.text || ctx.locked || ctx.allLocked || ctx.lock.pages?.length) return;
-          const r = fn(); if (!r) return;
-          ctx.setText(r.text); follow = {text: r.text, page: r.page ?? Math.min(index, st.pages.length - 2)};
-        } catch (e) { toast(e.message); }
-        finally { busy = false; close(); }
+        try { await run(index, text, st, edit); } finally { close(); }
       }; d.append(b);
     };
-    act(S.pageActions.duplicate, () => duplicatePage(text, st, index), !!p.generated || p.raw_only);
-    act(p.skipped ? S.pageActions.unskip : S.pageActions.skip, () => togglePageSkip(text, st, index), p.raw_only);
-    act(S.pageActions.previous, () => movePage(text, st, index, index - 1), index === 0);
-    act(S.pageActions.next, () => movePage(text, st, index, index + 2), index === st.pages.length - 1);
-    act(S.pageActions.remove, () => removePage(text, st, index));
+    act(S.pageActions.duplicate, duplicatePage, !!p.generated || p.raw_only);
+    act(p.skipped ? S.pageActions.unskip : S.pageActions.skip, togglePageSkip, p.raw_only);
+    act(S.pageActions.remove, removePage);
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = S.pageActions.close; cancel.onclick = close; d.append(cancel);
     d.addEventListener('cancel', e => { e.preventDefault(); close(); });
     document.body.append(d); d.showModal();
@@ -52,25 +99,21 @@ export function makePageActions(ctx) {
     container.addEventListener('contextmenu', onContext);
     return () => container.removeEventListener('contextmenu', onContext);
   }
+  // 外したページは縮小画像を暗くするだけにする（画像の上に文字を重ねない）
   function decorate(container) {
     for (const thumb of container.querySelectorAll('button[data-index]')) {
       const index = ctx.preview.pageOfSlide(+thumb.dataset.index), p = ctx.structure?.pages[index];
       thumb.classList.toggle('page-skipped', !!p?.skipped);
-      let badge = thumb.querySelector('.page-skip-label');
-      if (p?.skipped && !badge) { badge = document.createElement('span'); badge.className = 'page-skip-label'; badge.textContent = S.pageActions.skipped; thumb.append(badge); }
-      if (!p?.skipped) badge?.remove();
-      if (thumb.querySelector('.page-actions-trigger') || index == null) continue;
-      const more = document.createElement('span'); more.className = 'page-actions-trigger'; more.textContent = '⋯';
-      more.setAttribute('role', 'button'); more.tabIndex = 0; more.setAttribute('aria-label', S.pageActions.title);
-      const launch = e => { e.preventDefault(); e.stopPropagation(); open(ctx.preview.pageOfSlide(+thumb.dataset.index)); };
-      more.addEventListener('click', launch);
-      more.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') launch(e); });
-      thumb.append(more);
     }
   }
-  return { open, attach, decorate, previewLoaded() {
-    if (!follow) return; const wanted = follow; follow = null;
-    if (ctx.text !== wanted.text) return;
-    const index = ctx.preview.slideOfPage(wanted.page); if (index >= 0) ctx.preview.go(index, 0);
-  }, destroy() { alive = false; close(); } };
+  return {
+    open, attach, decorate, refresh,
+    previewLoaded() {
+      refresh();
+      if (!follow) return; const wanted = follow; follow = null;
+      if (ctx.text !== wanted.text) return;
+      const index = ctx.preview.slideOfPage(wanted.page); if (index >= 0) ctx.preview.go(index, 0);
+    },
+    destroy() { alive = false; close(); skipButton.remove(); removeButton.remove(); },
+  };
 }

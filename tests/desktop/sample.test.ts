@@ -3,12 +3,12 @@ import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
-import {openLegacyWorkspace} from '../../apps/server/workspace-service.js';
+import {openWorkspace} from '../../apps/server/workspace-service.js';
 
 test('first-run tutorial is separate from blank decks and never replaces user edits', async t => {
   const root = await mkdtemp(join(tmpdir(), 'studio-tutorial-'));
   t.after(() => rm(root, {recursive: true, force: true}));
-  const first = await openLegacyWorkspace(root, {sample: true});
+  const first = await openWorkspace(root, {sample: true});
   const ws = first.workspace;
   try {
     const source = await readFile(ws.qmd('sample'), 'utf8');
@@ -38,7 +38,7 @@ test('first-run tutorial is separate from blank decks and never replaces user ed
     assert.equal(ws.is_blank('mine'), true);
     await writeFile(ws.qmd('sample'), source + '\n利用者が書いたメモ。\n');
   } finally { await first.close(); }
-  const second = await openLegacyWorkspace(root, {sample: true});
+  const second = await openWorkspace(root, {sample: true});
   try {
     assert.match(await readFile(second.workspace.qmd('sample'), 'utf8'), /利用者が書いたメモ。/);
     assert.equal(second.workspace.list_decks().length, 3);

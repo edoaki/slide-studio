@@ -1,6 +1,7 @@
 // ホーム：発表の一覧・新しい発表・トピック・動作環境。
 import { api, esc, onEvent, toast } from './api.js';
 import { svg } from './icons.js';
+import './custom-select.js';
 import { S } from './strings.js';
 import { navigate } from './app.js';
 import { themeCards, dialog } from './themes.js';
@@ -62,12 +63,12 @@ export function mountHome(root) {
       <div class="brand">${svg('logo')}${S.appName}</div>
       <span class="grow"></span>
       <button class="ibtn" data-act="trash" aria-label="${S.homeTrash.title}" data-tip="${S.homeTrash.title}">${svg('trash')}</button>
-      <button class="ibtn" data-open-settings aria-haspopup="dialog" aria-label="${S.settings.title}" data-tip="${S.settings.title}">${svg('settings')}</button>
+      <button class="ibtn" data-open-settings aria-describedby="update-notification" aria-haspopup="dialog" aria-label="${S.settings.title}" data-tip="${S.settings.title}">${svg('settings')}<span class="update-dot" aria-hidden="true"></span></button>
     </header>
     <main class="home-main">
       <section>
         <div class="sec-head"><h2>${S.decks}</h2><button type="button" class="ibtn home-sort-trigger" aria-label="${S.homeList.sort}" data-tip="${S.homeList.sort}" aria-haspopup="menu" aria-expanded="false">${svg('sort')}</button>${add('new', S.newDeck)}<div class="home-sort-menu" popover="auto" role="menu" aria-label="${S.homeList.sort}">${Object.entries(S.homeList.sorts).map(([value,label]) => `<button type="button" role="menuitemradio" data-sort="${value}" aria-checked="${value === 'opened'}">${svg('check')}<span>${label}</span></button>`).join('')}</div></div>
-        <p class="empty-note home-no-results" role="status" hidden>${S.homeList.empty}</p><div class="cards"></div>
+        <p class="empty-note home-empty" role="status" hidden>${S.homeList.empty}</p><div class="cards"></div>
       </section>
       <section>
         <div class="sec-head"><h2>${S.libraries}</h2>${add('topic', S.topic.create)}</div>
@@ -129,9 +130,9 @@ export function mountHome(root) {
   }
   function drawPresentations() {
     if (!data) return;
-    const rows = presentationList(data.recent, '', sort);
+    const rows = presentationList(data.recent, sort);
     $('.cards').replaceChildren(...rows.map(d => actions.card(card(d), d)));
-    $('.home-no-results').hidden = rows.length > 0;
+    $('.home-empty').hidden = rows.length > 0;
   }
   root.onclick = async e => {
     const act = e.target.closest('[data-act]')?.dataset.act;
@@ -172,11 +173,11 @@ export function newDeckDialog(data, extra = {}) {
       <button type="button" data-mode="copy" aria-pressed="false" ${data.recent.length ? '' : 'disabled'}>${S.newCopy}</button>
       ${extra.modes || ''}
     </div>
-    <label class="from" hidden>${S.copyFrom}<select name="from" aria-label="${S.copyFrom}">${data.recent.map(d => `<option value="${esc(d.deck)}">${esc(d.title)}（${esc(d.deck)}）</option>`).join('')}</select></label>
+    <label class="from" hidden>${S.copyFrom}<studio-select name="from" aria-label="${S.copyFrom}">${data.recent.map(d => `<option value="${esc(d.deck)}">${esc(d.title)}（${esc(d.deck)}）</option>`).join('')}</studio-select></label>
     <label>${S.deckTitle}<input name="title" autocomplete="off"></label>
     <div class="two">
       <div>
-        <label ${shelves.length ? '' : 'hidden'}>${S.library}<select name="shelf">${shelves.map(s => `<option value="${esc(s)}"${s === selected ? ' selected' : ''}>${esc(s)}</option>`).join('')}<option value=""${shelves.length ? '' : ' selected'}>${S.topic.new}</option></select></label>
+        <label ${shelves.length ? '' : 'hidden'}>${S.library}<studio-select name="shelf" aria-label="${S.library}">${shelves.map(s => `<option value="${esc(s)}"${s === selected ? ' selected' : ''}>${esc(s)}</option>`).join('')}<option value=""${shelves.length ? '' : ' selected'}>${S.topic.new}</option></studio-select></label>
         <label class="new-shelf">${S.topic.name}<input name="newShelf" required pattern="[a-z0-9][a-z0-9-]*" autocomplete="off" spellcheck="false"></label>
       </div>
       <label>${S.deckName}<input name="name" pattern="[a-z0-9][a-z0-9-]*" autocomplete="off" spellcheck="false"></label>

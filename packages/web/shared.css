@@ -144,6 +144,7 @@ kbd { font: var(--fs-sm) var(--font-mono); padding: 1px 5px; border-radius: 4px;
   background: #2A2A28; color: #F1F1ED; box-shadow: 0 2px 10px rgba(0, 0, 0, .2);
   font: 500 var(--fs-sm)/1.3 var(--font-ui); white-space: nowrap; opacity: 0; transition: opacity var(--dur-fast) var(--ease);
   display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: max-content; max-width: calc(100vw - 8px); box-sizing: border-box;
 }
 .tip::before {
   content: ''; position: absolute; left: var(--arrow, 50%); width: 10px; height: 10px; margin-left: -5px;
@@ -152,7 +153,7 @@ kbd { font: var(--fs-sm) var(--font-mono); padding: 1px 5px; border-radius: 4px;
 .tip[data-side="below"]::before { top: -4px; }
 .tip[data-side="above"]::before { bottom: -4px; }
 .tip.show { opacity: 1; }
-.tip-name { white-space: pre-line; text-align: center; }
+.tip-name { white-space: pre-line; text-align: center; word-break: auto-phrase; overflow-wrap: anywhere; text-wrap: balance; }
 .tip-keys { display: flex; gap: 4px; }
 .tip kbd { min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: 4px; background: rgba(255, 255, 255, .14); color: inherit; font: 500 var(--fs-caption)/1 var(--font-ui); }
 
@@ -171,3 +172,43 @@ kbd { font: var(--fs-sm) var(--font-mono); padding: 1px 5px; border-radius: 4px;
 .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--on-var); }
 .btn.ghost:hover:not(:disabled) { background: var(--hover); color: var(--on); }
 
+
+/* ---------- 選択欄（custom-select.js の <studio-select>）。OS 標準の <select> は使わない ---------- */
+studio-select { display: inline-flex; min-width: 0; max-width: 100%; vertical-align: middle; }
+studio-select:not([variant="segmented"]) { width: 180px; }
+.ss-trigger {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; height: var(--control-md); margin: 0; padding: 0 8px 0 10px;
+  border: 1px solid var(--outline-strong); border-radius: var(--r-element); background: var(--solid); color: var(--on);
+  font: 400 var(--fs-ui)/1.2 var(--font-ui); text-align: left; cursor: pointer; box-shadow: 0 1px 1px rgba(20,20,15,.04);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.ss-trigger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--on) 28%, transparent); }
+.ss-trigger:focus-visible, .ss-trigger[aria-expanded="true"] { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.ss-trigger:disabled { opacity: .45; cursor: default; }
+.ss-trigger > .ss-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-trigger > .ss-value.placeholder { color: var(--muted); }
+.ss-trigger > svg.i { width: 14px; height: 14px; color: var(--muted); transition: transform var(--dur-base) var(--ease); }
+.ss-trigger[aria-expanded="true"] > svg.i { transform: rotate(180deg); color: var(--primary); }
+studio-select[size="sm"] .ss-trigger { height: var(--control-sm); padding: 0 6px 0 8px; gap: 6px; font-size: var(--fs-sm); }
+/* 一覧は popover で最前面に出し、位置は custom-select.js が決める */
+.ss-list {
+  position: fixed; inset: auto; margin: 0; padding: 4px; box-sizing: border-box; overflow: auto; overscroll-behavior: contain;
+  border: 0; border-radius: var(--r-container); background: var(--popover); color: var(--on); box-shadow: var(--sh2);
+  font: 400 var(--fs-ui)/1.3 var(--font-ui); text-align: left; cursor: default;
+}
+.ss-list:popover-open { display: flex; flex-direction: column; gap: 1px; animation: ss-in var(--dur-fast) var(--ease); }
+.ss-list[data-side="above"]:popover-open { animation-name: ss-in-above; }
+@keyframes ss-in { from { opacity: 0; transform: translateY(-3px); } }
+@keyframes ss-in-above { from { opacity: 0; transform: translateY(3px); } }
+.ss-option { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 6px 10px 6px 8px; border-radius: var(--r-element); cursor: pointer; white-space: nowrap; }
+.ss-option > svg.i { width: 14px; height: 14px; color: var(--primary); visibility: hidden; }
+.ss-option[aria-selected="true"] > svg.i { visibility: visible; }
+.ss-option[aria-selected="true"] { font-weight: 600; }
+.ss-option > .ss-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-option.active { background: var(--hover); }
+.ss-option[aria-disabled="true"] { opacity: .4; cursor: default; }
+studio-select[size="sm"] .ss-list { font-size: var(--fs-sm); }
+/* 横並び（variant="segmented"）は .seg の見た目で、選んだものを浮かせる */
+.ss-seg button[role="radio"][aria-checked="true"] { background: var(--solid); color: var(--on); box-shadow: 0 0 0 1px var(--outline), 0 1px 1px rgba(0,0,0,.05); }
+.ss-seg button[role="radio"]:hover:not(:disabled):not([aria-checked="true"]) { color: var(--on); }
+.ss-seg button[role="radio"]:disabled { opacity: .45; cursor: default; }

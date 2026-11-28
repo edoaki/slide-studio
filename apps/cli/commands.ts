@@ -5,9 +5,9 @@ import type { Workspace } from '../../packages/core/src/workspace.js';
 import { new_figure } from '../../packages/core/src/figures.js';
 import { import_deck } from '../../packages/core/src/importer.js';
 import { sha256 } from '../../packages/core/src/encoding.js';
-import { LegacyOutput } from '../server/output.js';
-import type { LegacyInspect } from '../../packages/contracts/src/output.js';
-import type { LegacyFeatureRequest } from '../../packages/contracts/src/server.js';
+import { OutputService, warningSummary } from '../server/output.js';
+import type { InspectDocument } from '../../packages/contracts/src/output.js';
+import type { FeatureRequest } from '../../packages/contracts/src/server.js';
 import { request } from '../../packages/ai/src/bridge.js';
 import * as audit from '../server/audit.js';
 
@@ -62,7 +62,7 @@ export async function throughBridge(root: string, args: Arguments): Promise<numb
 }
 function readReview(path: string | undefined) { return JSON.parse(readFileSync(path === '-' ? 0 : required(path, '確認結果のJSON'), 'utf8')); }
 
-export async function runCommand(ws: Workspace, args: Arguments, options: {pandocPath: string; inspect: LegacyInspect; diagnostics: () => Promise<unknown[]>}) {
+export async function runCommand(ws: Workspace, args: Arguments, options: {pandocPath: string; inspect: InspectDocument; diagnostics: () => Promise<unknown[]>}) {
   if (args.values.help) { process.stdout.write(HELP); return 0; }
   const [command, name, third] = args.positionals, values = args.values;
   if (command === 'new') {
@@ -84,7 +84,7 @@ export async function runCommand(ws: Workspace, args: Arguments, options: {pando
     else { print(`置き場: ${ws.root}`); for (const item of items) print(`${item.ok ? '✓' : '✗'} ${item.name}: ${item.detail ?? ''}`); }
     return items.every(i => i.ok) ? 0 : 1;
   }
-  const output = new LegacyOutput({...options, broadcast() {}});
+  const output = new OutputService({...options, broadcast() {}});
   if (command === 'audit') {
     if (name === 'tools') { print(audit.TOOLS); return 0; }
     const deck = required(third, '発表の名前'), id = args.positionals[3];
@@ -95,12 +95,12 @@ export async function runCommand(ws: Workspace, args: Arguments, options: {pando
     const result = values.figure ? await output.checkFigure(ws, values.figure) : await output.check(ws, required(name, '発表の名前'));
     const errors = values.page ? result.errors.filter(i => !i.page_id || i.page_id === values.page) : result.errors;
     const warnings = values.page ? result.warnings.filter(i => !i.page_id || i.page_id === values.page) : result.warnings;
-    print(values.json ? {...result, errors, warnings} : `検査：エラー ${errors.length}・警告 ${warnings.length}\n` + [...errors, ...warnings].map(i => i.message).join('\n'));
+    print(values.json ? {...result, errors, warnings} : `検査：エラー ${errors.length}件・${warningSummary(warnings)}\n` + [...errors, ...warnings].map(i => i.message).join('\n'));
     return errors.length ? 1 : 0;
   }
   if (command === 'build') {
     const deck = required(name, '発表の名前');
-    const result = await output.handle(ws, {method: 'POST', pathname: `/api/deck/${encodeURIComponent(deck)}/build`, query: new URLSearchParams(), body: {base: sha256(readFileSync(ws.qmd(deck))), force: values.force === true, ...(values['html-only'] ? {format: 'html'} : {})}} as LegacyFeatureRequest);
+    const result = await output.handle(ws, {method: 'POST', pathname: `/api/deck/${encodeURIComponent(deck)}/build`, query: new URLSearchParams(), body: {base: sha256(readFileSync(ws.qmd(deck))), force: values.force === true, ...(values['html-only'] ? {format: 'html'} : {})}} as FeatureRequest);
     const body = result?.body as {error?: string; blocked?: boolean; result?: unknown; files?: Array<{name: string}>};
     if (body.error) throw Error(body.error);
     if (body.blocked) { print(body.result); return 1; }

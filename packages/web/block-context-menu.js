@@ -1,4 +1,5 @@
 import { S } from './strings.js';
+import { studioSelect } from './custom-select.js';
 
 export function makeBlockContextMenu({ root, apply, movePage }) {
   let menu = null, origin = null;
@@ -6,10 +7,12 @@ export function makeBlockContextMenu({ root, apply, movePage }) {
   const outside = e => { if (menu && !menu.contains(e.target)) close(); };
   const key = e => {
     if (!menu) return;
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); }
-    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) && e.target.tagName !== 'SELECT') {
+    // 移動先の選択欄の中のキーは欄に任せる（一覧を開いている間の Esc は一覧だけ閉じる）
+    const field = e.target.closest?.('studio-select');
+    if (e.key === 'Escape' && !field?.open) { e.preventDefault(); e.stopPropagation(); close(true); }
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) && !field) {
       e.preventDefault(); e.stopPropagation();
-      const items = [...menu.querySelectorAll('button:not(:disabled),select')], index = items.indexOf(document.activeElement);
+      const items = [...menu.querySelectorAll('button:not(:disabled)')], index = items.indexOf(document.activeElement);
       items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (index + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
     }
   };
@@ -27,9 +30,7 @@ export function makeBlockContextMenu({ root, apply, movePage }) {
         b.onclick = () => { close(); apply(name); }; menu.append(b);
       }
       const label = document.createElement('label'); label.textContent = t.movePage;
-      const select = document.createElement('select'); select.setAttribute('aria-label', t.movePage);
-      select.append(new Option(t.choosePage, ''));
-      for (const p of actions.pages) { const option = new Option(t.page(p.index + 1, p.title), String(p.index)); option.disabled = !p.enabled; select.append(option); }
+      const select = studioSelect({ label: t.movePage, placeholder: t.choosePage, size: 'sm', options: actions.pages.map(p => ({ value: String(p.index), label: t.page(p.index + 1, p.title), disabled: !p.enabled })) });
       select.onchange = () => { if (select.value !== '') { const page = +select.value; close(); movePage(page); } };
       label.append(select); menu.append(label); root.append(menu);
       menu.style.left = `${Math.max(4, Math.min(x, innerWidth - menu.offsetWidth - 4))}px`;

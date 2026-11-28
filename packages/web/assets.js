@@ -63,12 +63,14 @@ export function makeAssets(ctx) {
     })();
     return loading;
   }
-  // 使っているページの番号。原稿は打つたびに変わるので、画面で数える
+  // 使っているページの番号。原稿は打つたびに変わるので、画面で数える（ページへの分割は同じ原稿なら1回）
   const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let split = null;
+  const pageTexts = () => (split?.text === ctx.text ? split : split = { text: ctx.text, pages: ctx.text.split(/^#{1,2}[ \t]+\S.*$/m).slice(1) }).pages;
   function usedPages(item) {
     const re = item.kind === 'image' ? new RegExp(`\\]\\(<?${reEsc(item.path)}[\\s)>]`) : item.ref ? new RegExp(`\\{\\{<\\s*fig\\s+"?${reEsc(item.ref)}["\\s>]`) : null;
     if (!re) return [];
-    return ctx.text.split(/^#{1,2}[ \t]+\S.*$/m).slice(1).flatMap((p, i) => re.test(p) ? [i + 1] : []);
+    return pageTexts().flatMap((p, i) => re.test(p) ? [i + 1] : []);
   }
 
   // 縮小表示。図は押せない iframe を縮めて見せる（形式でない HTML は scripts だけ許した別の生まれにする）
@@ -130,15 +132,21 @@ export function makeAssets(ctx) {
       b.querySelector('.n').textContent = data ? (b.dataset.kind === 'images' ? imgs.length : html.length) : '';
     });
     if (!shown()) return;
-    const signature = JSON.stringify([kind, listed(), ctx.text]);
+    // 作り直すのは素材の一覧（名前・状態・URL・更新時刻）が変わったときだけ。本文の入力で変わる使用状況（used・others）は
+    // 含めず、作り直さずに印を付け直す（図の iframe を読み直さない）
+    const items = listed();
+    const signature = JSON.stringify([kind, items.map(({ used, others, ...rest }) => rest)]);
     // An identical background refresh must not replace a pressed upload or
     // preview button between pointerdown and click.
-    if (signature === renderedItems && view.querySelector('.as-grid')) { paint(); return; }
+    if (signature === renderedItems && view.querySelector('.as-grid')) {
+      const byPath = new Map(items.map(x => [x.path, x]));
+      for (const c of view.querySelectorAll('.as-card')) mark(c, c._item = byPath.get(c._item.path) || c._item);
+      paint(); return;
+    }
     renderedItems = signature;
     const keep = view.scrollTop;
     const g = document.createElement('div'); g.className = 'as-grid';
     // HTML は トピックの図 → 図の形式でない の順（区切りは線だけ）
-    const items = listed();
     for (const k of [...chosen]) if (!items.some(x => x.path === k)) chosen.delete(k);
     g.setAttribute('role', 'listbox'); g.setAttribute('aria-multiselectable', 'true'); g.setAttribute('aria-label', A.list);
     items.forEach((item, i) => {

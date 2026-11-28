@@ -89,11 +89,13 @@ test('original theme controls preview, save, undo and keep text editable',{timeo
 });
 
 test('original live layout warnings mark overflow and clear after fixing the source style',{timeout:60000},async t=>{
- const {ws,page,errors}=await setup(t,'## はみ出し {#low}\n\n::: {.low}\n下の段落。\n:::\n\n## 次 {#next}\n\n本文。\n');
+ const {ws,page,errors}=await setup(t,'## はみ出し {#low}\n\n::: {.low}\n下の段落。\n\nもう一つの段落。\n:::\n\n## 次 {#next}\n\n本文。\n');
  const styles=join(ws.deck_dir('talk'),'styles');await mkdir(styles,{recursive:true});const path=join(styles,'slides.css');
  await writeFile(path,'#stage .low p {position:absolute;left:64px;top:700px;margin:0}');
  await page.locator('.lint-badge').waitFor();await page.locator('#pagestrip button[data-index="0"] .mark.warning').waitFor();
  const frame=page.frameLocator('#slideBox > iframe:not(.loading)');await frame.locator('#slide-studio-lint .slide-studio-lint-box').first().waitFor();
+ assert.equal(await page.locator('.lint-badge .n').textContent(),'1');
+ assert.ok(await frame.locator('#slide-studio-lint .slide-studio-lint-box').count() >= 2);
  await writeFile(path,'#stage .low p {position:static;margin:0}');
  await page.locator('.lint-badge').waitFor({state:'hidden'});assert.deepEqual(errors,[]);
 });
@@ -169,7 +171,7 @@ test('layout warnings navigate to the affected page, mark its toolbar and react 
  const {ws,page,errors}=await setup(t,'## はみ出し {#low}\n\n::: {.low}\n下の段落。\n:::\n\n## 次 {#next}\n\n本文。\n');
  const styles=join(ws.deck_dir('talk'),'styles');await mkdir(styles,{recursive:true});await writeFile(join(styles,'slides.css'),'#stage .low p {position:absolute;left:64px;top:700px;margin:0}');
  const badge=page.locator('.lint-badge');await badge.waitFor();await page.locator('#pagestrip button[data-index="1"]').click();await badge.click();
- const frame=page.frameLocator('#slideBox > iframe:not(.loading)');await frame.locator('.slide.active#low').waitFor();assert.match(await badge.getAttribute('data-tip')??'',/レイアウトの問題 1件/);
+ const frame=page.frameLocator('#slideBox > iframe:not(.loading)');await frame.locator('.slide.active#low').waitFor();assert.match(await badge.getAttribute('data-tip')??'',/レイアウトの問題があるページ 1ページ/);
  assert.equal(await page.locator('#pagestrip button[data-index="1"] .mark').count(),0);await frame.locator('.slide-studio-lint-box').waitFor();assert.match(await frame.locator('.slide-studio-lint-tab').innerText(),/^↓ \d+px$/);
  await frame.locator('.low p').click({position:{x:10,y:6}});await page.locator('#blockTools .lint-flag').waitFor();assert.match(await page.locator('#blockTools .lint-flag').getAttribute('data-tip')??'',/スライドの下に \d+px はみ出す/);
  await page.locator('#pagestrip button[data-index="1"]').click();await frame.locator('.slide.active#next').waitFor();assert.equal(await frame.locator('#slide-studio-lint > *').count(),0);
@@ -251,7 +253,7 @@ test('incremental list menu persists steps and remains editable after reload',{t
  await items.first().click();await bar.getByRole('button',{name:'段階表示',exact:true}).click();assert.equal(await bar.getByRole('checkbox',{name:'箇条書きを1項目ずつ出す',exact:true}).isChecked(),true);
  assert.equal(await items.nth(1).evaluate(el=>getComputedStyle(el).opacity),'0.28');
  if(process.env.SLIDE_STUDIO_STEP_SCREENSHOT)await page.screenshot({path:process.env.SLIDE_STUDIO_STEP_SCREENSHOT});
- await page.keyboard.press('Escape');await page.evaluate(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(Error('test denial'));});await page.getByRole('button',{name:'発表用メニュー',exact:true}).click();await page.getByRole('button',{name:'通常の発表',exact:true}).click();
+ await page.keyboard.press('Escape');await page.evaluate(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(Error('test denial'));});await page.getByRole('button',{name:'今のページから',exact:true}).click();
  const player=page.frameLocator('.present-screen iframe');await player.locator('.slide.active').waitFor();assert.equal(await player.locator('.incremental > ul > li').nth(1).isVisible(),false);await page.keyboard.press('Escape');await page.locator('.present-screen').waitFor({state:'detached'});assert.deepEqual(errors,[]);
 });
 

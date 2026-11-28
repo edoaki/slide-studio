@@ -15,6 +15,9 @@ import { PY_WS, pyStrip } from "./cover.js";
 import { run_pandoc } from "./pandoc.js";
 import {
   codePointLength,
+  codePointToUtf16,
+  cpSlice,
+  SourceLines,
   table_rows,
   ValueError,
 } from "./source.js";
@@ -71,7 +74,7 @@ const VOID_ELEMENTS = new Set([
   "wbr",
 ]);
 
-export interface LegacyEditOptions {
+export interface EditOptions {
   pandocPath: string;
   cwd: string;
 }
@@ -95,25 +98,6 @@ export interface ChunkInfoRendered {
 }
 
 type Node = any;
-
-/** Python string indices are code points; convert to a UTF-16 slice. */
-function cpSlice(value: string, start: number, end: number): string {
-  if (start <= 0 && end >= codePointLength(value)) return value;
-  return Array.from(value).slice(Math.max(0, start), Math.max(0, end)).join("");
-}
-
-function cpToUtf16(value: string, index: number): number {
-  if (index <= 0) return 0;
-  let codePoints = 0;
-  let position = 0;
-  while (position < value.length) {
-    if (codePoints >= index) return position;
-    const code = value.codePointAt(position)!;
-    position += code > 0xffff ? 2 : 1;
-    codePoints += 1;
-  }
-  return value.length;
-}
 
 function isPySpace(character: string): boolean {
   return PY_SPACE.test(character);
@@ -238,7 +222,7 @@ function pythonMatchAt(expression: RegExp, value: string, codePointIndex: number
     expression.source,
     `${expression.flags.replace(/g/gu, "").replace(/y/gu, "")}y`,
   );
-  sticky.lastIndex = cpToUtf16(value, codePointIndex);
+  sticky.lastIndex = codePointToUtf16(value, codePointIndex);
   const match = sticky.exec(value);
   return match && match.index === sticky.lastIndex - match[0].length ? match : null;
 }
@@ -348,7 +332,7 @@ function clean($: CheerioAPI): void {
 async function convert(
   input: string,
   args: string[],
-  options: LegacyEditOptions,
+  options: EditOptions,
 ): Promise<string> {
   const result = await run_pandoc(input, args, {
     pandocPath: options.pandocPath,
@@ -362,7 +346,7 @@ async function convert(
 export async function to_markdown(
   html: string,
   original = "",
-  options: LegacyEditOptions,
+  options: EditOptions,
 ): Promise<string> {
   const { $, root } = loadFragment(html);
   const atoms = new Map<string, string>();
@@ -390,7 +374,7 @@ export async function to_markdown(
 /** Convert table-cell HTML to piped-table Markdown with one Pandoc call. */
 export async function cells_to_markdown(
   cells: readonly string[],
-  options: LegacyEditOptions,
+  options: EditOptions,
 ): Promise<string[]> {
   const atoms = new Map<string, string>();
   const parts: string[] = [];
@@ -446,7 +430,7 @@ export async function cells_to_markdown(
 /** Convert the contents of one edited table cell (td/th outerHTML) to Markdown. */
 export async function cell_markdown(
   html: string,
-  options: LegacyEditOptions,
+  options: EditOptions,
 ): Promise<string> {
   const { $ } = loadFragment(html);
   const cell = $("td, th").first().get(0) as Node | undefined;
@@ -584,7 +568,7 @@ export function prepared_html(html: string, raw: string): string {
 export function table_cells(
   table: Node,
   raw: string,
-  _options?: LegacyEditOptions,
+  _options?: EditOptions,
 ): TableCellInfo[][] | null {
   const rows = table_rows(raw);
   const { $ } = loadFragment(serializeNode(table));
@@ -617,7 +601,7 @@ export function table_cells(
 /** Mirror `edit.chunk_info`: editability and direct-edit HTML per chunk. */
 export async function chunk_info(
   rendered: ChunkInfoRendered,
-  options?: LegacyEditOptions,
+  options?: EditOptions,
 ): Promise<ChunkEditMap> {
   const { $ } = loadFragment(rendered.html);
   const elements = new Map<string, Node>();
@@ -626,6 +610,7 @@ export async function chunk_info(
     if (key !== null) elements.set(key, element);
   }
 
+  const lines = new SourceLines(rendered.doc.text);
   const info: ChunkEditMap = {};
   for (const page of rendered.doc.pages) {
     for (const chunk of page.walk()) {
@@ -634,7 +619,7 @@ export async function chunk_info(
       if (chunk.kind !== "text") continue;
 
       const element = elements.get(key);
-      const raw = cpSlice(rendered.doc.text, chunk.start, chunk.end);
+      const raw = lines.slice(chunk.start, chunk.end);
       const found = element !== undefined && table_rows(raw)
         ? (tagName(element) === "table" ? [element] : $(element).find("table").toArray() as Node[])
         : [];

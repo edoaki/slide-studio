@@ -3,7 +3,7 @@
 // 文字の編集中は、同じ場所に文字の書式バー（text-format.js）を出す。
 // 並べ替え・追加・削除・大きさ・余白は原稿の文字列の上で計算し（block-ops.js）、描き直しを待たずに続けて操作できる。
 import { api, toast } from './api.js';
-import { svg } from './icons.js';
+import { button, sep, breadcrumbs, placeToolbar } from './block-toolbar.js';
 import { S } from './strings.js';
 import * as op from './block-ops.js';
 import * as nav from './block-nav.js';
@@ -31,7 +31,6 @@ const BRIDGE_KEYMAP = Object.freeze([
  ...['KeyC','Digit1','Digit2','Digit3'].map(code=>({code,shift:false,alt:true,ctrl:false,meta:false,preventDefault:true})),
  {code:'KeyF',shift:true,alt:false,ctrl:false,meta:false,preventDefault:true},
  ...['KeyW','KeyA','KeyS','KeyD'].flatMap(code=>[{code,shift:true,alt:false,ctrl:false,meta:false,preventDefault:true},{code,shift:false,alt:true,ctrl:false,meta:false,preventDefault:true}]),
- ...['KeyF','KeyH'].flatMap(code=>[{code,shift:false,alt:false,ctrl:false,meta:true,preventDefault:true},{code,shift:false,alt:false,ctrl:true,meta:false,preventDefault:true}]),
  ...[true,false].flatMap(shift=>[{code:'KeyZ',shift,alt:false,ctrl:false,meta:true,preventDefault:true},{code:'KeyZ',shift,alt:false,ctrl:true,meta:false,preventDefault:true}]),
 ]);
 
@@ -105,7 +104,7 @@ export function makeBlocks(ctx) {
     formatState: () => textSnapshot?.format, align: () => textSnapshot?.align,
     colors: () => textSnapshot?.colors ?? {}, create: (key,where) => beginText(key,'',{create:where}),
   };
-  const legacyEdit = () => ctx.preview.client ? remoteText : null;
+  const textEditor = () => ctx.preview.client ? remoteText : null;
   const frameSourceVersion = () => ctx.preview.edit?.sourceVersion ?? ctx.preview.sourceVersion ?? null;
   const knownKey = key => key == null ? null : (fresh() && op.find(st, key) ? key : null);
   let bridgeLayout = null;
@@ -213,7 +212,6 @@ export function makeBlocks(ctx) {
     if(!intent.trusted||intent.isComposing||intent.sourceVersion!==frameSourceVersion())return;
     const event={...intent,shiftKey:intent.mods.shift,altKey:intent.mods.alt,ctrlKey:intent.mods.ctrl,metaKey:intent.mods.meta,target:document.body,preventDefault(){},stopImmediatePropagation(){}};
     if(intent.type==='keyup'){holdKey(event);return;}
-    if ((intent.mods.meta || intent.mods.ctrl) && !intent.mods.alt && ['KeyF','KeyH'].includes(intent.code)) { ctx.search?.open(intent.code === 'KeyH'); return; }
     // Presentation/export shortcuts also work when focus is inside the isolated
     // preview. Keep F reserved for padding while a block is selected.
     if (!editing && (['KeyP','KeyO','KeyC','Slash','Digit0','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6'].includes(intent.code) || (intent.code === 'KeyF' && !selected))) {
@@ -410,7 +408,7 @@ export function makeBlocks(ctx) {
   }
   async function openStepMenu(key) {
     if (readOnly) return;
-    if (editing) await legacyEdit()?.finish?.();
+    if (editing) await textEditor()?.finish?.();
     ctx.qmdBlocks?.input?.blur();
     select(key);
     bar.querySelector('.step-tools')?.openStepMenu();
@@ -428,13 +426,13 @@ export function makeBlocks(ctx) {
   }
   function startHeading(point) {
     const p = fresh() && st.pages[ctx.preview.pageOfSlide(ctx.preview.index)];
-    const legacy = legacyEdit();
-    if (editing || !live() || !p || p.generated || !legacy) return;
+    const editor = textEditor();
+    if (editing || !live() || !p || p.generated || !editor) return;
     select(null);
     editing = true; ctx.preview.defer = true;
     session = { heading: p, headingPoint: point, text: ctx.text, last: ctx.text, html: null, sent: null, timer: 0, running: null, failed: false };
     addEventListener('pointerdown', outside, true);
-    legacy.startHeading(point); draw();
+    editor.startHeading(point); draw();
   }
   function start(key = selected, point = null) {
     if (editing || !live()) return;
@@ -442,18 +440,18 @@ export function makeBlocks(ctx) {
     select(key);
     if (data.chunks[key]?.cells) { startCell(key, point); return; }
     if (!data.chunks[key]?.direct) { ctx.qmdBlocks?.editCover(key); return; }
-    if (!legacyEdit()) return;
+    if (!textEditor()) return;
     editing = true; ctx.preview.defer = true;
     // 表紙のタイトル・副題は、太字・斜体・リンクを出さない
     const cover = !!op.coverPart(found()?.chunk);
     session = { key, base: data.version, text: ctx.text, last: ctx.text, mark: ctx.editor.mark, html: null, sent: null, timer: 0, running: null, failed: false, cover, alignBase: alignBaseOf(found()?.chunk) };
     addEventListener('pointerdown', outside, true);
     format.plain(cover); format.cell(false);
-    legacyEdit()?.start(key, data.chunks[key].html, { plain: cover, point }); draw();
+    textEditor()?.start(key, data.chunks[key].html, { plain: cover, point }); draw();
   }
   // 表はセルごとに直す。対応するセルがない場合は表の編集画面を開く
   async function startCell(key, point) {
-    const w = legacyEdit(), at = point && await w?.cellAt(key, point);
+    const w = textEditor(), at = point && await w?.cellAt(key, point);
     if (!at) return;
     const info = data.chunks[key].cells[at.r]?.[at.c];
     if (!info?.direct) { const f = found(); ctx.plugins.some(p => p.enterBlock?.(f.chunk, ctx.text.slice(f.chunk.start, f.chunk.end))); return; }
@@ -475,7 +473,7 @@ export function makeBlocks(ctx) {
     return info.html;
   }
   // スライドの外（原稿・チャットなど）を押しても編集を終える
-  function outside(e) { if (!bar.contains(e.target)) legacyEdit()?.finish?.(); }
+  function outside(e) { if (!bar.contains(e.target)) textEditor()?.finish?.(); }
   function input(html) {
     const s = session; if (!s || s.created) return;
     if (s.moving) { s.held = html; return; }
@@ -612,7 +610,7 @@ export function makeBlocks(ctx) {
     if (adding || editing) return;
     adding = true;
     try { if (!await commitCreation()) return; if (!await whenLive()) { toast(S.blockWait); return; } } finally { adding = false; }
-    const f = found(), w = legacyEdit();
+    const f = found(), w = textEditor();
     if (!f || editing || !w || op.coverPart(f.chunk)) return;
     const key = selected, c = f.chunk, o = op.outer(c);
     let where, anchor, make;
@@ -673,7 +671,6 @@ export function makeBlocks(ctx) {
     if (child && f.chunk.children.length) select(child); else start();
   }
   function keydown(e) {
-    if ((e.metaKey || e.ctrlKey) && !e.altKey && ['f','h'].includes(e.key.toLowerCase())) { e.preventDefault(); ctx.search?.open(e.key.toLowerCase() === 'h'); return true; }
     if (readOnly) return false;
     holdKey(e);
     if (drag.dragging && e.key === 'Escape') { e.preventDefault(); drag.cancel(); return true; }
@@ -743,30 +740,12 @@ export function makeBlocks(ctx) {
   }
 
   // ------------------------------------------------------------ ツールバー・パンくず
-  // ボタンには文字を書かず、操作名とキーはカーソルを合わせたときに出す（tip.js）
-  function button(icon, label, fn, { disabled = false, cls = '', pressed, keys = '' } = {}) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = `ibtn ${cls}`; b.innerHTML = svg(icon); b.disabled = disabled; b.onclick = fn;
-    if (pressed !== undefined) b.setAttribute('aria-pressed', String(pressed));
-    return tip(b, label, keys);
-  }
-  const sep = () => Object.assign(document.createElement('span'), { className: 'sep' });
   function trail() {
     const p = current();
     if (p?.raw_only) { ctx.hint(S.blockPageRaw); return; }
     const items = selected && fresh() ? nav.trail(st, selected) : [];
     if (!items.length) { msg.replaceChildren(); return; }
-    const list = document.createElement('nav');
-    list.className = 'crumbs'; list.setAttribute('aria-label', S.crumbs);
-    items.forEach((it, i) => {
-      if (i) list.append(Object.assign(document.createElement('span'), { className: 'crumb-sep', textContent: '›' }));
-      const b = document.createElement(it.key ? 'button' : 'span');
-      b.className = 'crumb'; b.textContent = it.label;
-      if (it.key) { b.type = 'button'; b.onclick = () => select(it.key); b.dataset.tip = S.crumbSelect(it.label); }
-      if (it.key === selected) b.setAttribute('aria-current', 'true');
-      list.append(b);
-    });
-    msg.replaceChildren(list);
+    msg.replaceChildren(breadcrumbs(items, selected, select));
   }
   // mock のスライドのツールバーの並び：外側を選ぶ｜（画像は揃え）｜余白｜削除。文字は選んだ文字をもう一度クリックで編集
   function draw() {
@@ -850,7 +829,7 @@ export function makeBlocks(ctx) {
       bar.append(sep());
       for (const side of (c.kind === 'columns' ? ['gap', 'outer'] : ['inner', 'outer'])) {
         const on = padMode && padSide === side;
-        const b = button(PAD_ICON[side], S.spacing[side], () => { padMode = !on; padSide = side; padDone = null; draw(); }, { disabled, pressed: on, keys: S.spacingKeys[side] });
+        const b = button(PAD_ICON[side], S.spacing[side], () => { padMode = !on; padSide = side; padDone = null; draw(); }, { disabled: busy || ctx.locked || ctx.conflict || !ctx.renderOk, pressed: on, keys: S.spacingKeys[side] });
         b.onpointerenter = () => setPad(() => { peek = side; });
         b.onpointerleave = () => setPad(() => { if (peek === side) peek = null; });
         bar.append(b);
@@ -912,20 +891,9 @@ export function makeBlocks(ctx) {
     const frame = ctx.preview.frame;
     const r = editingRect() ?? union(frameKey() ?? selected) ?? bridgeSelectionRect();
     if (!r || !frame) { bar.hidden = true; handles.clear(); return; }
-    bar.hidden = !editing && (padMode || !!hold || handles.dragging);
+    bar.hidden = !editing && live() && (padMode || !!hold || handles.dragging);
     if (bar.hidden) { drawHandles(); return; }
-    // 選んだブロックのすぐ上（入らなければ下）。ブロック自体には被せない。横は押した位置の近く、ブロックの幅の中
-    const vr = viewport.getBoundingClientRect(), fr = frame.getBoundingClientRect(), ox = fr.left - vr.left, oy = fr.top - vr.top;
-    const top = oy + Math.max(r.top, 0), bottom = oy + Math.min(r.bottom, fr.height);
-    const lx = ox + Math.max(r.left, 0) - 4, rx = ox + Math.min(r.right, fr.width) + 4;
-    const h = bar.offsetHeight, wd = bar.offsetWidth, GAP = 12;
-    let y = top - h - GAP;
-    if (y < 4) y = Math.min(bottom + GAP, vr.height - h - 4);
-    bar.style.top = `${Math.max(4, y)}px`;
-    bar.dataset.tipSide = y + h <= top ? 'above' : 'below';
-    const x = pointX == null ? lx : Math.max(lx, Math.min(ox + pointX - wd / 2, rx - wd));
-    bar.style.left = `${Math.max(4, Math.min(x, vr.width - wd - 4))}px`;
-    for (const box of bar.querySelectorAll('.decoration-tool')) box.positionMenu?.();
+    placeToolbar(bar, viewport, frame, r, pointX);
     drawHandles();
   }
   const resize = new ResizeObserver(() => { if (!bar.hidden) place(); });
@@ -957,14 +925,14 @@ export function makeBlocks(ctx) {
   const figOf = c => c?.kind === 'fig' ? op.figRef(ctx.text.slice(c.start, c.end)) : null;
   ctx.blocks = {
     get pending() { return !!pendingCreation || !!session?.failed; },
-    finish: () => legacyEdit()?.finish?.(),
+    finish: () => textEditor()?.finish?.(),
     setReadOnly(value) {
       readOnly = value;
       if (value) contextMenu.close();
       if (!value) { configureFrame(); return; }
       drag.cancel(); format.close(); coverAuthors.clear();
       follow = null; want = null; padDone = null; padMode = false;
-      const done = legacyEdit()?.finish?.();
+      const done = textEditor()?.finish?.();
       configureFrame();
       bridgeSelect();
       bridgeHover(null);
@@ -993,6 +961,7 @@ export function makeBlocks(ctx) {
     previewThemed() {
       // A theme swap can commit a new sourceVersion. Reconfigure explicitly
       // after it; configure itself never advances the frame revision.
+      if (data?.version !== frameSourceVersion()) { load(); return; }
       configureFrame();
       // 自分の保存の通知で入力欄を作り直すと、次の入力中の値・フォーカスを失う。
       if (drawnTheme !== JSON.stringify(designThemeValues())) draw();
@@ -1001,7 +970,7 @@ export function makeBlocks(ctx) {
     slideChanged() {
       contextMenu.close();
       coverAuthors.refresh();
-      if (editing) { legacyEdit()?.finish?.(); return; }
+      if (editing) { textEditor()?.finish?.(); return; }
       if (found()?.page.index !== ctx.preview.pageOfSlide(ctx.preview.index)) select(null); else place();
     },
     textChanged() {
@@ -1018,7 +987,7 @@ export function makeBlocks(ctx) {
       // must also commit a new block before exporting, presenting or using AI.
       await finishingText;
       if (session?.created) {
-        await legacyEdit()?.finish?.();
+        await textEditor()?.finish?.();
         if (pendingCreation || session?.created) return false;
       }
       if (!await commitCreation()) return false;

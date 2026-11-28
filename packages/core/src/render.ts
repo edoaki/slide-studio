@@ -1,3 +1,4 @@
+import { themeName } from "./workspace-utils.js";
 import { legacyHtml } from './html.js';
 /**
  * Slide HTML rendering and step-annotation pipeline.
@@ -20,9 +21,9 @@ import * as cheerio from "cheerio";
 import type { CheerioAPI } from "cheerio";
 import { isMap, parseDocument } from "yaml";
 import type {
-  LegacyRendered,
-  LegacyRenderOptions,
-  LegacySlide,
+  RenderedDeck,
+  RenderOptions,
+  RenderedSlide,
 } from "../../contracts/src/server.js";
 import { assetPath } from "./assets.js";
 import { atomicWriteFile } from "./atomic.js";
@@ -39,6 +40,8 @@ import { PandocError, run_pandoc, PANDOC_TIMEOUT_MS } from "./pandoc.js";
 import {
   ATTR_TOKEN,
   codePointLength,
+  codePointToUtf16,
+  cpSlice,
   FENCE_OPEN,
   fig_args,
   parse,
@@ -56,9 +59,12 @@ import type { Workspace } from "./workspace.js";
 const LUA = assetPath("lua", "slide-studio.lua");
 const READER = "markdown+fenced_divs+tex_math_dollars";
 
-const SHELL = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title></title></head><body><div class="reveal"><main id="stage" class="slides"></main></div><nav id="toolbar" aria-label="スライド操作"><button id="menu" aria-label="スライド一覧" title="スライド一覧（o）">☰</button><button id="fullscreen" aria-label="全画面" title="全画面（f）">⛶</button></nav><aside id="overview" aria-label="スライド一覧" role="dialog" aria-modal="true" hidden><div class="overview-controls"><span class="overview-close-hint">Esc</span><button id="close" type="button" aria-label="閉じる" title="閉じる（Esc）"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></aside></body></html>`;
+const SHELL = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title></title></head><body><div class="reveal"><main id="stage" class="slides"></main></div><nav id="toolbar" aria-label="スライド操作"><button id="menu" aria-label="スライド一覧" title="スライド一覧（o）">☰</button><button id="fullscreen" aria-label="全画面" title="全画面（f）">⛶</button></nav><aside id="overview" aria-label="スライド一覧" role="dialog" aria-modal="true" hidden><div class="overview-controls"><span class="overview-close-hint" aria-hidden="true">Esc</span><button id="close" type="button" aria-label="閉じる" aria-keyshortcuts="Escape"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></aside></body></html>`;
 
 const PY_SPACE = /[\t\n\v\f\r \x1c-\x1f\x85\p{Z}]/u;
+
+const baseCss = readFileSync(join(RUNTIME, "base.css"), "utf8");
+const playerJs = readFileSync(join(RUNTIME, "player.js"), "utf8");
 
 /** Pandoc failed; `message` has had converted line numbers mapped back. */
 export class RenderError extends StudioError {
@@ -68,7 +74,7 @@ export class RenderError extends StudioError {
   }
 }
 
-export interface LegacyWarningIssue {
+export interface RenderWarning {
   level: string;
   kind: string;
   message: string;
@@ -99,25 +105,6 @@ function pySplitWhitespace(value: string): string[] {
   }
   if (current) output.push(current);
   return output;
-}
-
-function cpToUtf16(value: string, index: number): number {
-  if (index <= 0) return 0;
-  if (index >= codePointLength(value)) return value.length;
-  let codePoints = 0;
-  let position = 0;
-  while (position < value.length) {
-    if (codePoints >= index) return position;
-    const code = value.codePointAt(position)!;
-    position += code > 0xffff ? 2 : 1;
-    codePoints += 1;
-  }
-  return value.length;
-}
-
-function cpSlice(value: string, start: number, end: number): string {
-  if (start <= 0 && end >= codePointLength(value)) return value;
-  return value.slice(cpToUtf16(value, start), cpToUtf16(value, end));
 }
 
 function compareCodePoints(left: string, right: string): number {
@@ -394,7 +381,7 @@ function sanitizeFrontMatter(wrapped: string, doc: Doc): string {
 
 // ---------------------------------------------------------------- Pandoc
 
-async function runLegacyPandoc(
+async function runPandoc(
   text: string,
   cwd: string,
   extra: string[],
@@ -491,7 +478,7 @@ function assemble(
   doc: Doc,
   body: string,
   missing: string[],
-): LegacyRendered {
+): RenderedDeck {
   const folder = ws.deck_dir(deck);
   const $ = legacyHtml(`<div id="slide-studio-root">${body}</div>`);
   const root = $("#slide-studio-root").first();
@@ -781,9 +768,9 @@ function assemble(
 
   const base = shell("<style></style>")
     .attr("id", "slide-studio-base")
-    .text(readFileSync(join(RUNTIME, "base.css"), "utf8"));
+    .text(baseCss);
   shell("head").append(base);
-  const theme = pyStr(pyTruthy(doc.meta.theme) ? doc.meta.theme : "default");
+  const theme = themeName(doc.meta.theme);
   shell("head").append(
     shell('<link rel="stylesheet">')
       .attr("id", "slide-studio-theme")
@@ -809,10 +796,10 @@ function assemble(
   shell("body").append(
     shell("<script></script>")
       .attr("id", "slide-studio-player")
-      .text(readFileSync(join(RUNTIME, "player.js"), "utf8")),
+      .text(playerJs),
   );
 
-  const slides: LegacySlide[] = [];
+  const slides: RenderedSlide[] = [];
   sections.forEach((section, index) => {
     const element = $(section);
     const heading = element.find("h1, h2").first();
@@ -849,8 +836,8 @@ export async function render_text(
   ws: Workspace,
   deck: string,
   text: string,
-  options: LegacyRenderOptions,
-): Promise<LegacyRendered> {
+  options: RenderOptions,
+): Promise<RenderedDeck> {
   const folder = ws.deck_dir(deck);
   const started = performance.now();
   // Python reads `slides.qmd` with universal newlines. Normalising here makes
@@ -860,13 +847,7 @@ export async function render_text(
   const [wrapped, origin] = wrapped_source(doc, options.wrap ?? true);
   const safeWrapped = sanitizeFrontMatter(wrapped, doc);
 
-  const extra = [
-    "--lua-filter", LUA,
-    "--citeproc",
-    "--csl", join(RUNTIME, "numeric.csl"),
-    "-M", "link-citations=true",
-    "-M", "suppress-bibliography=false",
-  ];
+  const extra = ["--lua-filter", LUA];
   await require_ready(ws, deck, doc.meta);
   if (pyTruthy(doc.meta.topic)) {
     extra.push(
@@ -874,22 +855,27 @@ export async function render_text(
       [ws.topic_dir(pyStr(doc.meta.topic)), folder].join(delimiter),
     );
   }
-  const bib = ws.bib(deck, doc.meta);
-  extra.push(
-    "--bibliography",
-    existsSync(bib)
-      ? await citeprocBibliography(ws, deck, bib)
-      : await emptyBibliography(ws, deck),
-  );
-  extra.push(
-    "-M",
-    `citation-abbreviations=${await emptyCitationAbbreviations(ws, deck)}`,
-  );
+  // Keep citeproc for citation syntax, metadata, and raw Pandoc nodes.
+  if (/@|bibliography|references|cite|&#/iu.test(normalized)) {
+    extra.push("--citeproc", "--csl", join(RUNTIME, "numeric.csl"),
+      "-M", "link-citations=true", "-M", "suppress-bibliography=false");
+    const bib = ws.bib(deck, doc.meta);
+    extra.push(
+      "--bibliography",
+      existsSync(bib)
+        ? await citeprocBibliography(ws, deck, bib)
+        : await emptyBibliography(ws, deck),
+    );
+    extra.push(
+      "-M",
+      `citation-abbreviations=${await emptyCitationAbbreviations(ws, deck)}`,
+    );
+  }
   await ensureFigurePages(ws, deck, doc);
   const parsed = performance.now();
 
   // Theme samples are virtual decks; Pandoc still needs an existing cwd.
-  const result = await runLegacyPandoc(safeWrapped, existsSync(folder) ? folder : ws.root, extra, origin, options.pandocPath);
+  const result = await runPandoc(safeWrapped, existsSync(folder) ? folder : ws.root, extra, origin, options.pandocPath);
   const converted = performance.now();
 
   const missing = [...new Set(
@@ -915,9 +901,9 @@ export async function render_text(
 export async function render_deck(
   ws: Workspace,
   deck: string,
-  options: LegacyRenderOptions,
+  options: RenderOptions,
   text?: string,
-): Promise<LegacyRendered> {
+): Promise<RenderedDeck> {
   ws.require_deck(deck);
   const source = text ?? readFileSync(ws.qmd(deck), "utf8");
   return render_text(ws, deck, source, options);
@@ -1004,7 +990,7 @@ function codeMask(lines: WarningLines, first: number): boolean[] {
  * The field names are exactly the legacy API's: `level`, `kind`, `message`,
  * `attribute`, `value`, `source_offset`, `source_line`, `page`, `slide`.
  */
-export function warning_issues(rendered: LegacyRendered): LegacyWarningIssue[] {
+export function warning_issues(rendered: RenderedDeck): RenderWarning[] {
   if (rendered.warnings.length === 0) return [];
   const doc = rendered.doc;
   const lines = new WarningLines(doc.text);
@@ -1022,7 +1008,7 @@ export function warning_issues(rendered: LegacyRendered): LegacyWarningIssue[] {
   }
   const candidates: Candidate[] = [];
   const groups = /\{(?:[^{}"']|"(?:\\.|[^"\\])*"|'[^']*')*\}/gu;
-  const frontUtf16 = cpToUtf16(doc.text, doc.front[1]);
+  const frontUtf16 = codePointToUtf16(doc.text, doc.front[1]);
   // Advance a UTF-16/code-point cursor instead of slicing the whole document
   // for every group and attribute; the old form was O(n²) on large decks.
   let codePointCursor = 0;
@@ -1070,7 +1056,7 @@ export function warning_issues(rendered: LegacyRendered): LegacyWarningIssue[] {
     }
   }
 
-  const output: LegacyWarningIssue[] = [];
+  const output: RenderWarning[] = [];
   const emitted = new Set<number>();
   for (const warning of rendered.warnings) {
     const match = /Ignoring duplicate attribute ([^=\s]+)="(.*)"\./u.exec(warning);

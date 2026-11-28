@@ -213,7 +213,7 @@ export class Preview {
     this._notifyChange({ index: client.api.index, step: client.api.step, maxStep: client.api.maxStep() });
   }
 
-  setTheme(name, version, sourceVersion = version) {
+  setTheme(name, version, sourceVersion) {
     const cacheVersion = String(version ?? Date.now());
     const visibleClient = this.client;
     const committedVersion = sourceVersion == null ? undefined : String(sourceVersion);

@@ -2,6 +2,7 @@ name: desktop-build
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -74,11 +75,28 @@ jobs:
       - name: Fetch native Pandoc
         run: npm run setup:pandoc
 
-      - name: Run tests
-        run: npm test
+      - name: Check Windows packaging and manual updates
+        run: node --test dist/tests/packaging/package-desktop.test.js dist/tests/desktop/updates.test.js
 
       - name: Build Windows NSIS installer (unsigned, no publish)
-        run: npm run dist:win
+        run: node scripts/package-desktop.mjs --win --arch x64
+
+      - name: Install and start the packaged Windows app
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem release/*.exe -ErrorAction Stop).FullName
+          $target = Join-Path $env:RUNNER_TEMP SlideStudio
+          $install = Start-Process -FilePath $installer -ArgumentList "/S", "/D=$target" -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Installer exited with $($install.ExitCode)" }
+          $env:SLIDE_STUDIO_ELECTRON_HOME = Join-Path $env:RUNNER_TEMP studio-profile
+          $workspace = Join-Path $env:RUNNER_TEMP studio-workspace
+          $app = Start-Process "$target/Slide Studio.exe" -ArgumentList "--studio-browser", "--no-browser", "--root", $workspace, "--port", "0" -PassThru
+          try {
+            $bootstrap = Join-Path $env:SLIDE_STUDIO_ELECTRON_HOME browser-connection.html
+            for ($i = 0; $i -lt 60 -and !(Test-Path $bootstrap); $i++) { Start-Sleep -Seconds 1 }
+            $url = [regex]::Match((Get-Content $bootstrap -Raw -ErrorAction Stop), 'href="([^"]+)"').Groups[1].Value
+            if ((Invoke-WebRequest -Uri $url).StatusCode -ne 200) { throw "Editor did not start" }
+          } finally { if (!$app.HasExited) { Stop-Process -Id $app.Id } }
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

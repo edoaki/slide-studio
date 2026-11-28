@@ -5,13 +5,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import type {
-  LegacyFeatureHandler,
-  LegacyRendered,
+  FeatureHandler,
+  RenderedDeck,
 } from "../../packages/contracts/src/server.js";
 import { parse } from "../../packages/core/src/source.js";
 import { sha256 } from "../../packages/core/src/encoding.js";
 import { Workspace } from "../../packages/core/src/workspace.js";
-import { startLegacyHost, type LegacyHost } from "../../apps/server/index.js";
+import { startStudioHost, type StudioHost } from "../../apps/server/index.js";
 
 async function scratch(t: TestContext): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "slide-studio-legacy-close-"));
@@ -21,19 +21,19 @@ async function scratch(t: TestContext): Promise<string> {
 
 async function launch(
   t: TestContext,
-  handler: LegacyFeatureHandler,
+  handler: FeatureHandler,
   shutdownGraceMs: number,
-): Promise<{ host: LegacyHost; shutdowns: () => number }> {
+): Promise<{ host: StudioHost; shutdowns: () => number }> {
   const workspace = Workspace.open(await scratch(t));
   const ui = await mkdtemp(join(tmpdir(), "slide-studio-legacy-close-ui-"));
   t.after(async () => rm(ui, { recursive: true, force: true }));
   await writeFile(join(ui, "app.html"), "<!doctype html><title>UI</title>\n");
   let shutdowns = 0;
-  const host = await startLegacyHost({
+  const host = await startStudioHost({
     workspace,
     uiDirectory: ui,
     pandocPath: "/bin/pandoc",
-    renderText: async (_workspace, _deck, text): Promise<LegacyRendered> => ({
+    renderText: async (_workspace, _deck, text): Promise<RenderedDeck> => ({
       html: "<!doctype html><html><body><div id=\"stage\"></div></body></html>",
       slides: [],
       doc: parse(text),
@@ -55,7 +55,7 @@ async function launch(
   return { host, shutdowns: () => shutdowns };
 }
 
-function gatedHandler(gate: Promise<void>, started: () => void): LegacyFeatureHandler {
+function gatedHandler(gate: Promise<void>, started: () => void): FeatureHandler {
   return async (request) => {
     if (request.pathname !== "/api/math") return null;
     started();

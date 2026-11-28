@@ -236,6 +236,14 @@ test("new_deck writes the blank template and detects edited sources", async (t) 
   assert.equal(ws.deck_shelf("talk"), "research");
 });
 
+test("invalid front matter theme falls back to default", t => {
+  const ws = Workspace.open(scratch(t));
+  ws.new_deck("talk", "research");
+  writeFileSync(ws.qmd("talk"), "---\ntheme: ../other\n---\n");
+  assert.equal(ws.deck_theme("talk"), "default");
+  assert.equal(ws.recent()[0]?.theme, "default");
+});
+
 test("copies a deck, skips materials and html/pdf, copies figures and bibliography", async (t) => {
   const root = await scratch(t);
   const ws = Workspace.open(root);

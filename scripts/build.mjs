@@ -70,6 +70,12 @@ if (await exists(stringsModule)) {
 // preserved UI as ES modules and bundle only this first-head bootstrap.
 const frameAgent = resolve(root, "packages/web/bridge/frame-agent.js");
 if (!process.argv.includes("--clean") && await exists(frameAgent)) {
+  // The browser and the AI worker share the core speaker-note parser.
+  await build({
+    entryPoints: [resolve(root, "packages/web/presentation-model.js")],
+    outfile: resolve(dist, "packages/web/presentation-model.js"),
+    bundle: true, format: "esm", platform: "browser", target: "chrome156",
+  });
   await build({
     entryPoints: [frameAgent],
     outfile: resolve(dist, "packages/web/bridge/frame-agent.classic.js"),

@@ -1,13 +1,13 @@
 import type { ServerResponse } from "node:http";
-import type { LegacyFeatureHandler, LegacyRenderText, LegacyRendered } from "../../packages/contracts/src/server.js";
-import type { LegacyInspect } from "../../packages/contracts/src/output.js";
+import type { FeatureHandler, RenderText, RenderedDeck } from "../../packages/contracts/src/server.js";
+import type { InspectDocument } from "../../packages/contracts/src/output.js";
 import type { ChunkEditMap } from "../../packages/core/src/edit.js";
 import type { Providers } from "../../packages/ai/src/providers.js";
 import type { Runner } from "../../packages/ai/src/workflow.js";
 import type { BoundedQueueEvents } from "./http.js";
 
 /** Public workspace surface used by the host. Keeping it structural makes test doubles possible. */
-export interface LegacyWorkspace {
+export interface HostWorkspace {
   readonly root: string;
   readonly themes: string;
   has_deck(deck: string): boolean;
@@ -40,7 +40,7 @@ export interface LegacyWorkspace {
   new_topic(shelf: string): string;
 }
 
-export interface LegacyDiagnosticItem {
+export interface DiagnosticItem {
   name: string;
   ok: boolean;
   detail?: string;
@@ -48,77 +48,76 @@ export interface LegacyDiagnosticItem {
   [key: string]: unknown;
 }
 
-export type LegacyDiagnostics =
-  | LegacyDiagnosticItem[]
-  | (() => LegacyDiagnosticItem[] | Promise<LegacyDiagnosticItem[]>);
+export type Diagnostics =
+  | DiagnosticItem[]
+  | (() => DiagnosticItem[] | Promise<DiagnosticItem[]>);
 
-export type LegacySelectWorkspace = () =>
-  | LegacyWorkspace
+export type SelectWorkspace = () =>
+  | HostWorkspace
   | null
-  | Promise<LegacyWorkspace | null>;
+  | Promise<HostWorkspace | null>;
 
-export type LegacyOpenExternal = (url: string) => boolean | Promise<boolean>;
+export type OpenExternal = (url: string) => boolean | Promise<boolean>;
 
-export type LegacyWorkspaceChanged = (
-  next: LegacyWorkspace,
-  previous: LegacyWorkspace,
+export type WorkspaceChanged = (
+  next: HostWorkspace,
+  previous: HostWorkspace,
 ) => void | Promise<void>;
 
-export interface LegacyExportDocumentInput {
+export interface ExportDocumentInput {
   deck: string;
   html: string;
   version: string;
-  rendered: LegacyRendered | null;
+  rendered: RenderedDeck | null;
 }
 
-export type LegacyExportDocument = (
-  document: LegacyExportDocumentInput,
+export type ExportDocument = (
+  document: ExportDocumentInput,
   format: "html" | "pdf",
   title: string,
 ) => string | null | Promise<string | null>;
 
-export interface LegacyHostOptions {
+export interface HostOptions {
   updates?: {
     state(): unknown;
     check(): Promise<unknown>;
-    download(): Promise<unknown>;
-    automatic(value: boolean): Promise<unknown>;
-    install(): void;
   };
   adminPort?: number;
   /** The caller owns the workspace lock and calls `Workspace.ensure()`. */
-  workspace: LegacyWorkspace;
+  workspace: HostWorkspace;
   /** Directory containing the web UI `app.html` and `/web` assets. */
   uiDirectory: string;
   pandocPath: string;
   /** Injected renderer. */
-  renderText: LegacyRenderText;
+  renderText: RenderText;
   /** Optional feature extensions. Registered handlers run in array order. */
-  featureHandlers?: LegacyFeatureHandler[];
+  featureHandlers?: FeatureHandler[];
   /** Native folder picker. The host never closes either workspace itself. */
-  selectWorkspace?: LegacySelectWorkspace;
-  openWorkspace?: (path: string, mode: "new" | "existing") => Promise<LegacyWorkspace>;
+  selectWorkspace?: SelectWorkspace;
+  openWorkspace?: (path: string, mode: "new" | "existing") => Promise<HostWorkspace | null>;
   recentWorkspaces?: () => string[];
   /**
    * Called after a selected workspace has been committed by the host. The
    * callback receives ownership of `previous`; the host no longer uses it.
    * The caller should release the previous lock here, not in selectWorkspace.
    */
-  onWorkspaceChanged?: LegacyWorkspaceChanged;
+  onWorkspaceChanged?: WorkspaceChanged;
   /** Native OS browser opening. */
-  openExternal?: LegacyOpenExternal;
+  openExternal?: OpenExternal;
   openPath?: (path: string) => Promise<void>;
+  /** Brings the presenter's projection window to front; false when none is open (or in browser mode). */
+  focusProjection?: () => boolean | Promise<boolean>;
   /** Native save/export adapter. */
-  exportDocument?: LegacyExportDocument;
-  inspect?: LegacyInspect;
+  exportDocument?: ExportDocument;
+  inspect?: InspectDocument;
   settingsPath?: string;
   applyUiZoom?: (percent: number) => void;
   aiStorage?: string;
   aiProviders?: Providers;
   aiRunner?: Runner;
   /** Injected doctor/environment report for `/api/env`. */
-  diagnostics?: LegacyDiagnostics;
-  warningIssues?: (rendered: LegacyRendered | null) => unknown[];
+  diagnostics?: Diagnostics;
+  warningIssues?: (rendered: RenderedDeck | null) => unknown[];
   onShutdown?: () => void | Promise<void>;
   watch?: boolean;
   keepAliveMs?: number;
@@ -132,14 +131,7 @@ export interface LegacyHostOptions {
   renderPending?: number;
 }
 
-export interface LegacyHostHandoff {
-  status: "in_progress";
-  pending: string[];
-  implemented: string[];
-  notes: string[];
-}
-
-export interface LegacyHost {
+export interface StudioHost {
   adminOrigin: string;
   contentOrigin: string;
   /** In-memory credential. Never log it or put it in content URLs. */
@@ -147,7 +139,7 @@ export interface LegacyHost {
   close(): Promise<void>;
   pending: readonly string[];
   pendingFeatures: readonly string[];
-  handoff: LegacyHostHandoff;
+  implemented: readonly string[];
 }
 
 export interface SourceSnapshot {
@@ -159,7 +151,7 @@ export interface SourceSnapshot {
 }
 
 export interface ChunkEntry {
-  rendered: LegacyRendered;
+  rendered: RenderedDeck;
   info: Promise<ChunkEditMap>;
 }
 
@@ -168,7 +160,7 @@ export interface DeckState {
   html: string | null;
   version: string;
   error: string | null;
-  rendered: LegacyRendered | null;
+  rendered: RenderedDeck | null;
   rendering: boolean;
   dirty: boolean;
   force: boolean;

@@ -25,16 +25,16 @@ async function state(frame:FrameLocator,index:number,step=0){
  for(let i=0;i<100;i++){const actual=await frame.locator('body').evaluate(() => [(window as any).deck?.index,(window as any).deck?.step]);if(actual[0]===index&&actual[1]===step)return;await new Promise(r=>setTimeout(r,30));}
  assert.deepEqual(await frame.locator('body').evaluate(()=>[(window as any).deck?.index,(window as any).deck?.step]),[index,step]);
 }
-async function start(page:Page,name='発表用メニュー'){
- await page.getByRole('button',{name,exact:true}).click();if(name==='発表用メニュー')await page.getByRole('button',{name:'通常の発表',exact:true}).click();await page.frameLocator('.present-screen iframe').locator('.slide.active').waitFor();await page.waitForFunction(()=>!document.querySelector<HTMLButtonElement>('.present-tools > button')?.disabled);
+// 最初のページからの発表（Shift+F）。ボタンの名前を渡すと、そのボタンで始める
+async function start(page:Page,name?:string){
+ if(name)await page.getByRole('button',{name,exact:true}).click();else await page.evaluate(()=>{window.dispatchEvent(new KeyboardEvent('keydown',{key:'F',shiftKey:true,bubbles:true}));});await page.frameLocator('.present-screen iframe').locator('.slide.active').waitFor();await page.waitForFunction(()=>!document.querySelector<HTMLButtonElement>('.present-tools > button')?.disabled);
 }
 async function finish(page:Page){await page.keyboard.press('Escape');await page.locator('.present-screen').waitFor({state:'detached'});}
 
 test('presentation flushes pending source, freezes its document and returns to the final page',{timeout:60000},async t=>{
  const {ws,page,editor,player,errors}=await setup(t);
  await page.getByRole('button',{name:'すべての記法を表示',exact:true}).click();
- await page.evaluate(()=>{const ta=document.querySelector<HTMLTextAreaElement>('.raw textarea')!;ta.value=ta.value.replace('最初の段落。','発表前に保存。');ta.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector<HTMLButtonElement>('.present-tools > button')!.click();});
- await page.getByRole('button',{name:'通常の発表',exact:true}).click();
+ await page.evaluate(()=>{const ta=document.querySelector<HTMLTextAreaElement>('.raw textarea')!;ta.value=ta.value.replace('最初の段落。','発表前に保存。');ta.dispatchEvent(new Event('input',{bubbles:true}));window.dispatchEvent(new KeyboardEvent('keydown',{key:'F',shiftKey:true,bubbles:true}));});
  await player.locator('p').filter({hasText:'発表前に保存。'}).waitFor();assert.match(await readFile(ws.qmd('talk'),'utf8'),/発表前に保存。/);await state(player,0);
  await writeFile(ws.qmd('talk'),(await readFile(ws.qmd('talk'),'utf8')).replace('発表前に保存。','外部の変更。'));
  await editor.locator('p').filter({hasText:'外部の変更。'}).waitFor({state:'attached'});assert.equal(await player.locator('p').filter({hasText:'外部の変更。'}).count(),0);
@@ -49,9 +49,8 @@ for(const failure of ['save','render'])test(`presentation refuses ${failure} fai
  await page.route(pattern,async route=>{if(failure==='render'&&route.request().postDataJSON()?.mode!=='present')return route.continue();await route.fulfill({status:500,json:{error:'fixture failure'}});});
  if(failure==='save'){
   await page.getByRole('button',{name:'すべての記法を表示',exact:true}).click();
-  await page.evaluate(()=>{const ta=document.querySelector<HTMLTextAreaElement>('.raw textarea')!;ta.value+='\n未保存の入力。';ta.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector<HTMLButtonElement>('.present-tools > button')!.click();});
- }else await page.getByRole('button',{name:'発表用メニュー',exact:true}).click();
- await page.getByRole('button',{name:'通常の発表',exact:true}).click();
+  await page.evaluate(()=>{const ta=document.querySelector<HTMLTextAreaElement>('.raw textarea')!;ta.value+='\n未保存の入力。';ta.dispatchEvent(new Event('input',{bubbles:true}));window.dispatchEvent(new KeyboardEvent('keydown',{key:'F',shiftKey:true,bubbles:true}));});
+ }else await page.evaluate(()=>{window.dispatchEvent(new KeyboardEvent('keydown',{key:'F',shiftKey:true,bubbles:true}));});
  await page.locator('.toast').filter({hasText:failure==='save'?'保存できませんでした':'発表を始められませんでした'}).waitFor();assert.equal(await page.locator('.present-screen').count(),0);assert.equal(await readFile(ws.qmd('talk'),'utf8'),before);
  if(failure==='save')assert.equal(presentRequests,0);
  await page.unroute(pattern);await start(page);await state(player,0);await finish(page);assert.deepEqual(errors,[]);
@@ -151,7 +150,7 @@ test('presentation can restart after exiting while fullscreen entry is pending',
  await start(page,'今のページから');await finish(page);assert.deepEqual(errors,[]);
 });
 
-test('speaker notes stay out of GUI and projection; rehearsal syncs a separate window without saving records',{timeout:120000},async t=>{
+test('speaker notes stay out of GUI and projection; the presenter view syncs a separate window',{timeout:120000},async t=>{
  const {ws,page,editor,errors}=await setup(t);
  await page.locator('.speaker-notes > summary').click();
  const note=page.locator('.speaker-notes textarea');await note.fill('ページ専用の秘密メモ');
@@ -162,18 +161,18 @@ test('speaker notes stay out of GUI and projection; rehearsal syncs a separate w
  assert.equal(await page.locator('#qblocks').getByText('ページ専用の秘密メモ',{exact:false}).count(),0);
  assert.equal(await editor.locator('body').getByText('ページ専用の秘密メモ',{exact:false}).count(),0);
  await page.locator('.bar').screenshot({path:'/tmp/slide-studio-speaker-toolbar.png'});
- await page.getByRole('button',{name:'発表用メニュー',exact:true}).click();const popupEvent=page.waitForEvent('popup');await page.getByRole('button',{name:'リハーサル',exact:true}).click();
+ const popupEvent=page.waitForEvent('popup');await page.getByRole('button',{name:'発表者ビュー',exact:true}).click();
  const screen=page.locator('.speaker-screen');await screen.locator('.speaker-current iframe').waitFor();
  await screen.getByRole('button',{name:'計測開始',exact:true}).click();
- await screen.locator('textarea').fill('リハーサル中に追記した秘密メモ');
- await screen.locator('[role=status]').filter({hasText:'保存済み'}).waitFor();
+ await screen.locator('.speaker-note-page textarea').fill('発表中に追記した秘密メモ');
+ await screen.locator('.speaker-note-page [role=status]').filter({hasText:'保存済み'}).waitFor();
  const popup=await popupEvent;
  const projected=popup.frameLocator('iframe');await projected.locator('.slide.active').waitFor();
  assert.equal(await projected.locator('body').getByText('秘密メモ',{exact:false}).count(),0);
  await page.screenshot({path:'/tmp/slide-studio-presenter.png'});
  await page.evaluate(()=>{document.documentElement.dataset.theme='dark';});
  await page.screenshot({path:'/tmp/slide-studio-presenter-dark.png'});
- await screen.locator('.speaker-controls > summary').click();await screen.getByLabel('枚数を数える範囲').selectOption('all');
+ await screen.locator('.speaker-controls > summary').click();await screen.getByRole('radio',{name:'ページ数で指定',exact:true}).click();await screen.getByRole('spinbutton',{name:'数えるページ数',exact:true}).waitFor();
  await page.screenshot({path:'/tmp/slide-studio-presenter-options.png'});
  await page.keyboard.press('Escape');assert.equal(await screen.count(),1);assert.equal(await screen.locator('.speaker-controls').getAttribute('open'),null);
  await page.evaluate(()=>{document.documentElement.dataset.theme='light';});
@@ -184,24 +183,31 @@ test('speaker notes stay out of GUI and projection; rehearsal syncs a separate w
  await screen.getByRole('button',{name:'進む',exact:true}).click();await state(projected,1);
  await screen.getByRole('button',{name:'一時停止',exact:true}).click();
  assert.match(await screen.locator('.speaker-progress').innerText(),/2 \/ 4/);
- await screen.getByRole('button',{name:'終了',exact:true}).click();await screen.waitFor({state:'detached'});
+ await screen.getByRole('button',{name:'発表を終了',exact:true}).click();await screen.waitFor({state:'detached'});
  await assert.rejects(readFile(join(ws.deck_dir('talk'),'rehearsals.json'),'utf8'),{code:'ENOENT'});
  assert.equal(await page.locator('.speaker-results').count(),0);
- assert.match(await readFile(ws.qmd('talk'),'utf8'),/リハーサル中に追記した秘密メモ/);
+ assert.match(await readFile(ws.qmd('talk'),'utf8'),/発表中に追記した秘密メモ/);
  assert.deepEqual(errors,[]);
 });
 
-test('speaker note follows the page and persists after rehearsal',{timeout:90000},async t=>{
+test('speaker note follows the page and persists after the presenter view',{timeout:90000},async t=>{
  const {ws,page}=await setup(t);
- await page.getByRole('button',{name:'発表用メニュー',exact:true}).click();await page.getByRole('button',{name:'リハーサル',exact:true}).click();const screen=page.locator('.speaker-screen');
- const field=screen.locator('textarea');await field.fill('一枚目のメモ\n```\n:::');
+ await page.getByRole('button',{name:'発表者ビュー',exact:true}).click();const screen=page.locator('.speaker-screen');
+ const field=screen.locator('.speaker-note-page textarea'),globalField=screen.locator('.speaker-note-global textarea');
+ // 発表者ビューでは、ページのメモと全体のメモを上下に並べて同時に表示する
+ await screen.getByText('p1 のメモ',{exact:true}).waitFor();await screen.getByText('全体のメモ',{exact:true}).waitFor();
+ assert.equal(await screen.getByRole('button',{name:'全体',exact:true}).count(),0);
+ const [top,bottom]=await Promise.all([field.boundingBox(),globalField.boundingBox()]);assert.ok(top&&bottom&&top.y+top.height<=bottom.y,'page note sits above the global note');
+ await field.fill('一枚目のメモ\n```\n:::');
  await screen.getByRole('button',{name:'進む',exact:true}).click();await state(page.frameLocator('.speaker-current iframe'),1);
- await field.fill('二枚目のメモ');await screen.locator('[role=status]').filter({hasText:'保存済み'}).waitFor();
+ await screen.getByText('p2 のメモ',{exact:true}).waitFor();
+ await field.fill('二枚目のメモ');await screen.locator('.speaker-note-page [role=status]').filter({hasText:'保存済み'}).waitFor();
  await screen.getByRole('button',{name:'戻る',exact:true}).click();await state(page.frameLocator('.speaker-current iframe'),0);
- await page.waitForFunction(()=>document.querySelector<HTMLTextAreaElement>('.speaker-screen textarea')?.value==='一枚目のメモ\n```\n:::');
- await screen.getByRole('button',{name:'全体',exact:true}).click();await field.fill('全体共通');await screen.locator('[role=status]').filter({hasText:'保存済み'}).waitFor();
+ await page.waitForFunction(()=>document.querySelector<HTMLTextAreaElement>('.speaker-screen .speaker-note-page textarea')?.value==='一枚目のメモ\n```\n:::');
+ await globalField.fill('全体共通');await screen.locator('.speaker-note-global [role=status]').filter({hasText:'保存済み'}).waitFor();
+ assert.equal(await field.inputValue(),'一枚目のメモ\n```\n:::');
  await screen.getByRole('button',{name:'計測開始',exact:true}).click();
- await screen.getByRole('button',{name:'終了',exact:true}).click();await screen.waitFor({state:'detached'});
+ await screen.getByRole('button',{name:'発表を終了',exact:true}).click();await screen.waitFor({state:'detached'});
  await assert.rejects(readFile(join(ws.deck_dir('talk'),'rehearsals.json'),'utf8'),{code:'ENOENT'});
  await page.reload();await page.locator('#stage[data-blocks=ready]').waitFor();
  await page.locator('.speaker-notes > summary').click();await page.locator('.speaker-notes button').filter({hasText:'全体'}).click();
@@ -209,32 +215,46 @@ test('speaker note follows the page and persists after rehearsal',{timeout:90000
 });
 
 
-test('presentation chooser opens only from the first-slide button and cancels without starting',{timeout:60000},async t=>{
+test('presenter button opens the presenter view directly without a menu',{timeout:60000},async t=>{
  const {page,editor,player,errors}=await setup(t);
  assert.equal(await page.locator('.speaker-tools').count(),0);
+ const presenter=page.getByRole('button',{name:'発表者ビュー',exact:true});
+ assert.equal(await presenter.getAttribute('aria-haspopup'),null);
  await page.locator('#pagestrip button[data-index="1"]').click();await state(editor,1);
- await page.getByRole('button',{name:'発表用メニュー',exact:true}).click();const dialog=page.getByRole('dialog',{name:'発表用メニュー',exact:true});await dialog.waitFor();
- for(const name of ['通常の発表','発表者ビュー','リハーサル'])await dialog.getByRole('button',{name,exact:true}).waitFor();
- assert.equal(await page.locator('.present-screen,.speaker-screen').count(),0);
- await page.screenshot({path:'/tmp/slide-studio-presentation-chooser.png'});
- await page.keyboard.press('Escape');await dialog.waitFor({state:'detached'});await state(editor,1);
- await page.locator('.present-tools > button').first().focus();await page.keyboard.press('f');await state(player,1);assert.equal(await page.locator('.presentation-launcher').count(),0);await finish(page);
- await page.locator('.present-tools > button').first().focus();await page.keyboard.press('Shift+F');await state(player,0);assert.equal(await page.locator('.presentation-launcher').count(),0);await finish(page);assert.deepEqual(errors,[]);
+ await presenter.click();const screen=page.locator('.speaker-screen');await screen.locator('.speaker-current iframe').waitFor();
+ assert.equal(await page.getByRole('dialog',{name:'発表用メニュー',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'発表原稿を作成',exact:true}).count(),0);
+ await screen.getByRole('button',{name:'計測開始',exact:true}).click();
+ await screen.getByRole('button',{name:'発表を終了',exact:true}).click();await screen.waitFor({state:'detached'});
+ await page.locator('#pagestrip button[data-index="1"]').click();await state(editor,1);
+ await page.locator('.present-tools > button').first().focus();await page.keyboard.press('f');await state(player,1);await finish(page);
+ await page.locator('.present-tools > button').first().focus();await page.keyboard.press('Shift+F');await state(player,0);await finish(page);assert.deepEqual(errors,[]);
 });
 
 test('speaker note uses visible page numbers and grows only to six lines',{timeout:60000},async t=>{
- const {page,errors}=await setup(t);const panel=page.locator('.speaker-notes');await panel.locator('summary').click();
+ const {page,errors}=await setup(t);const panel=page.locator('.speaker-notes');
+ // 発表メモは #viewport 上端の余白に重ねる。開閉・行の増減でスライドの位置が 1px も動かない
+ const top=()=>page.locator('#slideBox').evaluate(el=>new Promise<number>(r=>requestAnimationFrame(()=>r(el.getBoundingClientRect().top))));
+ const before=await top();const chip=(await panel.locator('summary').boundingBox())!;assert.ok(chip.y+chip.height<=before,'collapsed notes must not cover the slide');
+ await panel.locator('summary').click();
  await panel.getByRole('button',{name:'p1',exact:true}).waitFor();const field=panel.locator('textarea');
+ // 開くとページのメモ欄に入力カーソルが入り、すぐ書き始められる
+ await page.waitForFunction(()=>document.activeElement===document.querySelector('.speaker-notes textarea'));
+ assert.equal(await top(),before);assert.equal(await field.getAttribute('placeholder'),null);
  const size=()=>field.evaluate(el=>{const s=getComputedStyle(el);return {height:el.getBoundingClientRect().height,line:parseFloat(s.lineHeight),padding:parseFloat(s.paddingTop)+parseFloat(s.paddingBottom),overflow:s.overflowY,scroll:el.scrollHeight,client:el.clientHeight};});
  await field.fill('短いメモ');const short=await size();assert.ok(short.height <= short.line+short.padding+2);
  await field.fill('1\n2\n3\n4\n5\n6');const six=await size();assert.ok(six.height > short.height*3);assert.ok(six.height <= six.line*6+six.padding+2);
  await field.fill('1\n2\n3\n4\n5\n6\n7\n8\n9');const long=await size();assert.ok(Math.abs(long.height-six.height)<2);assert.equal(long.overflow,'auto');assert.ok(long.scroll>long.client);
+ assert.equal(await top(),before);
  await page.screenshot({path:'/tmp/slide-studio-notes-six-lines.png'});
  await field.fill('短いメモ');assert.ok((await size()).height <= short.height+2);
  await page.locator('#pagestrip button[data-index="1"]').click();await panel.getByRole('button',{name:'p2',exact:true}).waitFor();
- await panel.getByRole('button',{name:'全体',exact:true}).click();await field.fill('全体のメモ');await panel.locator('[role=status]').filter({hasText:'保存済み'}).waitFor();
- await panel.locator('summary').click();await panel.locator('summary').click();assert.ok((await size()).height <= short.height+2);
- await page.getByRole('button',{name:'発表用メニュー',exact:true}).click();await page.getByRole('button',{name:'発表者ビュー',exact:true}).click();
- const screen=page.locator('.speaker-screen');await screen.getByRole('button',{name:'p1',exact:true}).waitFor();await screen.getByRole('button',{name:'進む',exact:true}).click();await screen.getByRole('button',{name:'p2',exact:true}).waitFor();
+ await panel.getByRole('button',{name:'全体',exact:true}).click();assert.equal(await field.getAttribute('placeholder'),null);await field.fill('全体のメモ');await panel.locator('[role=status]').filter({hasText:'保存済み'}).waitFor();
+ await panel.locator('summary').click();assert.equal(await top(),before);await panel.locator('summary').click();
+ await page.waitForFunction(()=>{const f=document.querySelector<HTMLTextAreaElement>('.speaker-notes textarea');return document.activeElement===f&&f!.selectionStart===f!.value.length;});
+ assert.ok((await size()).height <= short.height+2);
+ await field.press('Escape');assert.equal(await panel.evaluate(el=>(el as HTMLDetailsElement).open),false);assert.equal(await top(),before);
+ await page.getByRole('button',{name:'発表者ビュー',exact:true}).click();
+ const screen=page.locator('.speaker-screen');await screen.getByText('p1 のメモ',{exact:true}).waitFor();await screen.getByRole('button',{name:'進む',exact:true}).click();await screen.getByText('p2 のメモ',{exact:true}).waitFor();
  assert.deepEqual(errors,[]);
 });

@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { lstatSync, mkdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { Workspace } from '../../packages/core/src/workspace.js';
 import { atomicWriteFile } from '../../packages/core/src/atomic.js';
-import { isInsideRoot } from '../../packages/core/src/paths.js';
-import { LegacyOutput, version } from './output.js';
+import { assertWorkspacePath, isInsideRoot } from '../../packages/core/src/paths.js';
+import { OutputService, version } from './output.js';
 
 type ImageState = {id: string; page: string; slide: number; step: number; image: string; image_sha256: string};
 type Issue = {id: string; level: string; [key: string]: unknown};
@@ -21,20 +21,16 @@ export const TOOLS = [
   {name: 'audit_status', description: '監査と確認記録が最新版に対応するか調べる。', input_schema: object({deck: string, audit_id: string})},
 ];
 function safe(ws: Workspace, path: string) {
-  if (!isInsideRoot(ws.root, path)) throw Error('監査の保存先が正しくありません');
-  for (let p = resolve(path);; p = dirname(p)) {
-    try { if (lstatSync(p).isSymbolicLink()) throw Error('監査の保存先にシンボリックリンクがあります'); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-    if (p === ws.root) break;
-  }
+  assertWorkspacePath(ws.root, path, "監査の保存先が正しくありません", "監査の保存先にシンボリックリンクがあります");
 }
 function folder(ws: Workspace, deck: string, id: string) {
   ws.require_deck(deck); if (!/^[a-f\d]{32}$/u.test(id)) throw Error('監査 ID が正しくありません');
   const path = join(ws.state, 'audits', deck, id); safe(ws, path); return path;
 }
-export async function run(ws: Workspace, deck: string, output: LegacyOutput) {
+export async function run(ws: Workspace, deck: string, output: OutputService) {
   const id = randomUUID().replaceAll('-', ''), dir = folder(ws, deck, id), before = current(ws, deck);
   const built = await output.audit(ws, deck), states: ImageState[] = [];
+  safe(ws,dir);
   mkdirSync(join(dir, 'shots'), {recursive: true});
   for (const shot of built.inspection.screenshots) {
     const name = `p${String(shot.slide + 1).padStart(2, '0')}-s${shot.step}`, image = join(dir, 'shots', name + '.png');
@@ -50,6 +46,14 @@ export async function run(ws: Workspace, deck: string, output: LegacyOutput) {
   });
   const report: Report = {schema_version: 1, audit_id: id, deck, version: before, checked_at: built.result.checked_at, stable: JSON.stringify(before) === JSON.stringify(current(ws, deck)), states, issues, review: null, instructions: '全状態の画像と問題を確認して audit_review に記録する。修正したら audit_run を再実行する。'};
   await atomicWriteFile(join(dir, 'report.json'), JSON.stringify(report, null, 2), 0o600);
+  // Only completed reports participate. Another audit may still be writing images.
+  const parent = dirname(dir);
+  const older = readdirSync(parent, {withFileTypes: true})
+    .filter(entry => entry.isDirectory() && entry.name !== id && /^[a-f\d]{32}$/u.test(entry.name))
+    .map(entry => join(parent, entry.name))
+    .filter(path => existsSync(join(path, 'report.json')))
+    .sort((a,b) => lstatSync(b).mtimeMs - lstatSync(a).mtimeMs);
+  for (const path of older.slice(9)) rmSync(path, {recursive: true, force: true});
   return status(ws, deck, id);
 }
 export function status(ws: Workspace, deck: string, id: string) {

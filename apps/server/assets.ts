@@ -1,7 +1,7 @@
 import type { Workspace } from '../../packages/core/src/workspace.js';
 import * as assets from '../../packages/core/src/deck-assets.js';
-import type { LegacyFeatureRequest, LegacyFeatureResponse } from '../../packages/contracts/src/server.js';
-export async function handleAssets(ws:Workspace,req:LegacyFeatureRequest,changed:(path:string)=>void):Promise<LegacyFeatureResponse|null>{
+import type { FeatureRequest, FeatureResponse } from '../../packages/contracts/src/server.js';
+export async function handleAssets(ws:Workspace,req:FeatureRequest,changed:(path:string)=>void):Promise<FeatureResponse|null>{
  const match=/^\/api\/deck\/([^/]+)\/assets(?:\/([^/]+))?$/u.exec(req.pathname);if(!match)return null;
  const deck=decodeURIComponent(match[1]!);if(!ws.has_deck(deck))return {status:404,body:{error:'発表がありません'}};
  try{if(!match[2]&&(req.method==='GET'||req.method==='HEAD'))return {body:assets.listing(ws,deck)};

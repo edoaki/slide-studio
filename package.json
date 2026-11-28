@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs --clean && tsc && node scripts/build.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.web.json",
     "start": "npm run build && node scripts/dev-desktop.mjs",
     "browser": "npm run build && node scripts/dev-desktop.mjs --studio-browser",
     "cli": "npm run build && node scripts/cli.mjs",
@@ -30,15 +30,16 @@
   "dependencies": {
     "cheerio": "1.2.0",
     "domhandler": "5.0.3",
-    "electron-updater": "6.8.3",
     "htmlparser2": "10.1.0",
     "pdf-lib": "1.17.1",
     "tar": "7.5.23",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "yauzl": "3.4.0"
   },
   "devDependencies": {
     "@electron-internal/extract-zip": "1.0.1",
     "@types/node": "24.19.2",
+    "@types/yauzl": "3.4.0",
     "electron": "45.3.1",
     "electron-builder": "26.18.0",
     "esbuild": "0.28.2",

@@ -10,7 +10,7 @@ interface HttpErrorLike extends Error {
   code?: unknown;
 }
 
-export class LegacyHttpError extends Error {
+export class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
@@ -18,7 +18,7 @@ export class LegacyHttpError extends Error {
     readonly headers?: Record<string, string>,
   ) {
     super(message);
-    this.name = "LegacyHttpError";
+    this.name = "HttpError";
   }
 }
 
@@ -56,7 +56,7 @@ export class BoundedQueue<T> {
         return;
       }
       if (this.#waiting.length >= this.#pending) {
-        rejectTask(new LegacyHttpError(503, "render queue is full"));
+        rejectTask(new HttpError(503, "render queue is full"));
         return;
       }
       this.#waiting.push(start);
@@ -212,7 +212,7 @@ export function sendFailure(response: ServerResponse, error: unknown): void {
     if (!response.destroyed) response.destroy();
     return;
   }
-  if (error instanceof LegacyHttpError) {
+  if (error instanceof HttpError) {
     sendJson(response, error.status, { error: error.message, ...error.extra }, error.headers ?? {});
     return;
   }
@@ -227,7 +227,7 @@ export function sendFailure(response: ServerResponse, error: unknown): void {
 }
 
 export async function readBody(request: IncomingMessage, limit: number): Promise<Buffer> {
-  const tooLarge = (): LegacyHttpError => new LegacyHttpError(
+  const tooLarge = (): HttpError => new HttpError(
     413,
     "リクエストが大きすぎます",
     undefined,
@@ -264,12 +264,12 @@ export function parseJson(bytes: Buffer): unknown {
   try {
     return JSON.parse(bytes.toString("utf8")) as unknown;
   } catch {
-    throw new LegacyHttpError(400, "リクエスト本文が正しくありません");
+    throw new HttpError(400, "リクエスト本文が正しくありません");
   }
 }
 
 export function recordBody(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) throw new LegacyHttpError(400, "リクエスト本文が正しくありません");
+  if (!isRecord(value)) throw new HttpError(400, "リクエスト本文が正しくありません");
   return value;
 }
 
@@ -277,7 +277,7 @@ export function decodeSegment(raw: string, label: string): string {
   try {
     return decodeURIComponent(raw);
   } catch {
-    throw new LegacyHttpError(400, `${label}が正しくありません`);
+    throw new HttpError(400, `${label}が正しくありません`);
   }
 }
 
@@ -287,7 +287,7 @@ export function decodeName(raw: string, label: string): string {
   try {
     return checkLookupName(value, label);
   } catch {
-    throw new LegacyHttpError(400, `${label}が正しくありません`);
+    throw new HttpError(400, `${label}が正しくありません`);
   }
 }
 

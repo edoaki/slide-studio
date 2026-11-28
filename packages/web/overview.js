@@ -1,5 +1,4 @@
 // 一覧：編集画面の上に重ねるウィンドウ。全ページを # ごとの横の列に並べる。縮小画像は帯と同じで、カーソルで step をめくり、押すとそのページの最初へ移る。
-import { slideInsertionPositions } from './slide-insertion.js';
 import { svg } from './icons.js';
 import { S } from './strings.js';
 import { tip } from './tip.js';
@@ -15,11 +14,7 @@ export function makeOverview(ctx, { shots, changed, reorder, actions }) {
   trigger.onclick = () => open();
   ctx.root.querySelector('#stripTools').append(trigger);
   let box = null, shade = null, thumbs = null, returnTo = null, wasInert = false;
-  let stopReorder = null, stopActions = null, insertion = null;
-  ctx.chooseSlideInsertion = done => {
-    if (box || sampleOn()) {done(null); return;}
-    insertion = done; open();
-  };
+  let stopReorder = null, stopActions = null;
   const sampleOn = () => ctx.root.querySelector('#stage').classList.contains('theme-sample-on');
 
   function group(title) {
@@ -28,18 +23,6 @@ export function makeOverview(ctx, { shots, changed, reorder, actions }) {
     const row = document.createElement('div'); row.className = title == null ? 'pagestrip wrap' : 'pagestrip';
     section.append(row);
     return { section, row };
-  }
-  function gap(before) {
-    const b = tip(Object.assign(document.createElement('button'), {type: 'button', className: 'overview-insert', innerHTML: svg('plus')}), before < ctx.structure.pages.length ? S.slideLibrary.before(before + 1) : S.slideLibrary.end);
-    b.dataset.before = before;
-    b.disabled = ctx.locked || ctx.allLocked || !!ctx.lock.pages?.length;
-    b.onclick = () => {
-      if (b.disabled) return;
-      const target = {before, text: ctx.text}, done = insertion;
-      insertion = null; close();
-      if (done) done(target); else ctx.openSlideLibrary?.(target);
-    };
-    return b;
   }
   function makeThumb() {
     const b = document.createElement('button'); b.type = 'button';
@@ -53,8 +36,6 @@ export function makeOverview(ctx, { shots, changed, reorder, actions }) {
     const lefts = [...box.querySelectorAll('.pagestrip')].map(r => r.scrollLeft);
     const inStrip = ctx.root.querySelectorAll('#pagestrip button[data-index]');
     const slides = [...inStrip].map(b => ctx.preview.slides[+b.dataset.index]), grouped = slides.some(s => s.sectionStart), groups = [];
-    let lastRow = null;
-    const inserted = new Set(), positions = new Set(slideInsertionPositions(ctx.structure));
     slides.forEach((s, i) => {
       if (!groups.length || s.sectionStart) groups.push(group(grouped ? s.group || S.overview.cover : null));
       const b = old.get(s.index) || makeThumb();
@@ -64,45 +45,35 @@ export function makeOverview(ctx, { shots, changed, reorder, actions }) {
       b.querySelector('.num').textContent = i + 1;
       b.setAttribute('aria-current', String(s.index === ctx.preview.index));
       b.hidden = !!inStrip[i]?.hidden; // テーマのタブで絞り込んでいるページだけを出す
-      const row = groups.at(-1).row, page = ctx.structure?.pages.find(p => p.index === s.page);
-      if (insertion && !b.hidden && page && positions.has(page.index) && !inserted.has(page.index)) {
-        row.append(gap(page.index)); inserted.add(page.index); lastRow = row;
-      }
-      row.append(b);
+      groups.at(-1).row.append(b);
     });
-    if (lastRow && positions.has(ctx.structure.pages.length)) lastRow.append(gap(ctx.structure.pages.length));
-    else if (insertion && positions.has(ctx.structure.pages.length) && !lastRow) {
-      if (!groups.length) groups.push(group(null));
-      groups.at(-1).row.append(gap(ctx.structure.pages.length));
-    }
     groups.forEach(g => { g.section.hidden = [...g.row.children].every(b => b.hidden); });
     box.replaceChildren(box.querySelector('.overview-head'), ...groups.map(g => g.section));
     box.querySelectorAll('.pagestrip').forEach((r, i) => { r.scrollLeft = lefts[i] || 0; });
     box.scrollTop = top;
     thumbs.decorate();
-    if (!insertion) { reorder?.decorate(box); actions?.decorate(box); }
-    else box.querySelectorAll('button[data-index]').forEach(b => b.draggable = false);
+    reorder?.decorate(box); actions?.decorate(box);
     changed();
   }
   function open() {
-    if (box || sampleOn() || (!insertion && !ctx.preview.slides.length)) return;
+    if (box || sampleOn() || !ctx.preview.slides.length) return;
     returnTo = document.activeElement; wasInert = ctx.root.inert;
     box = document.createElement('div'); box.className = 'overview-screen';
     box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', S.overview.title);
     const closer = tip(Object.assign(document.createElement('button'), { type: 'button', className: 'ibtn overview-close', innerHTML: svg('x') }), S.overview.close, OPEN_KEY);
     closer.onclick = close;
     const head = document.createElement('header'); head.className = 'overview-head';
-    head.append(Object.assign(document.createElement('h1'), { textContent: insertion ? S.slideLibrary.choosePosition : S.overview.title }), closer);
+    head.append(Object.assign(document.createElement('h1'), { textContent: S.overview.title }), closer);
     box.append(head);
     // まわりの暗い所を押すと閉じる
     shade = document.createElement('div'); shade.className = 'overview-shade';
     shade.addEventListener('click', e => { if (e.target === shade) close(); });
     // カーソルが乗っていないときは最後の step（そのページの全部）を出す
     thumbs = shotThumbs(box, shots, () => Infinity);
-    if (!insertion) { stopReorder = reorder?.attach(box); stopActions = actions?.attach(box); }
+    stopReorder = reorder?.attach(box); stopActions = actions?.attach(box);
     box.addEventListener('click', e => {
       const b = e.target.closest('button[data-index]');
-      if (!b || insertion) return;
+      if (!b) return;
       ctx.preview.go(+b.dataset.index);
       close();
     });
@@ -119,7 +90,6 @@ export function makeOverview(ctx, { shots, changed, reorder, actions }) {
     if (returnTo?.isConnected) returnTo.focus({ preventScroll: true });
     returnTo = null;
     changed();
-    const done = insertion; insertion = null; done?.(null);
   }
   // 開いている間は編集画面のキーを動かさない
   const keys = e => {
@@ -139,6 +109,6 @@ export function makeOverview(ctx, { shots, changed, reorder, actions }) {
       e.preventDefault(); open();
       return true;
     },
-    destroy() { close(); delete ctx.chooseSlideInsertion; trigger.remove(); removeEventListener('keydown', keys, true); },
+    destroy() { close(); trigger.remove(); removeEventListener('keydown', keys, true); },
   };
 }

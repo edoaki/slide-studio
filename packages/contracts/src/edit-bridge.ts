@@ -14,22 +14,24 @@ export interface FrameSnapshot extends FrameIdentity {
   sourceVersion?: string;
   hasReferences?: boolean;
   overviewOpen?: boolean;
-  blackout?: boolean;
   pageInput?: string;
 }
 export type NavigationCommand =
   | { method: "go"; params: { index: number; step: number } }
   | { method: "move"; params: { delta: number } }
   | { method: "jump"; params: { delta: number } }
-  | { method: "setBlackout"; params: { value: boolean } }
-  | { method: "presentationKey"; params: { type: "keydown" | "keyup"; key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | " " | "o" | "Escape" | "b" | "B" | "Enter" | "Backspace" | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"; repeat: boolean } }
+  | { method: "presentationKey"; params: { type: "keydown" | "keyup"; key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | " " | "o" | "Escape" | "Enter" | "Backspace" | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"; repeat: boolean } }
   | { method: "goStage"; params: { stage: number } }
   | { method: "resize"; params: Record<string, never> }
   | { method: "setFilter"; params: { indices: number[] | null } }
   | { method: "theme.swap"; params: { name: string; version: string; sourceVersion?: string } }
   | { method: "pageWheel"; params: { deltaX: number; deltaY: number; deltaMode: 0 | 1 | 2;
       shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey: boolean } }
-  | { method: "finish"; params: Record<string, never> };
+  | { method: "finish"; params: Record<string, never> }
+  /** Presenter only: report the pointer as a `pointer` event ({x, y, visible}, 0..1 of the slide). */
+  | { method: "pointer.track"; params: { enabled: boolean } }
+  /** Presenter only: slide clicks move only in the left/right edge zones (centre clicks do nothing). */
+  | { method: "clicks.edges"; params: { enabled: boolean } };
 /** Coordinates are content-frame CSS pixels, never admin-window coordinates. */
 export interface EditRect { left: number; top: number; right: number; bottom: number }
 export interface EditGeometry {
@@ -107,7 +109,7 @@ export interface FrameResponse extends FrameIdentity {
 }
 export type FrameEvent = FrameIdentity & {
   protocol: typeof EDIT_BRIDGE_PROTOCOL; type: "event";
-  event: "ready" | "deckchange" | "layout" | "key" | "link.open" | "failure" | "edit.layout" | "edit.intent" | "text.state" | "text.heading" | "toc.select" | "cover.intent" | "block.intent" | "theme.select" | "edit.lint" | "insert.pointer" | "insert.paste";
+  event: "ready" | "deckchange" | "layout" | "key" | "link.open" | "failure" | "edit.layout" | "edit.intent" | "text.state" | "text.heading" | "toc.select" | "cover.intent" | "block.intent" | "theme.select" | "edit.lint" | "insert.pointer" | "insert.paste" | "pointer";
   data: unknown;
 };
 // Text sessions carry source revisions and single-session leases; frame events

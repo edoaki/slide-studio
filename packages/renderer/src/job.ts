@@ -18,6 +18,7 @@ export interface ValidatedRenderJob {
   timeoutMs: number;
   screenshots: boolean;
   allSteps?: boolean;
+  priorityIndices?: number[];
   pdf?: boolean;
 }
 
@@ -66,7 +67,12 @@ export function parseRenderJob(value: unknown): ValidatedRenderJob {
   }
 
   for (const name of ["allSteps", "pdf"]) if (job[name] !== undefined && typeof job[name] !== "boolean") throw new JobValidationError(`${name} must be a boolean`);
+  const indices = job.priorityIndices;
+  if (indices !== undefined && (!Array.isArray(indices) || indices.length > 10001 || indices.some(i => !Number.isInteger(i) || i < 0 || i > 10000))) {
+    throw new JobValidationError("invalid priorityIndices");
+  }
   return {
+    ...(Array.isArray(indices) ? {priorityIndices: [...new Set<number>(indices)]} : {}),
     ...(job.allSteps === undefined ? {} : { allSteps: job.allSteps as boolean }),
     ...(job.pdf === undefined ? {} : { pdf: job.pdf as boolean }),
     schemaVersion: 1,

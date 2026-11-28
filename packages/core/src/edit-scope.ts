@@ -207,6 +207,31 @@ function hunks(base: string[], other: string[]): Hunk[] {
     }));
 }
 
+/** A bounded line diff for the persistent chat history. */
+export function changeSummary(before: string, after: string): string {
+  const base = before.split(/\r?\n/u), current = after.split(/\r?\n/u);
+  let start = 0, leftEnd = base.length, rightEnd = current.length;
+  while (start < leftEnd && start < rightEnd && base[start] === current[start]) start++;
+  while (leftEnd > start && rightEnd > start && base[leftEnd-1] === current[rightEnd-1]) {
+    leftEnd--; rightEnd--;
+  }
+  if (leftEnd === start && rightEnd === start) return "";
+  const left = base.slice(start,leftEnd), right = current.slice(start,rightEnd);
+  const edits: Opcode[] = left.length * right.length <= 250_000
+    ? opcodes(left,right) : [["replace",0,left.length,0,right.length]];
+  const lines: string[] = [];
+  for (const [tag,i,j,k,l] of edits) {
+    if (tag === "equal") continue;
+    lines.push(`@@ -${start+i+1},${j-i} +${start+k+1},${l-k} @@`);
+    for (const [prefix,source,from,to] of [["-",left,i,j],["+",right,k,l]] as const) {
+      for (let n=from;n<Math.min(to,from+20);n++) lines.push(prefix+source[n]!.slice(0,512));
+      if (to-from>20) lines.push("…");
+    }
+    if (lines.length>=80) { lines.push("…"); break; }
+  }
+  return lines.join("\n").slice(0,8192);
+}
+
 function sameHunk(left: Hunk | null, right: Hunk): boolean {
   if (left === null) return false;
   if (left.start !== right.start || left.end !== right.end) return false;
@@ -216,6 +241,8 @@ function sameHunk(left: Hunk | null, right: Hunk): boolean {
 
 /** Line-based three-way merge; `null` means both sides changed the same line. */
 export function merge3(base: string, mine: string, theirs: string): string | null {
+  if (mine === theirs || base === theirs) return mine;
+  if (base === mine) return theirs;
   const lines = splitLinesKeepEnds(base);
   const all = [
     ...hunks(lines, splitLinesKeepEnds(mine)),
@@ -235,7 +262,8 @@ export function merge3(base: string, mine: string, theirs: string): string | nul
     ) {
       return null;
     }
-    output.push(...lines.slice(at, start), ...replacement);
+    for (let i = at; i < start; i++) output.push(lines[i]!);
+    for (const line of replacement) output.push(line);
     at = end;
     last = hunk;
   }

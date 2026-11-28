@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { create } from 'tar';
 import { Providers } from '../../packages/ai/src/providers.js';
-import { Runtime, latestRelease, type Release } from '../../packages/ai/src/runtime.js';
+import { Runtime, latestRelease, compareVersions, type Release } from '../../packages/ai/src/runtime.js';
 
 async function fixture(t: TestContext) {
   const root = await mkdtemp(join(tmpdir(), 'studio-runtime-'));
@@ -90,4 +90,101 @@ test('runtime reads terminal CLI versions, refreshes its cache, and reports fail
     await rm(binary);
     assert.equal((await runtime.info()).version, null);
   }
+});
+
+test('version order follows release order and never treats a prerelease as newer', () => {
+  assert.equal(compareVersions('0.171.0', '0.160.0'), 1);
+  assert.equal(compareVersions('0.9.0', '0.10.0'), -1);
+  assert.equal(compareVersions('1.2.3', '1.2.3'), 0);
+  assert.equal(compareVersions('1.2.3', '1.2.3-beta.1'), 1);
+  assert.equal(compareVersions('1.2.3-beta.2', '1.2.3-beta.10'), -1);
+  assert.equal(compareVersions('1.2.3+build.5', '1.2.3'), 0);
+});
+
+test('latest-version checks do not postpone the daily automatic update; old state loads compatibly', async t => {
+  const f = await fixture(t), day = 86400;
+  await f.runtime.update();
+  await mkdir(f.runtime.root, {recursive: true});
+  const legacy = {current: '1.0.0', previous: null, latest: '1.0.0', checked: Date.now() / 1000, auto: true, skip: null, error: null};
+  await writeFile(join(f.runtime.root, 'state.json'), JSON.stringify(legacy));
+  assert.equal(f.runtime.state().autoAttempted, 0);
+  f.next('1.1.0');
+  // Opening settings may check for the latest version; the automatic update still runs.
+  await f.runtime.check();
+  const now = Date.now() / 1000;
+  assert.equal(f.runtime.state().autoAttempted, 0);
+  assert.equal(await f.runtime.automatic(undefined, now), true);
+  assert.equal(f.runtime.state().current, '1.1.0');
+  assert.equal(f.runtime.state().autoAttempted, now);
+  assert.ok(f.runtime.state().checked > 0);
+  f.next('1.2.0');
+  assert.equal(await f.runtime.automatic(undefined, now + day - 1), false);
+  assert.equal(f.runtime.state().current, '1.1.0');
+  assert.equal(await f.runtime.automatic(undefined, now + day), true);
+  assert.equal(f.runtime.state().current, '1.2.0');
+  // Never downgrades, and a rolled-back version is not reinstalled automatically.
+  f.next('1.0.5');
+  assert.equal(await f.runtime.automatic(undefined, now + 2 * day), false);
+  assert.equal(f.runtime.state().current, '1.2.0');
+  f.next('1.2.0'); await f.runtime.rollback();
+  assert.equal(await f.runtime.automatic(undefined, now + 3 * day), false);
+  assert.equal(f.runtime.state().current, '1.1.0');
+});
+
+test('automatic update retries a failed attempt after an hour and leaves fixed or absent executables alone', async t => {
+  const f = await fixture(t), hour = 3600;
+  await f.runtime.update();
+  const now = Date.now() / 1000;
+  f.next('1.1.0', true);
+  await assert.rejects(f.runtime.automatic(undefined, now), /cannot start/);
+  assert.equal(f.runtime.state().current, '1.0.0');
+  assert.equal(await f.runtime.automatic(undefined, now + hour - 1), false);
+  f.next('1.1.0');
+  assert.equal(await f.runtime.automatic(undefined, now + hour), true);
+  assert.equal(f.runtime.state().current, '1.1.0');
+
+  let asked = 0;
+  const fixed = new Runtime(new Providers(join(f.root, 'fixed'), {PATH: '', SLIDE_STUDIO_CLAUDE: join(f.root, 'mine')}), 'claude', {release: async () => { asked++; throw Error('must not check'); }});
+  assert.equal(await fixed.automatic(), false);
+  class Absent extends Providers { override binary() { return null; } }
+  const absent = new Runtime(new Absent(join(f.root, 'absent'), {PATH: ''}), 'claude', {release: async () => { asked++; throw Error('must not download'); }});
+  assert.equal(await absent.automatic(), false);
+  assert.equal(asked, 0);
+  await fixed.close(); await absent.close();
+});
+
+test('an outdated terminal CLI is replaced by the managed runtime; a current or newer one is kept', {skip: process.platform === 'win32'}, async t => {
+  const root = await mkdtemp(join(tmpdir(), 'studio-runtime-terminal-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const bin = join(root, 'bin'), terminal = join(bin, 'claude'), answer = join(root, 'version.txt');
+  await mkdir(bin);
+  await writeFile(terminal, `#!${process.execPath}\nprocess.stdout.write(require('node:fs').readFileSync(${JSON.stringify(answer)}));\n`, {mode: 0o700});
+  const payload = Buffer.from('managed claude');
+  const release: Release = {version: '0.171.0', url: 'https://fixture.invalid/claude', algorithm: 'sha256', digest: createHash('sha256').update(payload).digest('hex'), archive: false};
+  let downloads = 0;
+  const make = (name: string) => {
+    const providers = new Providers(join(root, name), {PATH: bin});
+    return {providers, runtime: new Runtime(providers, 'claude', {release: async () => release, fetch: async () => { downloads++; return new Response(new Uint8Array(payload)); }, accept: async () => {}})};
+  };
+  const now = Date.now() / 1000;
+  for (const version of ['0.171.0', '0.172.0']) {
+    await writeFile(answer, `${version} (Claude Code)`);
+    const {providers, runtime} = make('keep-' + version);
+    assert.equal(await runtime.automatic(undefined, now), false);
+    assert.equal(providers.binary('claude'), terminal);
+    assert.equal((await runtime.info(true)).update, false);
+    await runtime.close();
+  }
+  assert.equal(downloads, 0);
+  await writeFile(answer, '0.160.0 (Claude Code)');
+  const {providers, runtime} = make('old');
+  await runtime.check();
+  assert.equal((await runtime.info(true)).update, true);
+  assert.equal(await runtime.automatic(undefined, now), true);
+  assert.equal(downloads, 1);
+  assert.equal(providers.binary('claude'), join(runtime.root, '0.171.0', 'claude'));
+  assert.equal(runtime.state().current, '0.171.0');
+  const info = await runtime.info();
+  assert.equal(info.terminal, false); assert.equal(info.version, '0.171.0'); assert.equal(info.update, false);
+  await runtime.close();
 });

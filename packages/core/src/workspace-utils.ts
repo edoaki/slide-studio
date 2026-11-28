@@ -257,6 +257,10 @@ export function isReadOnlyError(error: unknown): boolean {
 
 // ---------------------------------------------------------------- names
 
+export function themeName(value: unknown): string {
+  return typeof value === "string" && NAME.test(value) ? value : "default";
+}
+
 export function check_name(value: unknown, what = "名前"): string {
   if (typeof value !== "string" || !NAME.test(value)) {
     throw new StudioError(`${what}には英小文字・数字・ハイフンを使ってください: ${pyRepr(value)}`);

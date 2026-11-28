@@ -1,8 +1,8 @@
 import type { Workspace } from '../../packages/core/src/workspace.js';
 import * as materials from '../../packages/core/src/materials.js';
-import type { LegacyFeatureRequest, LegacyFeatureResponse } from '../../packages/contracts/src/server.js';
+import type { FeatureRequest, FeatureResponse } from '../../packages/contracts/src/server.js';
 
-export async function handleMaterials(ws:Workspace,req:LegacyFeatureRequest,options:{openPath?:(path:string)=>Promise<void>;changed?:(path:string)=>void}):Promise<LegacyFeatureResponse|null>{
+export async function handleMaterials(ws:Workspace,req:FeatureRequest,options:{openPath?:(path:string)=>Promise<void>;changed?:(path:string)=>void}):Promise<FeatureResponse|null>{
   const match=/^\/api\/deck\/([^/]+)\/materials(?:\/([^/]+))?$/u.exec(req.pathname);
   if(!match)return null;
   const deck=decodeURIComponent(match[1]!);

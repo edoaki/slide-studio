@@ -3,14 +3,18 @@ import type {AppServerPool} from './pool.js';
 export interface CodexRunOptions extends AppServerOptions {
  prompt:string;model:string;effort?:string|null;session?:string|null;images?:string[];schema?:JsonObject;readonly?:boolean;signal?:AbortSignal;
  onSession?:(id:string)=>void;onEvent?:(event:RpcEvent)=>void;
- pool?:AppServerPool;
+ pool?:AppServerPool; turnTimeoutMs?:number; idleTimeoutMs?:number;
 }
 /** A completed status is required; disconnects and cancellation are never success. */
 export async function runCodex(options:CodexRunOptions){
  if(options.signal?.aborted)throw Error('AI の実行を取り消しました');
  const lease=await options.pool?.acquire({...options,signal:undefined});
  const client=lease?.client??new AppServerClient({...options,signal:undefined});let session=options.session??null,turnId:string|null=null,cancelled=false,healthy=false,killTimer:NodeJS.Timeout|undefined;
- const cancel=()=>{cancelled=true;if(client.alive&&session&&turnId)void client.call('turn/interrupt',{threadId:session,turnId}).catch(()=>{});killTimer=setTimeout(()=>void client.close(),2000);};
+ let timeoutError: Error | undefined;
+ const cancel=()=>{if(cancelled)return;cancelled=true;if(client.alive&&session&&turnId)void client.call('turn/interrupt',{threadId:session,turnId}).catch(()=>{});killTimer=setTimeout(()=>void client.close(),2000);};
+ const timeout=()=>{timeoutError=Error('AI の処理が時間切れになりました');cancel();};
+ const deadline=setTimeout(timeout,options.turnTimeoutMs??2*60*60*1000);
+ const idle=setTimeout(timeout,options.idleTimeoutMs??15*60*1000);
  options.signal?.addEventListener('abort',cancel,{once:true});if(options.signal?.aborted)cancel();
  try{
   if(!lease)await client.start();if(cancelled)throw Error('AI の実行を取り消しました');
@@ -22,12 +26,12 @@ export async function runCodex(options:CodexRunOptions){
   const turn=await client.call('turn/start',{threadId:session,input:[{type:'text',text:options.prompt},...(options.images??[]).map(path=>({type:'localImage',path}))],...(options.effort?{effort:options.effort}:{}),...(options.schema?{outputSchema:options.schema}:{})});
   const initial=turn.turn as JsonObject|undefined;if(typeof initial?.id!=='string')throw Error('AI の実行 ID がありません');turnId=initial.id;if(cancelled)void client.call('turn/interrupt',{threadId:session,turnId}).catch(()=>{});
   let final='';
-  for(;;){const event=await client.events.next();if(event.params.threadId&&event.params.threadId!==session)continue;options.onEvent?.(event);
+  for(;;){const event=await client.events.next();if(event.params.threadId&&event.params.threadId!==session)continue;idle.refresh();options.onEvent?.(event);
    if(event.method==='item/completed'){const item=event.params.item as JsonObject|undefined;if(item?.type==='agentMessage'&&typeof item.text==='string')final=item.text;}
    if(event.method==='turn/completed'){const completed=event.params.turn as JsonObject|undefined;if(completed?.id!==turnId)continue;
     if(completed.status!=='completed'){const error=completed.error as JsonObject|undefined;throw Error(typeof error?.message==='string'?error.message:completed.status==='interrupted'?'AI の実行を取り消しました':'AI の実行に失敗しました');}
     if(cancelled)throw Error('AI の実行を取り消しました');healthy=true;return {session,final};
    }
   }
- }finally{if(killTimer)clearTimeout(killTimer);options.signal?.removeEventListener('abort',cancel);if(lease)await lease.release(healthy);else await client.close();}
+ }catch(error){throw timeoutError??error;}finally{clearTimeout(deadline);clearTimeout(idle);if(killTimer)clearTimeout(killTimer);options.signal?.removeEventListener('abort',cancel);if(lease)await lease.release(healthy);else await client.close();}
 }

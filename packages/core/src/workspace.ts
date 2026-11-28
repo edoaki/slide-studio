@@ -8,25 +8,21 @@
  */
 import { randomUUID } from "node:crypto";
 import {
-  chmodSync,
   existsSync,
-  lstatSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
   readlinkSync,
   realpathSync,
-  rmSync,
   rmdirSync,
   statSync,
   symlinkSync,
-  unlinkSync,
 } from "node:fs";
-import type { Dirent } from "node:fs";
+
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { WorkspaceFiles } from "./workspace-files.js";
 import { assetPath } from "./assets.js";
-import { isNodeError } from "./errors.js";
-import { assertInsideRoot, canonicalRoot, isInsideRoot } from "./paths.js";
+
+import { canonicalRoot, isInsideRoot } from "./paths.js";
 import { parse, type Doc } from "./source.js";
 import {
   drop_cover_layout,
@@ -39,8 +35,8 @@ import { with_current_palette } from "./block-design.js";
 import { copy_topic_assets, migrateTopics } from "./topic-migrate.js";
 import { mergeBibtexTexts } from "./workspace-bib.js";
 import {
-  atomicWrite,
   check_creation_name,
+  themeName,
   check_name,
   checkLookupName,
   CONTROL_CHARACTER,
@@ -52,7 +48,6 @@ import {
   figure_steps,
   figure_title,
   isIgnoredDeckFile,
-  isReadOnlyError,
   location_file,
   lstatOrNull,
   migrationPreparationMessages,
@@ -176,12 +171,9 @@ export interface WorkspaceOptions {
   version?: string;
 }
 
-interface CopyOptions {
-  ignore?: (directory: string, names: string[]) => string[];
-}
-
 export class Workspace {
   readonly root: string;
+  readonly #files: WorkspaceFiles;
   readonly #templates: string;
   readonly #runtimeAssets: string;
   readonly #version: string;
@@ -192,6 +184,7 @@ export class Workspace {
     const expanded = expandUser(root);
     const resolved = resolve(expanded);
     this.root = existsSync(resolved) ? canonicalRoot(resolved) : resolved;
+    this.#files = new WorkspaceFiles(this.root);
     this.#templates = options.templatesRoot ? resolve(options.templatesRoot) : TEMPLATES;
     this.#runtimeAssets = options.runtimeRoot ? resolve(options.runtimeRoot) : RUNTIME;
     this.#version = options.version ?? VERSION;
@@ -276,7 +269,7 @@ export class Workspace {
     const before: Record<string, unknown> = { ...placed };
 
     const themeDirectory = join(this.#templates, "themes");
-    const bundled = this.#listFiles(themeDirectory)
+    const bundled = this.#files.listFiles(themeDirectory)
       .filter((name) => name.endsWith(".css") && !name.startsWith("_"))
       .sort();
     for (const name of bundled) {
@@ -309,15 +302,15 @@ export class Workspace {
           continue;
         }
       }
-      this.#write(destination, data);
+      this.#files.write(destination, data);
       placed[name] = digest;
     }
 
     // serif was replaced by terracotta. Keep a copy of untouched files and
     // move decks/preferences forward without touching customized themes.
     const oldSerif = join(this.themes, "serif.css");
-    if (this.#isRegularFile(oldSerif) && this.#isRegularFile(join(this.themes, "terracotta.css"))) {
-      const oldSerifBytes = this.#read(oldSerif, "serif.css");
+    if (this.#files.isRegularFile(oldSerif) && this.#files.isRegularFile(join(this.themes, "terracotta.css"))) {
+      const oldSerifBytes = this.#files.read(oldSerif, "serif.css");
       const digest = sha256Bytes(oldSerifBytes);
       const untouched = digest === placed["serif.css"] || (OLD_THEMES["serif.css"]?.has(digest) ?? false);
       if (untouched) {
@@ -328,13 +321,13 @@ export class Workspace {
           .filter((deck) => this.deck_theme(deck) === "serif")
           .map((deck) => {
             const path = this.qmd(deck);
-            const bytes = this.#read(path, "slides.qmd");
+            const bytes = this.#files.read(path, "slides.qmd");
             return { deck, path, bytes, text: decodeUtf8(bytes, "slides.qmd") };
           });
-        this.#write(join(trash, "serif.css"), oldSerifBytes);
+        this.#files.write(join(trash, "serif.css"), oldSerifBytes);
         for (const target of decks) {
-          this.#write(join(trash, "decks", target.deck, "slides.qmd"), target.bytes);
-          this.#write(target.path, set_front(target.text, { theme: "terracotta" }));
+          this.#files.write(join(trash, "decks", target.deck, "slides.qmd"), target.bytes);
+          this.#files.write(target.path, set_front(target.text, { theme: "terracotta" }));
         }
         const prefs = this.prefs();
         const recent = this.#stringList(prefs.recent_themes).map((name) =>
@@ -344,7 +337,7 @@ export class Workspace {
           recent_themes: recent,
           ...(prefs.theme === "serif" ? { theme: "terracotta" } : {}),
         });
-        this.#unlinkOptional(oldSerif);
+        this.#files.unlinkOptional(oldSerif);
         placed["serif.css"] = null;
       }
     }
@@ -357,18 +350,18 @@ export class Workspace {
     this.#refreshThemes();
 
     if (!sameJson(placed, before)) {
-      this.#write(recordPath, sortedJson(placed, 1));
+      this.#files.write(recordPath, sortedJson(placed, 1));
     }
 
-    this.#ensureDirectory(this.runtime, "runtime");
+    this.#files.ensureDirectory(this.runtime, "runtime");
     for (const name of RUNTIME_FILES) {
       const source = join(this.#runtimeAssets, name);
       const destination = join(this.runtime, name);
       const data = readFileSync(source);
       const current = readIfFile(destination);
       if (!current || !current.equals(data)) {
-        if (lstatOrNull(destination)?.isSymbolicLink()) this.#unlinkOptional(destination);
-        this.#write(destination, data);
+        if (lstatOrNull(destination)?.isSymbolicLink()) this.#files.unlinkOptional(destination);
+        this.#files.write(destination, data);
       }
     }
 
@@ -389,7 +382,7 @@ export class Workspace {
       [this.themes, "themes"],
       [this.state, ".slide-studio"],
     ] as const) {
-      this.#ensureDirectory(path, label);
+      this.#files.ensureDirectory(path, label);
     }
   }
 
@@ -397,22 +390,22 @@ export class Workspace {
     const retired = join(this.themes, `${name}.css`);
     const prefs = this.prefs();
     const affected = this.list_decks().filter((deck) => this.deck_theme(deck) === name);
-    const exists = this.#isRegularFile(retired);
+    const exists = this.#files.isRegularFile(retired);
     const recentThemes = this.#stringList(prefs.recent_themes);
     if (exists || affected.length > 0 || prefs.theme === name || recentThemes.includes(name)) {
       const trash = join(this.state, "trash", "themes", timeNs());
-      const retiredBytes = exists ? this.#read(retired, `${name}.css`) : null;
+      const retiredBytes = exists ? this.#files.read(retired, `${name}.css`) : null;
       // Decode before writing the theme or deck backups: a non-UTF-8 qmd must
       // not be replaced with a lossy round-trip.
       const decks = affected.map((deck) => {
         const path = this.qmd(deck);
-        const bytes = this.#read(path, "slides.qmd");
+        const bytes = this.#files.read(path, "slides.qmd");
         return { deck, path, bytes, text: decodeUtf8(bytes, "slides.qmd") };
       });
-      if (retiredBytes) this.#write(join(trash, `${name}.css`), retiredBytes);
+      if (retiredBytes) this.#files.write(join(trash, `${name}.css`), retiredBytes);
       for (const target of decks) {
-        this.#write(join(trash, "decks", target.deck, "slides.qmd"), target.bytes);
-        this.#write(target.path, set_front(target.text, { theme: "default" }));
+        this.#files.write(join(trash, "decks", target.deck, "slides.qmd"), target.bytes);
+        this.#files.write(target.path, set_front(target.text, { theme: "default" }));
       }
       const recent = this.#stringList(prefs.recent_themes).map((value) =>
         value === name ? "default" : value
@@ -421,10 +414,10 @@ export class Workspace {
         recent_themes: recent,
         ...(prefs.theme === name ? { theme: "default" } : {}),
       });
-      if (exists) this.#unlinkOptional(retired);
+      if (exists) this.#files.unlinkOptional(retired);
     }
-    this.#unlinkOptional(join(this.state, "theme-defaults", `${name}.css`));
-    this.#removeTree(join(this.state, "themes", name));
+    this.#files.unlinkOptional(join(this.state, "theme-defaults", `${name}.css`));
+    this.#files.removeTree(join(this.state, "themes", name));
   }
 
   #migrateDefaultDeckStyles(): void {
@@ -432,26 +425,26 @@ export class Workspace {
     for (const deck of this.list_decks()) {
       if (this.deck_theme(deck) !== "default") continue;
       const path = join(this.deck_dir(deck), "styles", "slides.css");
-      const css = this.#isRegularFile(path) ? this.#readText(path, "slides.css") : "";
-      if (!css.includes(legacy.trim())) this.#write(path, `${legacy}\n${css}`);
+      const css = this.#files.isRegularFile(path) ? this.#files.readText(path, "slides.css") : "";
+      if (!css.includes(legacy.trim())) this.#files.write(path, `${legacy}\n${css}`);
     }
   }
 
   #refreshThemes(): void {
     const directory = this.themes;
-    for (const name of this.#listEntries(directory)
+    for (const name of this.#files.listEntries(directory)
       .filter((item) => item.name.endsWith(".css"))
       .map((item) => item.name)
       .sort()) {
       const path = join(directory, name);
-      if (!this.#isRegularFile(path)) continue;
-      const bytes = this.#read(path, name);
+      if (!this.#files.isRegularFile(path)) continue;
+      const bytes = this.#files.read(path, name);
       const css = decodeUtf8(bytes, name);
       let updated = drop_cover_layout(refresh_heading_options(css, this.#themeVariables));
       if (this.#themeVariables.every((variable) => theme_variables(css).includes(variable))) {
         const repainted = with_current_palette(updated, read_vars(css, this.#themeVariables));
         if (repainted !== updated) {
-          this.#write(join(this.state, "trash", "themes", timeNs(), name), bytes);
+          this.#files.write(join(this.state, "trash", "themes", timeNs(), name), bytes);
           updated = repainted;
         }
       }
@@ -460,7 +453,7 @@ export class Workspace {
       if (
         OVERRIDE_RE.test(css)
         && colors["--header"] === colors["--paper"]
-        && this.#isRegularFile(original)
+        && this.#files.isRegularFile(original)
       ) {
         updated = preserve_title_header(
           updated,
@@ -468,7 +461,7 @@ export class Workspace {
           this.#themeVariables,
         );
       }
-      if (updated !== css) this.#write(path, updated);
+      if (updated !== css) this.#files.write(path, updated);
     }
   }
 
@@ -484,8 +477,8 @@ export class Workspace {
         fix: messages.fix,
       }];
     }
-    if (!this.#isRegularFile(path)) return [];
-    const css = this.#readText(path, "default.css");
+    if (!this.#files.isRegularFile(path)) return [];
+    const css = this.#files.readText(path, "default.css");
     if (this.#themeVariables.every((variable) => theme_variables(css).includes(variable))) return [];
     const messages = themePreparationMessages();
     return [{
@@ -529,9 +522,9 @@ export class Workspace {
   // ------------------------------------------------------------ 発表
   list_decks(): string[] {
     const directory = this.decks;
-    if (!this.#isDirectory(directory)) return [];
+    if (!this.#files.isDirectory(directory)) return [];
     const output: string[] = [];
-    for (const entry of this.#listEntries(directory)) {
+    for (const entry of this.#files.listEntries(directory)) {
       if (entry.name.startsWith("_") || entry.name.startsWith(".")) continue;
       try {
         checkLookupName(entry.name, "発表名");
@@ -591,7 +584,7 @@ export class Workspace {
   }
 
   deck_meta(deck: string): Record<string, unknown> {
-    return parse(this.#readText(this.qmd(deck), "slides.qmd")).meta;
+    return parse(this.#files.readText(this.qmd(deck), "slides.qmd")).meta;
   }
 
   deck_shelf(deck: string): string {
@@ -609,12 +602,11 @@ export class Workspace {
   }
 
   deck_theme(deck: string): string {
-    const theme = this.deck_meta(deck).theme;
-    return pyTruthy(theme) ? pyStr(theme) : "default";
+    return themeName(this.deck_meta(deck).theme);
   }
 
   is_blank(deck: string): boolean {
-    const text = normalizeForCompare(this.#readText(this.qmd(deck), "slides.qmd"));
+    const text = normalizeForCompare(this.#files.readText(this.qmd(deck), "slides.qmd"));
     const document = parse(text);
     if (document.pages.length === 0) return true;
     const meta = document.meta;
@@ -630,9 +622,9 @@ export class Workspace {
   is_untouched(deck: string): boolean {
     if (!this.is_blank(deck)) return false;
     const memo = this.memo(deck);
-    if (existsNoFollow(memo) && !this.#isRegularFile(memo)) return false;
-    if (!this.#isRegularFile(memo)) return true;
-    const current = normalizeForCompare(this.#readText(memo, "memo.md"));
+    if (existsNoFollow(memo) && !this.#files.isRegularFile(memo)) return false;
+    if (!this.#files.isRegularFile(memo)) return true;
+    const current = normalizeForCompare(this.#files.readText(memo, "memo.md"));
     const template = normalizeForCompare(
       readFileSync(join(this.#templates, "deck", "memo.md"), "utf8"),
     );
@@ -656,11 +648,11 @@ export class Workspace {
     if (existsNoFollow(destination)) throw new StudioError(`既にあります: ${destination}`);
 
     const themePath = join(this.themes, `${theme}.css`);
-    if (!this.#isRegularFile(themePath)) {
+    if (!this.#files.isRegularFile(themePath)) {
       throw new StudioError(`テーマがありません: themes/${theme}.css`);
     }
 
-    this.#ensureDirectory(this.decks, "decks");
+    this.#files.ensureDirectory(this.decks, "decks");
 
     // The topic folders are part of the same user-visible commit as the deck.
     // Create them before copying so `images_dir(deck)` does not need the deck
@@ -680,10 +672,10 @@ export class Workspace {
       }
     }
     try {
-      this.#ensureDirectory(topicHtml, "topic html");
-      this.#ensureDirectory(topicImages, "topic images");
+      this.#files.ensureDirectory(topicHtml, "topic html");
+      this.#files.ensureDirectory(topicImages, "topic images");
     } catch (error) {
-      this.#cleanupCreated(createdTopicPaths);
+      this.#files.cleanupCreated(createdTopicPaths);
       throw error;
     }
 
@@ -706,25 +698,25 @@ export class Workspace {
             ...(sameDirectory ? ["materials"] : []),
           ];
         };
-        this.#copyTree(source, temporary, { ignore });
+        this.#files.copyTree(source, temporary, { ignore });
         const qmd = join(temporary, "slides.qmd");
         const sourceBib = this.bib(source_deck);
-        if (shelf !== this.deck_shelf(source_deck) && this.#isRegularFile(sourceBib)) {
-          this.#write(join(temporary, "reference.bib"), this.#read(sourceBib, "reference.bib"));
+        if (shelf !== this.deck_shelf(source_deck) && this.#files.isRegularFile(sourceBib)) {
+          this.#files.write(join(temporary, "reference.bib"), this.#files.read(sourceBib, "reference.bib"));
         }
         let text = copy_topic_assets(
           this,
           source_deck,
           deck,
           shelf,
-          this.#readText(qmd, "slides.qmd"),
+          this.#files.readText(qmd, "slides.qmd"),
           created,
         );
         text = set_front(text, { topic: shelf, theme });
         if (title) text = set_front(text, { title: JSON.stringify(title) });
-        this.#write(qmd, text);
+        this.#files.write(qmd, text);
       } else {
-        this.#copyTree(join(this.#templates, "deck"), temporary, {
+        this.#files.copyTree(join(this.#templates, "deck"), temporary, {
           ignore: (_directory, names) => names.filter((name) => name === ".DS_Store"),
         });
         let text = template === "tutorial"
@@ -741,23 +733,23 @@ export class Workspace {
           const assets = join(this.#templates, "tutorial-assets");
           const imagePath = join(topicImages, image), figurePath = join(topicHtml, figure);
           created.push(imagePath, figurePath);
-          this.#write(imagePath, readFileSync(join(assets, "workflow.svg")));
-          this.#copyTree(join(assets, "html"), figurePath);
-          this.#write(join(figurePath, "index.html"), readFileSync(join(this.#templates, "figure", "index.html"), "utf8")
+          this.#files.write(imagePath, readFileSync(join(assets, "workflow.svg")));
+          this.#files.copyTree(join(assets, "html"), figurePath);
+          this.#files.write(join(figurePath, "index.html"), readFileSync(join(this.#templates, "figure", "index.html"), "utf8")
             .replaceAll("{{RUNTIME}}", runtime_rel(figurePath, this)).replaceAll("{{STYLE}}", ""));
-          this.#write(join(temporary, "materials", "発表づくりのメモ.txt"), readFileSync(join(assets, "reference.txt")));
+          this.#files.write(join(temporary, "materials", "発表づくりのメモ.txt"), readFileSync(join(assets, "reference.txt")));
           text = text.replaceAll("{{IMAGE}}", image).replaceAll("{{FIGURE}}", figure).replaceAll("{{TOPIC}}", shelf);
         }
-        this.#write(join(temporary, "slides.qmd"), text);
+        this.#files.write(join(temporary, "slides.qmd"), text);
       }
       renameWithRetry(temporary, destination);
     } catch (error) {
       try {
-        this.#removeTree(temporary);
+        this.#files.removeTree(temporary);
       } catch {
         // Keep the original copy/rename failure visible.
       }
-      this.#cleanupCreated(created);
+      this.#files.cleanupCreated(created);
       throw error;
     }
 
@@ -769,13 +761,13 @@ export class Workspace {
       // a user's existing records are never rewritten.
       try {
         const target = join(this.topic_dir(shelf), "reference.bib");
-        const current = this.#isRegularFile(target) ? this.#readTextStrict(target, "reference.bib") : "";
+        const current = this.#files.isRegularFile(target) ? this.#files.readTextStrict(target, "reference.bib") : "";
         const have = new Set([...current.matchAll(/@\w+\s*\{\s*([^,\s]+)/gu)].map((m) => m[1]));
         const sample = readFileSync(join(this.#templates, "tutorial-assets", "reference.bib"), "utf8");
         const missing = sample.split(/\n(?=@)/u).map((entry) => entry.trim())
           .filter((entry) => { const key = /^@\w+\s*\{\s*([^,\s]+)/u.exec(entry)?.[1]; return key && !have.has(key); });
         if (missing.length) {
-          this.#write(target, `${current.trimEnd()}${current.trim() ? "\n\n" : ""}${missing.join("\n\n")}\n`);
+          this.#files.write(target, `${current.trimEnd()}${current.trim() ? "\n\n" : ""}${missing.join("\n\n")}\n`);
         }
       } catch (error) {
         warnings.push(`サンプルの文献: ${error instanceof Error ? error.message : String(error)}`);
@@ -831,7 +823,7 @@ export class Workspace {
             ? pyStr(meta.pagetitle)
             : deck,
         shelf: pyTruthy(meta.topic) ? pyStr(meta.topic) : "",
-        theme: pyTruthy(meta.theme) ? pyStr(meta.theme) : "",
+        theme: themeName(meta.theme),
         modified: statValue.mtimeMs / 1000,
       });
     }
@@ -847,7 +839,7 @@ export class Workspace {
     let items = readJsonArray(this.recent_file).filter((item) => item.deck !== deck);
     items.unshift({ deck, opened: Date.now() / 1000 });
     items = items.slice(0, 50);
-    this.#write(this.recent_file, JSON.stringify(items, null, 1));
+    this.#files.write(this.recent_file, JSON.stringify(items, null, 1));
   }
 
   prefs(): Record<string, unknown> {
@@ -859,17 +851,17 @@ export class Workspace {
     for (const [key, value] of Object.entries(values)) {
       if (value !== null && value !== undefined) prefs[key] = value;
     }
-    this.#write(join(this.state, "prefs.json"), JSON.stringify(prefs, null, 1));
+    this.#files.write(join(this.state, "prefs.json"), JSON.stringify(prefs, null, 1));
   }
 
   // ------------------------------------------------------------ 棚と図
   shelves(): string[] {
-    if (!this.#isDirectory(this.topics)) return [];
+    if (!this.#files.isDirectory(this.topics)) return [];
     const output: string[] = [];
-    for (const entry of this.#listEntries(this.topics)) {
+    for (const entry of this.#files.listEntries(this.topics)) {
       if (entry.name.startsWith(".") || entry.name.startsWith("_")) continue;
       const path = join(this.topics, entry.name);
-      if (!this.#entryIsDirectory(path)) continue;
+      if (!this.#files.entryIsDirectory(path)) continue;
       output.push(entry.name);
     }
     return output.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
@@ -881,7 +873,7 @@ export class Workspace {
     if (existsNoFollow(destination)) {
       throw new StudioError(`同じ名前のトピックがあります: ${shelf}`);
     }
-    this.#ensureDirectory(destination, "topic");
+    this.#files.ensureDirectory(destination, "topic");
     return destination;
   }
 
@@ -892,11 +884,11 @@ export class Workspace {
       throw new StudioError("topicMissing", "NOT_FOUND");
     }
     const real = realpathSync.native(base);
-    const topicsReal = this.#isDirectory(this.topics) ? realpathSync.native(this.topics) : this.topics;
+    const topicsReal = this.#files.isDirectory(this.topics) ? realpathSync.native(this.topics) : this.topics;
     if (dirname(real) !== topicsReal) throw new StudioError("topicMissing", "NOT_FOUND");
 
     for (const deck of this.list_decks()) {
-      const text = this.#readText(this.qmd(deck), "slides.qmd");
+      const text = this.#files.readText(this.qmd(deck), "slides.qmd");
       const topic = parse(text).meta.topic;
       const metaTopic = pyTruthy(topic) ? pyStr(topic) : "";
       const figurePattern = new RegExp(`\\{\\{<\\s*fig\\s+["']?${escapeRegExp(shelf)}/`, "u");
@@ -906,7 +898,7 @@ export class Workspace {
     }
 
     const trash = join(this.state, "trash", "topics", `${shelf}-${timeNs()}`);
-    this.#renameWithinRoot(base, trash);
+    this.#files.renameWithinRoot(base, trash);
     return trash;
   }
 
@@ -916,7 +908,7 @@ export class Workspace {
     if (!link) return true;
     if (link.isSymbolicLink() || !link.isDirectory()) return false;
     const hasFile = (directory: string): boolean => {
-      for (const entry of this.#listEntries(directory)) {
+      for (const entry of this.#files.listEntries(directory)) {
         const path = join(directory, entry.name);
         if (entry.isSymbolicLink()) {
           if (entry.name !== ".DS_Store") return true;
@@ -933,7 +925,7 @@ export class Workspace {
 
   themes_list(): string[] {
     const output: string[] = [];
-    for (const entry of this.#listEntries(this.themes)) {
+    for (const entry of this.#files.listEntries(this.themes)) {
       if (entry.name.startsWith("_") || !entry.name.endsWith(".css")) continue;
       if (!entry.isFile() && !entry.isSymbolicLink()) continue;
       output.push(entry.name.slice(0, -4));
@@ -959,14 +951,14 @@ export class Workspace {
     if (existsNoFollow(join(this.themes, `${name}.css`))) {
       throw new StudioError("同じ名前のテーマがあります");
     }
-    this.#write(join(this.state, "theme-defaults", `${name}.css`), css);
-    this.#write(join(this.themes, `${name}.css`), css);
+    this.#files.write(join(this.state, "theme-defaults", `${name}.css`), css);
+    this.#files.write(join(this.themes, `${name}.css`), css);
   }
 
   remove_theme(name: string): string {
     check_name(name, "テーマ");
     const path = join(this.themes, `${name}.css`);
-    if (!this.#isRegularFile(path)) throw new StudioError("テーマがありません", "NOT_FOUND");
+    if (!this.#files.isRegularFile(path)) throw new StudioError("テーマがありません", "NOT_FOUND");
     if (name === "default") throw new StudioError("default のテーマは削除できません");
 
     const using = this.list_decks().filter((deck) => this.deck_theme(deck) === name);
@@ -975,17 +967,17 @@ export class Workspace {
     }
 
     const trash = join(this.state, "trash", "themes", timeNs());
-    this.#renameWithinRoot(path, join(trash, `${name}.css`));
+    this.#files.renameWithinRoot(path, join(trash, `${name}.css`));
     const defaults = join(this.state, "theme-defaults", `${name}.css`);
-    if (this.#isRegularFile(defaults)) this.#renameWithinRoot(defaults, join(trash, "defaults", `${name}.css`));
+    if (this.#files.isRegularFile(defaults)) this.#files.renameWithinRoot(defaults, join(trash, "defaults", `${name}.css`));
     const previews = join(this.state, "themes", name);
-    if (this.#isDirectory(previews)) this.#renameWithinRoot(previews, join(trash, "previews", name));
+    if (this.#files.isDirectory(previews)) this.#files.renameWithinRoot(previews, join(trash, "previews", name));
 
     const bundled = join(this.#templates, "themes", `${name}.css`);
-    if (this.#isRegularFile(bundled)) {
+    if (this.#files.isRegularFile(bundled)) {
       const record = join(this.state, "bundled-themes.json");
       const placed = readJsonObject(record) as Record<string, string | null>;
-      this.#write(record, sortedJson({ ...placed, [`${name}.css`]: null }, 1));
+      this.#files.write(record, sortedJson({ ...placed, [`${name}.css`]: null }, 1));
     }
 
     const prefs = this.prefs();
@@ -1024,15 +1016,15 @@ export class Workspace {
     const selected = deck ? this.deck_shelf(deck) : shelf;
     if (!selected) return [];
     const base = this.shelf_dir(selected);
-    if (!this.#isDirectory(base)) return [];
+    if (!this.#files.isDirectory(base)) return [];
     const output: Array<Record<string, unknown>> = [];
-    const entries = this.#listEntries(base).sort((left, right) =>
+    const entries = this.#files.listEntries(base).sort((left, right) =>
       left.name < right.name ? -1 : left.name > right.name ? 1 : 0
     );
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name.startsWith("_")) continue;
       const directory = join(base, entry.name);
-      if (!this.#isRegularFile(join(directory, "figure.mjs"))) continue;
+      if (!this.#files.isRegularFile(join(directory, "figure.mjs"))) continue;
       output.push({
         name: entry.name,
         ref: `${selected}/${entry.name}`,
@@ -1047,7 +1039,7 @@ export class Workspace {
   decks_using(ref: string): string[] {
     const output: string[] = [];
     for (const deck of this.list_decks()) {
-      const text = this.#readText(this.qmd(deck), "slides.qmd");
+      const text = this.#files.readText(this.qmd(deck), "slides.qmd");
       for (const match of text.matchAll(/\{\{<\s*fig\s+(\S+)/gu)) {
         if ((match[1] ?? "").replace(/^"+|"+$/gu, "") === ref) {
           output.push(deck);
@@ -1071,300 +1063,8 @@ export class Workspace {
     return checkLookupName(deck, "発表名");
   }
 
-  #assertLexicalInside(path: string, label: string): void {
-    const target = resolve(path);
-    if (!isInsideRoot(this.root, target)) {
-      throw new StudioError(`refusing to access outside the workspace root: ${label}`, "OUTSIDE_ROOT");
-    }
-  }
-
-  #nearestExisting(path: string): string {
-    let current = path;
-    while (!existsNoFollow(current)) {
-      const parent = dirname(current);
-      if (parent === current) break;
-      current = parent;
-    }
-    return current;
-  }
-
-  #assertParentRealInside(path: string, label: string): void {
-    const parent = this.#nearestExisting(dirname(path));
-    const real = realpathSync.native(parent);
-    assertInsideRoot(this.root, real, label);
-  }
-
-  #ensureDirectory(path: string, label: string): string {
-    this.#assertLexicalInside(path, label);
-    if (resolve(path) === this.root) {
-      if (!existsNoFollow(this.root)) mkdirSync(this.root, { recursive: true });
-      const rootLink = lstatOrNull(this.root);
-      if (!rootLink || rootLink.isSymbolicLink() || !rootLink.isDirectory()) {
-        throw new StudioError("workspace root is not a directory");
-      }
-      return this.root;
-    }
-    const link = lstatOrNull(path);
-    if (link) {
-      if (link.isSymbolicLink()) {
-        throw new StudioError(`${label} may not be a symbolic link`, "OUTSIDE_ROOT");
-      }
-      if (!link.isDirectory()) throw new StudioError(`${label} is not a directory`);
-      const real = realpathSync.native(path);
-      assertInsideRoot(this.root, real, label);
-      return real;
-    }
-    const parent = dirname(path);
-    if (parent !== path) this.#ensureDirectory(parent, `${label} parent`);
-    try {
-      mkdirSync(path);
-    } catch (error) {
-      if (!isNodeError(error) || error.code !== "EEXIST") {
-        throw new StudioError(`cannot create ${label}: ${String(error)}`);
-      }
-    }
-    return this.#ensureDirectory(path, label);
-  }
-
-  #entryIsDirectory(path: string): boolean {
-    const link = lstatOrNull(path);
-    if (!link) return false;
-    if (link.isSymbolicLink()) {
-      try {
-        const real = realpathSync.native(path);
-        return isInsideRoot(this.root, real) && statSync(real).isDirectory();
-      } catch {
-        return false;
-      }
-    }
-    return link.isDirectory();
-  }
-
-  #isDirectory(path: string): boolean {
-    const link = lstatOrNull(path);
-    return Boolean(link && !link.isSymbolicLink() && link.isDirectory());
-  }
-
-  #isRegularFile(path: string): boolean {
-    const link = lstatOrNull(path);
-    if (!link || link.isSymbolicLink() || !link.isFile()) return false;
-    const real = realpathSync.native(path);
-    return isInsideRoot(this.root, real) || !isInsideRoot(this.root, resolve(path));
-  }
-
-  #read(path: string, label: string): Buffer {
-    const link = lstatOrNull(path);
-    if (!link) throw new StudioError(`${label} がありません`, "NOT_FOUND");
-    if (link.isSymbolicLink()) {
-      let target: string;
-      try {
-        target = realpathSync.native(path);
-      } catch {
-        throw new StudioError(`${label} がありません`, "NOT_FOUND");
-      }
-      assertInsideRoot(this.root, target, label);
-      if (!statSync(target).isFile()) throw new StudioError(`${label} is not a file`, "NOT_FOUND");
-      return readFileSync(target);
-    }
-    if (!link.isFile()) throw new StudioError(`${label} is not a file`, "NOT_FOUND");
-    const real = realpathSync.native(path);
-    assertInsideRoot(this.root, real, label);
-    return readFileSync(real);
-  }
-
-  #readText(path: string, label: string): string {
-    return this.#read(path, label).toString("utf8");
-  }
-
-  #readTextStrict(path: string, label: string): string {
-    return decodeUtf8(this.#read(path, label), label);
-  }
-
-  #write(path: string, data: string | Uint8Array, mode?: number): void {
-    this.#ensureDirectory(dirname(path), `folder for ${basename(path)}`);
-    const link = lstatOrNull(path);
-    if (link?.isSymbolicLink()) {
-      throw new StudioError(`${basename(path)} may not be a symbolic link`);
-    }
-    if (link && !link.isFile()) throw new StudioError(`${basename(path)} is not a file`);
-    try {
-      atomicWrite(path, data, mode ?? (link?.isFile() ? link.mode & 0o777 : undefined));
-    } catch (error) {
-      if (isReadOnlyError(error)) {
-        throw new StudioError(
-          `${basename(path)} は読み取り専用のため書き換えられません（元のファイルは残しています）`,
-          "READ_ONLY",
-        );
-      }
-      throw error;
-    }
-  }
-
-  #unlinkOptional(path: string): void {
-    const link = lstatOrNull(path);
-    if (!link || link.isDirectory()) return;
-    const realParent = realpathSync.native(dirname(path));
-    assertInsideRoot(this.root, realParent, basename(path));
-    try {
-      unlinkSync(join(realParent, basename(path)));
-    } catch (error) {
-      if (isReadOnlyError(error)) {
-        throw new StudioError(
-          `${basename(path)} は読み取り専用のため削除できません（元のファイルは残しています）`,
-          "READ_ONLY",
-        );
-      }
-      throw error;
-    }
-  }
-
-  #removeTree(path: string): void {
-    this.#assertLexicalInside(path, basename(path));
-    if (!existsNoFollow(dirname(path))) return;
-    const realParent = realpathSync.native(dirname(path));
-    assertInsideRoot(this.root, realParent, basename(path));
-    const target = join(realParent, basename(path));
-    const link = lstatOrNull(target);
-    if (!link) return;
-    if (link.isSymbolicLink()) {
-      unlinkSync(target);
-      return;
-    }
-    if (!link.isDirectory()) {
-      unlinkSync(target);
-      return;
-    }
-    rmSync(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
-  }
-
-  #cleanupCreated(paths: Iterable<string>): void {
-    const unique = [...new Set(paths)].sort((left, right) => {
-      const depth = right.split(sep).length - left.split(sep).length;
-      return depth !== 0 ? depth : (left < right ? 1 : left > right ? -1 : 0);
-    });
-    for (const path of unique) {
-      if (resolve(path) === this.root) continue;
-      try {
-        this.#removeTree(path);
-      } catch {
-        // Best-effort rollback; never hide the original failure.
-      }
-    }
-  }
-
-  #renameWithinRoot(from: string, to: string): void {
-    const fromParent = realpathSync.native(dirname(from));
-    assertInsideRoot(this.root, fromParent, basename(from));
-    this.#ensureDirectory(dirname(to), "trash");
-    const toParent = realpathSync.native(dirname(to));
-    assertInsideRoot(this.root, toParent, basename(to));
-    try {
-      renameWithRetry(join(fromParent, basename(from)), join(toParent, basename(to)));
-    } catch (error) {
-      if (isReadOnlyError(error)) {
-        throw new StudioError(
-          `${basename(from)} は読み取り専用のため移動できません（元のファイルは残しています）`,
-          "READ_ONLY",
-        );
-      }
-      throw error;
-    }
-  }
-
-  #listEntries(directory: string): Dirent[] {
-    try {
-      return readdirSync(directory, { withFileTypes: true });
-    } catch (error) {
-      if (isNodeError(error) && (error.code === "ENOENT" || error.code === "ENOTDIR")) return [];
-      throw error;
-    }
-  }
-
-  #listFiles(directory: string): string[] {
-    return this.#listEntries(directory)
-      .filter((entry) => entry.isFile())
-      .map((entry) => entry.name);
-  }
-
-  #walkEntries(directory: string, prefix = ""): Array<[string, Dirent]> {
-    const output: Array<[string, Dirent]> = [];
-    for (const entry of this.#listEntries(directory)) {
-      if (entry.isSymbolicLink()) continue;
-      const path = join(directory, entry.name);
-      output.push([path, entry]);
-      if (entry.isDirectory()) output.push(...this.#walkEntries(path, prefix));
-    }
-    return output;
-  }
-
   #stringList(value: unknown): string[] {
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-  }
-
-  #copyTree(
-    source: string,
-    destination: string,
-    options: CopyOptions = {},
-    visited: Set<string> = new Set(),
-  ): void {
-    const sourceLink = lstatOrNull(source);
-    if (!sourceLink) throw new StudioError(`コピー元がありません: ${source}`);
-    if (sourceLink.isSymbolicLink()) {
-      const real = realpathSync.native(source);
-      assertInsideRoot(this.root, real, relative(this.root, source));
-      if (visited.has(real)) {
-        throw new StudioError(`シンボリックリンクが循環しています: ${source}`, "CONFLICT");
-      }
-      const statValue = statSync(real);
-      if (statValue.isDirectory()) {
-        this.#copyTree(real, destination, options, new Set([...visited, real]));
-        return;
-      }
-      if (statValue.isFile()) {
-        this.#write(destination, readFileSync(real), statValue.mode & 0o777);
-        return;
-      }
-      throw new StudioError(`コピーできない種類のファイルです: ${source}`, "CONFLICT");
-    }
-
-    this.#ensureDirectory(destination, basename(destination));
-    const entries = this.#listEntries(source);
-    // Python's copytree passes every name to the ignore callback, including
-    // symlinks. Filtering them out would follow a linked materials/ or PDF.
-    const names = entries.map((entry) => entry.name).sort();
-    const ignored = new Set(options.ignore?.(source, names) ?? []);
-    for (const entry of entries) {
-      if (ignored.has(entry.name)) continue;
-      const from = join(source, entry.name);
-      const to = join(destination, entry.name);
-      const link = lstatSync(from);
-      if (link.isSymbolicLink()) {
-        const real = realpathSync.native(from);
-        if (!isInsideRoot(this.root, real)) {
-          throw new StudioError(
-            `ワークスペースの外を指すリンクはコピーできません: ${relative(this.root, from)}`,
-            "OUTSIDE_ROOT",
-          );
-        }
-        if (visited.has(real)) {
-          throw new StudioError(`シンボリックリンクが循環しています: ${relative(this.root, from)}`, "CONFLICT");
-        }
-        const statValue = statSync(real);
-        if (statValue.isDirectory()) {
-          this.#copyTree(real, to, options, new Set([...visited, real]));
-        } else if (statValue.isFile()) {
-          this.#write(to, readFileSync(real), statValue.mode & 0o777);
-        } else {
-          throw new StudioError(`コピーできない種類のファイルです: ${relative(this.root, from)}`, "CONFLICT");
-        }
-      } else if (link.isDirectory()) {
-        this.#copyTree(from, to, options, visited);
-      } else if (link.isFile()) {
-        this.#write(to, readFileSync(from), link.mode & 0o777);
-      } else {
-        throw new StudioError(`コピーできない種類のファイルです: ${relative(this.root, from)}`, "CONFLICT");
-      }
-    }
   }
 
   #migrateTopics(): void {
@@ -1382,21 +1082,21 @@ export class Workspace {
       let merged: string;
       try {
         merged = mergeBibtexTexts([
-          this.#isRegularFile(target) ? this.#readTextStrict(target, "reference.bib") : "",
-          ...old.map((path) => this.#readTextStrict(path, "reference.bib")),
+          this.#files.isRegularFile(target) ? this.#files.readTextStrict(target, "reference.bib") : "",
+          ...old.map((path) => this.#files.readTextStrict(path, "reference.bib")),
         ]);
       } catch {
         // A conflict or unreadable BibTeX must never delete the local file.
         continue;
       }
-      if (old.length > 0 || !this.#isRegularFile(target)) {
-        if (this.#isRegularFile(target)) {
+      if (old.length > 0 || !this.#files.isRegularFile(target)) {
+        if (this.#files.isRegularFile(target)) {
           this.#backupToTrash(
             `bib-${timeNs()}/topics/${basename(dirname(target))}/${basename(target)}`,
-            this.#read(target, "reference.bib"),
+            this.#files.read(target, "reference.bib"),
           );
         }
-        this.#write(target, merged);
+        this.#files.write(target, merged);
       }
       for (const path of old) {
         const destination = join(
@@ -1406,7 +1106,7 @@ export class Workspace {
           basename(dirname(path)),
           basename(path),
         );
-        this.#renameWithinRoot(path, destination);
+        this.#files.renameWithinRoot(path, destination);
       }
     }
   }
@@ -1421,10 +1121,10 @@ export class Workspace {
         continue;
       }
       if (dirname(target) === this.state) continue;
-      if (existsNoFollow(target) && !this.#isRegularFile(target)) continue;
+      if (existsNoFollow(target) && !this.#files.isRegularFile(target)) continue;
       if (!groups.has(target)) groups.set(target, []);
       const old = join(this.deck_dir(deck), "reference.bib");
-      if (this.#isRegularFile(old)) groups.get(target)!.push(old);
+      if (this.#files.isRegularFile(old)) groups.get(target)!.push(old);
     }
     return [...groups.entries()];
   }
@@ -1434,8 +1134,8 @@ export class Workspace {
     for (const [target, old] of this.#bibliographyPlans()) {
       try {
         mergeBibtexTexts([
-          this.#isRegularFile(target) ? this.#readTextStrict(target, "reference.bib") : "",
-          ...old.map((path) => this.#readTextStrict(path, "reference.bib")),
+          this.#files.isRegularFile(target) ? this.#files.readTextStrict(target, "reference.bib") : "",
+          ...old.map((path) => this.#files.readTextStrict(path, "reference.bib")),
         ]);
       } catch (error) {
         errors.push(
@@ -1452,12 +1152,12 @@ export class Workspace {
     // This writer owns agent-files.json and its version stamp, including the
     // native CLI guidance shipped in the Electron templates.
     const templateDirectory = join(this.#templates, "workspace");
-    if (!this.#isDirectory(templateDirectory)) return;
+    if (!this.#files.isDirectory(templateDirectory)) return;
     const stamp = join(this.state, "agent-files.json");
     const known = readJsonObject(stamp);
     const files = new Map<string, Buffer>();
     const walk = (directory: string, prefix: string): void => {
-      for (const entry of this.#listEntries(directory).sort((left, right) =>
+      for (const entry of this.#files.listEntries(directory).sort((left, right) =>
         left.name < right.name ? -1 : left.name > right.name ? 1 : 0
       )) {
         if (entry.isSymbolicLink()) continue;
@@ -1473,7 +1173,7 @@ export class Workspace {
       const destination = this.#relativeToRoot(relativePath);
       if (!destination) continue;
       try {
-        this.#assertParentRealInside(destination, relativePath);
+        this.#files.assertParentRealInside(destination, relativePath);
       } catch {
         delete known[relativePath];
         continue;
@@ -1502,7 +1202,7 @@ export class Workspace {
           readFileSync(destination),
         );
       }
-      this.#write(destination, data);
+      this.#files.write(destination, data);
       known[relativePath] = digest;
     }
 
@@ -1515,14 +1215,14 @@ export class Workspace {
       const destination = this.#relativeToRoot(relativePath);
       if (!destination) continue;
       try {
-        this.#assertParentRealInside(destination, relativePath);
+        this.#files.assertParentRealInside(destination, relativePath);
       } catch {
         continue;
       }
       const link = lstatOrNull(destination);
       if (!link || link.isSymbolicLink() || !link.isFile()) continue;
       if (sha256Bytes(readFileSync(destination)) !== digest) continue;
-      this.#unlinkOptional(destination);
+      this.#files.unlinkOptional(destination);
       let parent = dirname(destination);
       while (parent !== this.root) {
         const parentLink = lstatOrNull(parent);
@@ -1548,7 +1248,7 @@ export class Workspace {
     const claudeLink = lstatOrNull(claude);
     let agentsSafe = true;
     try {
-      this.#assertParentRealInside(join(this.root, ".agents", "skills", ".probe"), ".agents");
+      this.#files.assertParentRealInside(join(this.root, ".agents", "skills", ".probe"), ".agents");
     } catch {
       agentsSafe = false;
     }
@@ -1556,7 +1256,7 @@ export class Workspace {
     try {
       // `.claude` itself may be a symlink even when the `skills` child is not
       // itself a link. Probe the parent chain the same way as `.agents`.
-      this.#assertParentRealInside(join(links, ".probe"), ".claude/skills");
+      this.#files.assertParentRealInside(join(links, ".probe"), ".claude/skills");
     } catch {
       linksSafe = false;
     }
@@ -1571,13 +1271,13 @@ export class Workspace {
       // Never create or clean links through a symlinked `.claude/skills` or
       // `.agents` directory.
       known["_version"] = this.#version;
-      this.#write(stamp, JSON.stringify(known, null, 1));
+      this.#files.write(stamp, JSON.stringify(known, null, 1));
       return;
     }
     for (const name of [...skills].sort()) {
       const link = join(links, name);
       if (existsNoFollow(link)) continue;
-      this.#ensureDirectory(links, "skill links");
+      this.#files.ensureDirectory(links, "skill links");
       const relativeTarget = `../../.agents/skills/${name}`;
       try {
         symlinkSync(relativeTarget, link, "dir");
@@ -1587,45 +1287,45 @@ export class Workspace {
           try {
             symlinkSync(join(this.root, ".agents", "skills", name), link, "junction");
           } catch {
-            this.#copyTree(join(this.root, ".agents", "skills", name), link);
+            this.#files.copyTree(join(this.root, ".agents", "skills", name), link);
           }
         } else {
-          this.#copyTree(join(this.root, ".agents", "skills", name), link);
+          this.#files.copyTree(join(this.root, ".agents", "skills", name), link);
         }
       }
     }
-    if (this.#isDirectory(links)) {
-      for (const entry of this.#listEntries(links)) {
+    if (this.#files.isDirectory(links)) {
+      for (const entry of this.#files.listEntries(links)) {
         const link = join(links, entry.name);
         const statValue = lstatOrNull(link);
         if (!statValue?.isSymbolicLink() || existsSync(link)) continue;
         try {
-          this.#assertParentRealInside(link, entry.name);
+          this.#files.assertParentRealInside(link, entry.name);
           const target = readlinkSync(link).replaceAll("\\", "/");
           const relativeTarget = `../../.agents/skills/${entry.name}`;
           const absoluteTarget = join(this.root, ".agents", "skills", entry.name).replaceAll("\\", "/");
-          if (target === relativeTarget || target === absoluteTarget) this.#unlinkOptional(link);
+          if (target === relativeTarget || target === absoluteTarget) this.#files.unlinkOptional(link);
         } catch {
           // Leave links we cannot inspect alone.
         }
       }
     }
     known["_version"] = this.#version;
-    this.#write(stamp, JSON.stringify(known, null, 1));
+    this.#files.write(stamp, JSON.stringify(known, null, 1));
   }
 
   #backupToTrash(relativePath: string, data: Buffer): void {
     const destination = join(this.state, "trash", relativePath);
-    this.#write(destination, data);
+    this.#files.write(destination, data);
   }
 
   #ensurePortable(): void {
     const compiler = join(this.state, "compiler");
-    this.#ensureDirectory(compiler, "compiler");
+    this.#files.ensureDirectory(compiler, "compiler");
     const bundled = assetPath('portable');
     const stamp = join(this.state,'portable-files.json'), known = readJsonObject(stamp);
     const copy = (directory:string, prefix=''):void => {
-      for (const entry of this.#listEntries(directory)) {
+      for (const entry of this.#files.listEntries(directory)) {
         if (entry.isSymbolicLink()) continue;
         const key = prefix ? `${prefix}/${entry.name}` : entry.name;
         if (entry.isDirectory()) { copy(join(directory,entry.name),key); continue; }
@@ -1633,15 +1333,15 @@ export class Workspace {
         const rel = key === 'build.mjs' ? key : `.slide-studio/${key}`;
         const target = this.#relativeToRoot(rel); if (!target) continue;
         try {
-          this.#assertParentRealInside(target,rel);
+          this.#files.assertParentRealInside(target,rel);
           const current=readIfFile(target),data=readFileSync(join(directory,entry.name));
           if (existsNoFollow(target) && (!current || (!current.equals(data) && known[rel] !== sha256Bytes(current)))) continue;
-          if (!current || !current.equals(data)) this.#write(target,data);
+          if (!current || !current.equals(data)) this.#files.write(target,data);
           known[rel]=sha256Bytes(data);
         } catch { /* Preserve user-owned files and unsafe paths. */ }
       }
     };
-    if (this.#isDirectory(bundled)) { copy(bundled); this.#write(stamp,JSON.stringify(known,null,1)); }
+    if (this.#files.isDirectory(bundled)) { copy(bundled); this.#files.write(stamp,JSON.stringify(known,null,1)); }
     for (const readme of [join(this.root, "README.md"), join(compiler, "README.md")]) {
       const current = readIfFile(readme);
       // A symlink or directory is neither our README nor safe to overwrite.
@@ -1649,7 +1349,7 @@ export class Workspace {
       const untouchedOld = Boolean(current && OLD_PORTABLE_READMES.has(sha256Bytes(current)));
       if (current && !untouchedOld) continue;
       if (current) this.#backupToTrash(`portable/${timeNs()}/${basename(readme)}`, current);
-      this.#write(readme, PORTABLE_README);
+      this.#files.write(readme, PORTABLE_README);
     }
   }
 
@@ -1659,7 +1359,7 @@ export class Workspace {
     if (parts.some((part) => part === "" || part === "." || part === "..")) return null;
     const candidate = join(this.root, ...parts);
     try {
-      this.#assertLexicalInside(candidate, relativePath);
+      this.#files.assertLexicalInside(candidate, relativePath);
     } catch {
       return null;
     }

@@ -1,5 +1,5 @@
 // ホームの AI 準備。チャットと同じ取得・認証 API を使う。
-import { api, esc, toast } from './api.js';
+import { api, esc, onEvent, toast } from './api.js';
 import { S } from './strings.js';
 
 const T = S.ai, R = T.runtime;
@@ -65,7 +65,8 @@ export function homeAi(host) {
     }
   }
 
-  async function refresh(force = false, recheck = false) {
+  // fresh：サーバーが検出し直したばかり（ai-status の通知）なので、版の変化で検出し直さない
+  async function refresh(force = false, recheck = false, fresh = false) {
     clearTimeout(timer);
     const current = ++generation;
     if (!detected || force || recheck) detect(force || recheck);
@@ -81,7 +82,7 @@ export function homeAi(host) {
       for (const [id, state] of logins) acceptState(id, state);
       states = new Map(logins); error = '';
       render();
-      if ((completed || changed) && !force && !recheck) detect(true);
+      if ((completed || changed) && !force && !recheck && !fresh) detect(true);
       if (rows.some(a => a.busy) || logins.some(([, state]) => active(state))) timer = setTimeout(() => refresh(), 1000);
     } catch (e) {
       if (!alive || current !== generation) return;
@@ -118,5 +119,12 @@ export function homeAi(host) {
     }
   }
 
-  return { refresh, act, destroy() { alive = false; clearTimeout(timer); generation++; } };
+  // 自動更新・取得・ログインの完了をサーバーが知らせる。版とモデルの表示を再起動なしで更新する
+  const off = onEvent(ev => {
+    if (!alive || ev.type !== 'ai-status') return;
+    if (ev.ai) { providers = ev.ai.providers; statusError = ''; detected = true; render(); } else detect();
+    refresh(false, false, true);
+  });
+
+  return { refresh, act, destroy() { alive = false; off(); clearTimeout(timer); generation++; } };
 }

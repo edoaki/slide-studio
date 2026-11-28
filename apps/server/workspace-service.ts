@@ -1,5 +1,5 @@
 /**
- * Locked owner for one legacy {@link Workspace}.
+ * Locked owner for one {@link Workspace}.
  *
  * The desktop process must not run `Workspace.ensure()` until the workspace
  * state directory is a real directory inside the canonical root and the
@@ -13,7 +13,7 @@ import { Workspace, type WorkspaceOptions } from "../../packages/core/src/worksp
 import { acquireWorkspaceLock, releaseWorkspaceLock } from "../../packages/core/src/lock.js";
 import { isInsideRoot } from "../../packages/core/src/paths.js";
 
-export interface OpenLegacyWorkspaceOptions extends WorkspaceOptions {
+export interface OpenWorkspaceOptions extends WorkspaceOptions {
   /** Create the trial sample only when the workspace has no decks. */
   sample?: boolean;
 }
@@ -45,10 +45,10 @@ async function directoryAt(path: string, label: string): Promise<boolean> {
  * Open one canonical root, create `.slide-studio` safely, acquire the lock and
  * only then run the legacy workspace ensure migrations.
  */
-export async function openLegacyWorkspace(
+export async function openWorkspace(
   rootInput: string,
-  options: OpenLegacyWorkspaceOptions = {},
-): Promise<LegacyWorkspaceService> {
+  options: OpenWorkspaceOptions = {},
+): Promise<WorkspaceService> {
   if (typeof rootInput !== "string" || !isAbsolute(rootInput)) {
     throw new CoreError("INVALID_INPUT", "workspace root must be an explicit absolute path");
   }
@@ -88,14 +88,14 @@ export async function openLegacyWorkspace(
       // bibliography migration all run exactly as they do for a user deck.
       workspace.new_deck("sample", "sample", "default", null, "サンプル発表", "tutorial");
     }
-    return new LegacyWorkspaceService(workspace, lock.path, lock.token);
+    return new WorkspaceService(workspace, lock.path, lock.token);
   } catch (error) {
     await releaseWorkspaceLock(lock.path, lock.token);
     throw error;
   }
 }
 
-export class LegacyWorkspaceService {
+export class WorkspaceService {
   readonly workspace: Workspace;
   readonly root: string;
   #lockPath: string | undefined;

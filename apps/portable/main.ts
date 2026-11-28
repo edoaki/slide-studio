@@ -11,9 +11,9 @@ import {render_text} from '../../packages/core/src/render.js';
 import {bundleHtml} from '../../packages/core/src/bundle.js';
 import {atomicWriteFile} from '../../packages/core/src/atomic.js';
 import {acquireWorkspaceLock,releaseWorkspaceLock} from '../../packages/core/src/lock.js';
-import {LegacyOutput,output_path} from '../server/output.js';
+import {OutputService,output_path} from '../server/output.js';
 import {sha256} from '../../packages/core/src/encoding.js';
-import type {LegacyInspect} from '../../packages/contracts/src/output.js';
+import type {InspectDocument} from '../../packages/contracts/src/output.js';
 import type {RenderResult} from '../../packages/renderer/src/contracts.js';
 
 export async function main(root:string,args:string[]):Promise<number>{
@@ -24,7 +24,7 @@ export async function main(root:string,args:string[]):Promise<number>{
  const deck=positionals[0];if(!deck||positionals.length!==1)throw Error('発表名を1つ指定してください（--list で一覧）');ws.require_deck(deck);
  const compiler=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
  const pandocPath=process.env.SLIDE_STUDIO_PANDOC||join(compiler,'resources/pandoc/bin',process.platform==='win32'?'pandoc.exe':'pandoc');
- const inspect:LegacyInspect=async(html,options)=>{
+ const inspect:InspectDocument=async(html,options)=>{
   const temporary=await mkdtemp(join(tmpdir(),'studio-portable-'));
   try{
    const inputHtml=join(temporary,'input.html'),outputDir=join(temporary,'output'),job=join(temporary,'job.json');await writeFile(inputHtml,html);await writeFile(job,JSON.stringify({schemaVersion:1,inputHtml,outputDir,timeoutMs:180000,...options}));
@@ -48,7 +48,7 @@ export async function main(root:string,args:string[]):Promise<number>{
    const bundled=bundleHtml(rendered.html,ws.deck_dir(deck),ws.root);
    const path=output_path(ws,deck,'html');await atomicWriteFile(path,bundled.html,0o600);console.log(path);return 0;
   }
-  const output=new LegacyOutput({pandocPath,inspect,broadcast(){}});
+  const output=new OutputService({pandocPath,inspect,broadcast(){}});
   try{
    const response=await output.handle(ws,{method:'POST',pathname:`/api/deck/${encodeURIComponent(deck)}/build`,query:new URLSearchParams(),headers:{},bytes:new Uint8Array(),body:{base:sha256(await readFile(ws.qmd(deck))),force:!!values.force}});
    const body=response?.body as {error?:string;blocked?:boolean;files?:{name:string}[];result?:unknown};

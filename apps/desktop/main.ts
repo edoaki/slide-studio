@@ -1,3 +1,4 @@
+import { recordMainError } from './main-log.js';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, realpathSync, statSync, readFileSync, type Stats } from "node:fs";
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, lstat } from "node:fs/promises";
 import { tmpdir, homedir } from "node:os";
@@ -21,7 +22,7 @@ import type {
   CoreErrorCode,
   PreviewDocument,
 } from "../../packages/contracts/src/desktop.js";
-import type { LegacyExportDocumentInput } from "../server/index.js";
+import type { ExportDocumentInput } from "../server/index.js";
 import { close_pandoc } from "../../packages/core/src/pandoc.js";
 import { render_text } from "../../packages/core/src/render.js";
 import { default_root } from "../../packages/core/src/workspace.js";
@@ -29,23 +30,24 @@ import { argumentsOf, runCommand, throughBridge, earlyCommand } from "../cli/com
 import { prepareLauncher } from "../cli/launcher.js";
 import { atomicWriteFile } from "../../packages/renderer/src/output.js";
 import { atomicWriteFile as privateWrite } from "../../packages/core/src/atomic.js";
+import { RenderWindowPool } from "../../packages/renderer/src/render-window.js";
 import { STUDIO_RENDER_SCHEME } from "../../packages/renderer/src/protocol.js";
 import {
-  startLegacyHost,
-  type LegacyDiagnosticItem,
-  type LegacyHost,
-  type LegacyWorkspace,
+  startStudioHost,
+  type DiagnosticItem,
+  type StudioHost,
+  type HostWorkspace,
 } from "../server/index.js";
 import {
-  openLegacyWorkspace,
-  type LegacyWorkspaceService,
+  openWorkspace,
+  type WorkspaceService,
 } from "../server/workspace-service.js";
 
-import updaterPackage from 'electron-updater';
 import { DesktopUpdates } from './updates.js';
+import { WindowStateStore, placeWindow } from './window-state.js';
+import { projectionPlacement } from './projection-window.js';
 
 let desktopUpdates: DesktopUpdates | undefined;
-let manualUpdateInstall = false;
 
 type ExportFormat = "html" | "pdf";
 
@@ -68,10 +70,12 @@ const MAIN_STRINGS = Object.freeze({
 });
 
 let mainWindow: BrowserWindow | undefined;
-let desktopHost: LegacyHost | undefined;
-let workspaceService: LegacyWorkspaceService | undefined;
-let pendingWorkspaceService: LegacyWorkspaceService | undefined;
-let workspace: LegacyWorkspace | undefined;
+// The presenter's projection window, so the presenter can bring it to front.
+let projectionWindow: BrowserWindow | undefined;
+let desktopHost: StudioHost | undefined;
+let workspaceService: WorkspaceService | undefined;
+let pendingWorkspaceService: WorkspaceService | undefined;
+let workspace: HostWorkspace | undefined;
 let appPath = "";
 let uiDirectory = "";
 let pandocPath = "";
@@ -133,8 +137,23 @@ function installApplicationMenu(): void {
   const command = (name: string) => { void mainWindow?.webContents.executeJavaScript(
     `window.dispatchEvent(new CustomEvent('studio-settings-command', {detail: ${JSON.stringify(name)}}))`
   ).catch(error => console.error('[settings]', error)); };
+  const mac = process.platform === 'darwin';
+  // Navigate through the renderer so unsaved edits are flushed before leaving.
+  const goHome = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    void mainWindow.webContents.executeJavaScript("import('/web/app.js').then(module => module.navigate('/'))", true)
+      .catch(error => console.error('[menu]', error));
+  };
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
+    ...(mac ? [{ role: 'appMenu' as const }] : []),
+    { label: 'ファイル', submenu: [
+      { label: 'ホームに戻る', accelerator: 'CmdOrCtrl+Shift+H', click: goHome },
+      { type: 'separator' },
+      { role: 'close', label: 'ウィンドウを閉じる' },
+      ...(mac ? [] : [{ role: 'quit' as const, label: '終了' }]),
+    ] },
     { role: 'editMenu' },
     { label: '表示', submenu: [
       { label: '設定…', accelerator: 'CmdOrCtrl+,', click: () => command('open') },
@@ -142,6 +161,12 @@ function installApplicationMenu(): void {
       { label: '拡大', accelerator: 'CmdOrCtrl+Plus', click: () => command('in') },
       { label: '縮小', accelerator: 'CmdOrCtrl+-', click: () => command('out') },
       { label: '実際のサイズ', accelerator: 'CmdOrCtrl+0', click: () => command('reset') },
+    ] },
+    { label: 'ウィンドウ', role: 'window', submenu: [
+      { role: 'minimize', label: '最小化' },
+      mac ? { role: 'zoom', label: 'ズーム' }
+        : { label: '最大化', click: (_item, window) => { if (window instanceof BrowserWindow) window.isMaximized() ? window.unmaximize() : window.maximize(); } },
+      ...(mac ? [{ type: 'separator' as const }, { role: 'front' as const, label: 'すべてを手前に移動' }] : []),
     ] },
   ]));
 }
@@ -310,6 +335,41 @@ function installSessionPolicy(): void {
   applySessionPolicy(session.defaultSession);
 }
 
+function isProjectionUrl(url: string): boolean {
+  try { return mainNavigationAllowed(url) && new URL(url).pathname === '/web/projection.html'; } catch { return false; }
+}
+
+/** Brings the open projection window to front. A renderer's `window.focus()` cannot do this reliably. */
+function focusProjectionWindow(): boolean {
+  const target = projectionWindow;
+  if (target === undefined || target.isDestroyed()) return false;
+  if (target.isMinimized()) target.restore();
+  target.show();
+  target.moveTop();
+  target.focus();
+  return true;
+}
+
+/**
+ * A new window takes keyboard focus. The projection window only shows slides,
+ * so leave the keys with the presenter view that opened it: otherwise O and
+ * page numbers would open the overview or the number entry on the projection.
+ * On the same display it is created hidden and shown without focus, so it stays
+ * in front of the presenter view. On another display it goes full screen after
+ * it is shown, so give the focus back then as well.
+ */
+function keepPresenterFocused(owner: BrowserWindow, projection: BrowserWindow, fullscreen: boolean): void {
+  if (!fullscreen) { projection.showInactive(); return; }
+  const giveBack = () => {
+    if (owner.isDestroyed() || projection.isDestroyed()) return;
+    owner.focus();
+    owner.webContents.focus();
+  };
+  giveBack();
+  projection.once('ready-to-show', giveBack);
+  if (fullscreen) projection.once('enter-full-screen', giveBack);
+}
+
 function installWindowPolicy(window: BrowserWindow): void {
   const contents = window.webContents;
   let completingClose = false;
@@ -336,20 +396,25 @@ function installWindowPolicy(window: BrowserWindow): void {
     leaveAfterSave(() => { completingClose = true; window.close(); });
   });
   contents.setWindowOpenHandler(({ url }) => {
-    if (window === mainWindow && mainNavigationAllowed(url) && new URL(url).pathname === '/web/projection.html') {
-      const area = screen.getDisplayMatching(window.getBounds()).workArea;
-      const width = Math.floor(area.width / 2), height = Math.floor(area.height / 2);
+    if (window === mainWindow && isProjectionUrl(url)) {
+      // With an external display, open full screen there; otherwise a quarter of this display.
+      // On this display it opens hidden and keepPresenterFocused shows it without taking the keys.
+      const { bounds, external } = projectionPlacement(screen.getAllDisplays(), screen.getDisplayMatching(window.getBounds()));
       return { action: 'allow', overrideBrowserWindowOptions: {
-        x:area.x + area.width - width, y:area.y + area.height - height,
-        width, height, title:'投影用スライド',
+        ...bounds, fullscreen: external, show: external, title:'投影用スライド',
         webPreferences:{session:uiSession!,sandbox:true,contextIsolation:true,nodeIntegration:false,nodeIntegrationInSubFrames:false,webviewTag:false,spellcheck:false} } };
     }
     console.error(`[desktop] blocked window.open: ${redactCredential(url)}`);
     return { action: "deny" };
   });
-  contents.on('did-create-window', child => {
+  contents.on('did-create-window', (child, details) => {
     installWindowPolicy(child);
     window.once('closed', () => { if (!child.isDestroyed()) child.destroy(); });
+    if (isProjectionUrl(details.url)) {
+      projectionWindow = child;
+      child.once('closed', () => { if (projectionWindow === child) projectionWindow = undefined; });
+      keepPresenterFocused(window, child, details.options.fullscreen === true);
+    }
   });
   contents.on("will-attach-webview", (event) => {
     event.preventDefault();
@@ -413,16 +478,34 @@ function installWindowPolicy(window: BrowserWindow): void {
   });
 }
 
+let mainWindowState: WindowStateStore | undefined;
+/** Save the main window's normal bounds and maximized state as it moves, resizes or closes. */
+function trackMainWindowState(window: BrowserWindow, store: WindowStateStore): void {
+  mainWindowState = store;
+  const remember = () => {
+    // A minimized window keeps the state it had before minimizing.
+    if (window.isDestroyed() || window.isMinimized()) return;
+    store.schedule({ ...window.getNormalBounds(), maximized: window.isMaximized() || window.isFullScreen() });
+  };
+  window.on("resize", remember).on("move", remember).on("maximize", remember).on("unmaximize", remember)
+    .on("enter-full-screen", remember).on("leave-full-screen", remember);
+  window.on("close", () => { remember(); void store.flush(); });
+}
+
 function createMainWindow(adminOrigin: string, token: string, deck?: string): void {
   credentialToken = token;
   bootstrapUrl = `${adminOrigin}${deck ? '/deck/' + encodeURIComponent(deck) : '/'}#token=${encodeURIComponent(token)}`;
-  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const width = Math.min(area.width, Math.max(900, Math.round(area.width * 0.94)));
-  const height = Math.min(area.height, Math.max(600, Math.round(area.height * 0.94)));
+  // Restore the previous size and position, kept inside a connected display.
+  const stateStore = new WindowStateStore(join(app.getPath("userData"), "window-state.json"));
+  const saved = stateStore.read();
+  const restored = placeWindow(saved, screen.getAllDisplays().map(display => display.workArea), { width: 900, height: 600 });
+  const area = restored ? screen.getDisplayMatching(restored).workArea : screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const width = restored?.width ?? Math.min(area.width, Math.max(900, Math.round(area.width * 0.94)));
+  const height = restored?.height ?? Math.min(area.height, Math.max(600, Math.round(area.height * 0.94)));
   mainWindow = new BrowserWindow({
     show: !hiddenWindow,
-    x: area.x + Math.round((area.width - width) / 2),
-    y: area.y + Math.round((area.height - height) / 2),
+    x: restored?.x ?? area.x + Math.round((area.width - width) / 2),
+    y: restored?.y ?? area.y + Math.round((area.height - height) / 2),
     width,
     height,
     minWidth: Math.min(900, area.width),
@@ -440,6 +523,9 @@ function createMainWindow(adminOrigin: string, token: string, deck?: string): vo
     },
   });
   installWindowPolicy(mainWindow);
+  // maximize() would also show a hidden test window.
+  if (restored && saved?.maximized && !hiddenWindow) mainWindow.maximize();
+  trackMainWindowState(mainWindow, stateStore);
   mainWindow.on("closed", () => {
     mainWindow = undefined;
     void shutdown(0);
@@ -515,9 +601,8 @@ async function exportDocument(
   });
 }
 
-/** Adapt the legacy export input to the existing PDF/HTML writer. */
-function exportLegacyDocument(
-  input: LegacyExportDocumentInput,
+function exportHostDocument(
+  input: ExportDocumentInput,
   format: ExportFormat,
   title: string,
 ): Promise<string | null> {
@@ -561,7 +646,7 @@ async function openExternalUrl(raw: string): Promise<boolean> {
   return true;
 }
 
-function legacyDiagnostics(): LegacyDiagnosticItem[] {
+function collectDiagnostics(): DiagnosticItem[] {
   let pandocOk = false;
   let pandocDetail = "";
   try {
@@ -587,7 +672,9 @@ function legacyDiagnostics(): LegacyDiagnosticItem[] {
   ];
 }
 
-async function inspectLegacy(html: string, options: { pdf: boolean; screenshots: boolean; allSteps: boolean }) {
+const renderWindows = new RenderWindowPool();
+
+async function inspectDocument(html: string, options: { pdf: boolean; screenshots: boolean; allSteps: boolean }) {
   return enqueuePdf(async () => {
     const [{ parseRenderJob }, { renderDeck }, { JobDeadline }] = await Promise.all([
       import('../../packages/renderer/src/job.js'), import('../../packages/renderer/src/render.js'), import('../../packages/renderer/src/deadline.js'),
@@ -598,7 +685,7 @@ async function inspectLegacy(html: string, options: { pdf: boolean; screenshots:
     try {
       const inputHtml = join(temporary, 'input.html'), outputDir = join(temporary, 'output');
       await writeOutput(inputHtml, html);
-      const result = await renderDeck(parseRenderJob({ schemaVersion: 1, inputHtml, outputDir, timeoutMs: 180000, ...options }), outputDir, deadline);
+      const result = await renderDeck(parseRenderJob({ schemaVersion: 1, inputHtml, outputDir, timeoutMs: 180000, ...options }), outputDir, deadline, renderWindows);
       const screenshots = await Promise.all(result.steps.filter(s => s.screenshot).map(async s => ({ slide: s.slide, step: s.step, bytes: await readFile(join(outputDir, s.screenshot!)) })));
       return { slides: result.slides, steps: result.steps, screenshots, ...(options.pdf ? { pdf: await readFile(join(outputDir, result.pdfFile)) } : {}) };
     } finally {
@@ -633,7 +720,7 @@ async function writePdf(document: PreviewDocument, filePath: string): Promise<st
       timeoutMs,
       screenshots: false,
     });
-    const result = await renderDeck(job, outputDir, deadline);
+    const result = await renderDeck(job, outputDir, deadline, renderWindows);
     const pdf = await readFile(join(outputDir, result.pdfFile));
     await writeOutput(filePath, pdf);
     return basename(filePath);
@@ -663,7 +750,7 @@ function readWorkspaceLocations(): {current:string|null;recent:string[]} {
     return {current:typeof value.current==="string"&&isAbsolute(value.current)?value.current:null,recent};
   } catch {return {current:null,recent:[]};}
 }
-async function chooseWorkspacePath(input:string,mode:"new"|"existing"):Promise<LegacyWorkspace> {
+async function chooseWorkspacePath(input:string,mode:"new"|"existing"):Promise<HostWorkspace | null> {
   const selected=input==="~"?homedir():input.startsWith("~/")?join(homedir(),input.slice(2)):input;
   if(!selected.trim()||!isAbsolute(selected))throw codedError("INVALID_INPUT","保管場所を絶対パスで指定してください");
   const info=await lstat(selected).catch((error:NodeJS.ErrnoException)=>{if(error.code==='ENOENT')return null;throw error;});
@@ -675,10 +762,22 @@ async function chooseWorkspacePath(input:string,mode:"new"|"existing"):Promise<L
     const names=await readdir(selected);
     const directory=async(name:string)=>(await stat(join(selected,name)).catch(()=>null))?.isDirectory();
     if(names.length && !(await directory('decks') && (await directory('topics') || await directory('figures'))))throw codedError("INVALID_INPUT","空のフォルダか、スライドの保管フォルダを選んでください");
+    const locations = readWorkspaceLocations();
+    const known = [workspaceService?.root, locations.current, ...locations.recent].filter((path): path is string => !!path);
+    if (names.length && !known.some(path => canonicalPath(path) === canonicalPath(selected))) {
+      const prompt = {
+        type: "question" as const, buttons: ["キャンセル", "信頼して開く"], defaultId: 0, cancelId: 0,
+        message: "この保管フォルダの作成元を信頼しますか？",
+        detail: `${selected}\n\n図の表示時にフォルダ内のスクリプトが動きます。AI は AGENTS.md や SKILL.md の指示を読みます。`,
+      };
+      const answer = mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showMessageBox(mainWindow, prompt) : await dialog.showMessageBox(prompt);
+      if (answer.response !== 1) return null;
+    }
   }
   return prepareWorkspace(selected);
 }
-async function selectWorkspace(): Promise<LegacyWorkspace | null> {
+async function selectWorkspace(): Promise<HostWorkspace | null> {
   const result = await showOpenDialog({
     title: MAIN_STRINGS.chooseWorkspace,
     properties: ["openDirectory", "createDirectory"],
@@ -688,7 +787,7 @@ async function selectWorkspace(): Promise<LegacyWorkspace | null> {
   if (shuttingDown) return null;
   return chooseWorkspacePath(selected,"existing");
 }
-async function prepareWorkspace(selected:string):Promise<LegacyWorkspace> {
+async function prepareWorkspace(selected:string):Promise<HostWorkspace> {
 
   if (
     workspaceService !== undefined
@@ -696,7 +795,7 @@ async function prepareWorkspace(selected:string):Promise<LegacyWorkspace> {
   ) {
     return workspaceService.workspace;
   }
-  const next = await openLegacyWorkspace(selected);
+  const next = await openWorkspace(selected);
   if (shuttingDown) {
     await next.close().catch((error: unknown) => {
       console.error("[desktop] cannot close a workspace opened during shutdown", error);
@@ -714,9 +813,9 @@ async function prepareWorkspace(selected:string):Promise<LegacyWorkspace> {
   return next.workspace;
 }
 
-async function legacyWorkspaceChanged(
-  next: LegacyWorkspace,
-  previous: LegacyWorkspace,
+async function workspaceChanged(
+  next: HostWorkspace,
+  previous: HostWorkspace,
 ): Promise<void> {
   const pending = pendingWorkspaceService;
   workspace = next;
@@ -761,12 +860,12 @@ async function start(): Promise<void> {
     assertPandocAvailable();
     if (!cliMode) process.env.SLIDE_STUDIO_CLI_BIN = await prepareLauncher(join(userData, "bin"), process.execPath, app.isPackaged ? undefined : join(appPath, "dist/apps/desktop/main.js"));
 
-    workspaceService = await openLegacyWorkspace(requested.root, {
+    workspaceService = await openWorkspace(requested.root, {
       sample: requested.sample,
     });
     workspace = workspaceService.workspace;
     if (cli && cli.positionals[0] && cli.positionals[0] !== "open") {
-      const code = await runCommand(workspaceService.workspace, cli, {pandocPath, inspect: inspectLegacy, diagnostics: async () => legacyDiagnostics()});
+      const code = await runCommand(workspaceService.workspace, cli, {pandocPath, inspect: inspectDocument, diagnostics: async () => collectDiagnostics()});
       await shutdown(code); return;
     }
     if (shuttingDown) {
@@ -777,30 +876,13 @@ async function start(): Promise<void> {
       return;
     }
 
-    // Only release builds contain the updater feed configuration.
-    const resources = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
-    const updateDriver = !browserMode && app.isPackaged && resources && existsSync(join(resources, 'app-update.yml'))
-      ? updaterPackage.autoUpdater : undefined;
-    updateDriver?.on('error', error => {
-      if (!shuttingDown) return;
-      dialog.showErrorBox('アプリを更新できませんでした', error.message);
-      app.exit(1);
-    });
-    desktopUpdates = new DesktopUpdates(updateDriver, join(app.getPath('userData'), 'updates.json'), app.getVersion());
-    await desktopUpdates.initialize();
-    desktopHost = await startLegacyHost({
+    desktopUpdates = new DesktopUpdates(app.getVersion());
+    desktopHost = await startStudioHost({
       settingsPath: join(userData, 'ui-settings.json'),
       applyUiZoom: browserMode ? undefined : percent => { mainWindow?.webContents.setZoomFactor(percent / 100); },
       updates: {
         state: () => desktopUpdates!.snapshot(),
         check: () => desktopUpdates!.check(),
-        download: () => desktopUpdates!.download(),
-        automatic: value => desktopUpdates!.setAutomatic(value),
-        install: () => {
-          if (!desktopUpdates!.canInstall()) throw new Error('更新のダウンロードが完了していません');
-          // Return the HTTP response before the ordinary save-and-close path drains it.
-          setTimeout(() => { manualUpdateInstall = true; mainWindow?.close(); }, 250);
-        },
       },
       workspace: workspaceService.workspace,
       uiDirectory,
@@ -809,17 +891,18 @@ async function start(): Promise<void> {
       selectWorkspace,
       openWorkspace:chooseWorkspacePath,
       recentWorkspaces:()=>readWorkspaceLocations().recent,
-      onWorkspaceChanged: legacyWorkspaceChanged,
+      onWorkspaceChanged: workspaceChanged,
       openExternal: openExternalUrl,
+      focusProjection: focusProjectionWindow,
       openPath: async path => {
         const error = await shell.openPath(path);
         if (error) throw new Error(error);
       },
-      exportDocument: exportLegacyDocument,
-      inspect: inspectLegacy,
+      exportDocument: exportHostDocument,
+      inspect: inspectDocument,
       aiStorage: join(app.getPath("userData"), "ai"),
       adminPort: browserMode ? Number(argumentValue(process.argv, "port") ?? 4320) : undefined,
-      diagnostics: legacyDiagnostics,
+      diagnostics: collectDiagnostics,
       onShutdown: async () => {
         // Accepted host operations have settled by now. Cancel any remaining
         // Pandoc subprocess and wait for the desktop PDF queue before the
@@ -850,11 +933,12 @@ async function start(): Promise<void> {
       return;
     }
 
-    desktopUpdates.start();
     installSessionPolicy();
     createMainWindow(desktopHost.adminOrigin, desktopHost.token, cli?.positionals[0] === "open" ? cli.positionals[1] : argumentValue(process.argv, "deck"));
+    desktopUpdates.start();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    mainError("startup", error);
     console.error("[desktop] startup failed", error);
     try {
       if (cliMode || browserMode) { await shutdown(1); return; }
@@ -869,13 +953,13 @@ async function start(): Promise<void> {
 async function shutdown(exitCode = 0): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  renderWindows.close();
   desktopUpdates?.stop();
-  let updateSafe = true;
+  const windowStateSaved = mainWindowState?.flush();
   activePdfDeadline?.abort("quit requested");
   try {
     await desktopHost?.close();
   } catch (error) {
-    updateSafe = false;
     console.error("[desktop] cannot close the desktop host", error);
   }
   desktopHost = undefined;
@@ -904,12 +988,11 @@ async function shutdown(exitCode = 0): Promise<void> {
     try {
       await service.close();
     } catch (error) {
-      updateSafe = false;
       console.error("[desktop] cannot release the workspace lock", error);
     }
   }
+  await windowStateSaved;
   forceQuit = true;
-  if (exitCode === 0 && updateSafe && desktopUpdates?.installOnQuit(manualUpdateInstall)) return;
   app.exit(exitCode);
 }
 
@@ -931,6 +1014,21 @@ mkdirSync(sessionDataDirectory, { recursive: true });
 app.setPath("userData", profileDirectory);
 app.setPath("sessionData", sessionDataDirectory);
 app.setPath("logs", logsDirectory);
+
+function mainError(event: string, detail: unknown) {
+  recordMainError(logsDirectory, event, detail, redactCredential);
+}
+// Observe fatal exceptions without suppressing Node's normal fatal exit.
+process.on("uncaughtExceptionMonitor", (error, origin) => mainError(origin, error));
+process.on("unhandledRejection", reason => {
+  mainError("unhandledRejection", reason);
+  void shutdown(1);
+});
+app.on("child-process-gone", (_event, detail) => mainError("child-process-gone", `${detail.type}: ${detail.reason} (${detail.exitCode})`));
+app.on("render-process-gone", (_event, _contents, detail) => mainError("render-process-gone", `${detail.reason} (${detail.exitCode})`));
+app.on("browser-window-created", (_event, window) => {
+  window.on("unresponsive", () => mainError("unresponsive", `window ${window.id}`));
+});
 app.setPath("crashDumps", crashDumpsDirectory);
 if (cliTemporaryProfile) app.once("quit", () => { try { rmSync(cliTemporaryProfile, {recursive: true, force: true}); } catch {} });
 app.enableSandbox();

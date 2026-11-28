@@ -21,3 +21,10 @@ test('busy tabs reject model switches and attachments stay within their declared
  const {ws,store}=fixture(t),data=store.state('talk'),tab=data.tabs[0]!;data.rounds.push({id:'round',tab:tab.id,state:'run',items:[{key:'deck'}]});await assert.rejects(store.update_tab('talk',tab.id,{open:false}),/作業中/);assert.equal(store.public('talk').locked,true);
  const materials=join(ws.deck_dir('talk'),'materials');mkdirSync(materials);writeFileSync(join(materials,'paper.pdf'),'pdf');assert.equal(attachments(ws,'talk',[{path:'materials/paper.pdf'}])[0]?.kind,'file');symlinkSync(ws.qmd('talk'),join(materials,'link.pdf'));assert.throws(()=>attachments(ws,'talk',[{path:'materials/link.pdf'}]),/シンボリックリンク/);assert.throws(()=>attachments(ws,'talk',[{path:'materials/../slides.qmd'}]));
 });
+test('public chat state gives attachments a content URL for thumbnails without storing it',async t=>{
+ const {ws,store}=fixture(t),tab=store.state('talk').tabs[0]!,images=join(ws.asset_root('talk'),'images');mkdirSync(images,{recursive:true});writeFileSync(join(images,'写真 1.png'),'png');
+ await store.update_tab('talk',tab.id,{attach:[{path:'images/写真 1.png'}]});store.state('talk').rounds.push({id:'round',tab:tab.id,state:'done',attach:[{path:'images/写真 1.png',name:'写真 1.png',kind:'image'}]});
+ const shown=store.public('talk'),url=`/files/topics/test/images/${encodeURIComponent('写真 1.png')}`;
+ assert.equal((shown.tabs[0]!.attach[0] as {url?:string}).url,url);assert.equal(((shown.rounds[0]!.attach as Array<{url?:string}>)[0])?.url,url);
+ assert.equal('url' in tab.attach[0]!,false);await store.save('talk');assert.doesNotMatch(readFileSync(join(ws.state,'chat/talk.json'),'utf8'),/\/files\//u);
+});

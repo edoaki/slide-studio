@@ -1,15 +1,19 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import type { Workspace } from '../../core/src/workspace.js';
 import { atomicWriteFile } from '../../core/src/atomic.js';
-import { merge3, touched } from '../../core/src/edit-scope.js';
+import { assertWorkspacePath } from '../../core/src/paths.js';
+import { changeSummary, merge3, touched } from '../../core/src/edit-scope.js';
 import { ACTIVE, attachments, type ChatRound, type ChatStore, type ChatTab } from '../../core/src/chat-store.js';
 import * as roles from '../../core/src/ai-roles.js';
 import * as snapshots from '../../core/src/snapshot.js';
+import { decodeDeckBytes } from '../../core/src/encoding.js';
+import { scriptTargets, applyScript, scriptSchema } from './speaker-script.js';
 import { cleanItems, prompt, type Item } from './context.js';
 import type { AIStatus } from './status.js';
-import { runNative, schema, type NativeOptions, type RunEvent } from './native.js';
+import { runNative, schema, writablePaths, type NativeOptions, type RunEvent } from './native.js';
 import type { ProviderId } from './providers.js';
 
 export interface Issue extends Record<string, unknown> {message: string; old?: boolean}
@@ -38,7 +42,7 @@ export class Workflow {
   private running = new Map<string, {deck: string; controller: AbortController; task: Promise<void>}>();
   private closed = false;
   constructor(readonly ws: Workspace, readonly store: ChatStore, readonly status: AIStatus,
-    private options: {check: (deck: string, mode: roles.Mode) => Promise<Check>; reviewContext?: (deck: string, mode: roles.Mode) => Promise<unknown>; changed: (paths: string[]) => void; runner?: Runner}) {}
+    private options: {saveScript: (deck: string, base: string, text: string, signal: AbortSignal) => Promise<void>; check: (deck: string, mode: roles.Mode) => Promise<Check>; reviewContext?: (deck: string, mode: roles.Mode) => Promise<unknown>; changed: (paths: string[]) => void; runner?: Runner}) {}
   get busy() { return [...this.running].some(([id, run]) => ACTIVE.has(this.store.round(run.deck, id).state)); }
   themeLocked(name: string) {
     return [...this.running].some(([id, active]) => {
@@ -47,10 +51,15 @@ export class Workflow {
     });
   }
   locked(deck: string, kind: roles.Mode, before?: string, after?: string) {
-    const state = this.store.public(deck);
-    if (kind === 'memo') return state.memo_locked;
+    if (kind === 'memo') return this.store.public(deck).memo_locked;
     if (kind === 'theme') return this.themeLocked(this.ws.deck_theme(deck));
-    return state.lock.all || !!(before !== undefined && after !== undefined && touched(before, after, state.lock));
+    return this.slideSaveLock(deck, before, after) !== null;
+  }
+  slideSaveLock(deck: string, before?: string, after?: string): 'all' | 'partial' | null {
+    const {lock} = this.store.public(deck);
+    if (lock.all) return 'all';
+    if ((lock.pages.length || lock.figures.length) && before !== undefined && after !== undefined && touched(before, after, lock)) return 'partial';
+    return null;
   }
   private version(deck: string, mode: roles.Mode) {
     const path = mode === 'memo' ? this.ws.memo(deck) : mode === 'theme' ? join(this.ws.themes, this.ws.deck_theme(deck) + '.css') : this.ws.qmd(deck);
@@ -71,7 +80,11 @@ export class Workflow {
     if (body.base !== this.version(deck, tab.mode)) throw new RunConflict('原稿が変わっています。保存が終わってから送信してください');
     const previous = data.rounds.findLast(r => r.tab === tabId) as Round | undefined;
     const talk = body.talk === true && tab.mode === 'slides';
-    const pending = !continuation && previous?.state === 'cancelled' && !previous.restored && !!previous.talk === talk ? previous : null;
+    const scriptCommand = items.some(item => /^\/発表原稿(?:\s|$)/u.test(item.text));
+    const script = !talk && tab.mode === 'slides' && (scriptCommand || items.length === 1 && items[0]!.key === 'deck'
+      && /^(?:発表原稿を(?:考えて|書いて|作って|作成して))(?:ください)?[。！!]?$/u.test(items[0]!.text));
+    if (script && (items.length !== 1 || items[0]!.key !== 'deck')) throw Error('発表原稿の一括作成は「発表全体」の指示1件で送信してください。');
+    const pending = !script && !previous?.script_base && !continuation && previous?.state === 'cancelled' && !previous.restored && !!previous.talk === talk ? previous : null;
     let attach = attachments(this.ws, deck, body.attach ?? tab.attach);
     if (pending) {
       const prior = structuredClone(pending.items);
@@ -90,6 +103,7 @@ export class Workflow {
       summary: '', results: [], files: null, check: null, snapshot: null, restored: null,
       error: null, cancel: false, user_edits: [], overlap: [],
     };
+    if (script) round.script_base = body.base;
     if (tab.mode === 'theme') round.theme = this.ws.deck_theme(deck);
     if (continuation) {
       round.continued_from = continuation.id; round.handover = this.handover(deck, tabId, continuation);
@@ -119,20 +133,22 @@ export class Workflow {
   }
 
   private handover(deck: string, tabId: string, stopped?: Round) {
-    const history = this.store.state(deck).rounds.filter(r => r.tab === tabId).slice(-12).map(r => ({items: r.items, summary: r.summary, error: r.error}));
+    const history = this.store.state(deck).rounds.filter(r => r.tab === tabId).slice(-12).map(r => ({items: r.items, results: r.results, summary: r.summary, error: r.error}));
     return '[会話の引き継ぎ] 現在のファイルを正本とし、過去の依頼を再実行しない。完了済みの変更を保ち、残りを進める。\n'
       + JSON.stringify({history, stopped: stopped ? {items: stopped.items, results: stopped.results, check: stopped.check, error: stopped.error} : null});
   }
 
-  private async execute(deck: string, tab: ChatTab, round: Round, role: roles.RoleId, text: string, parent: boolean, signal: AbortSignal) {
+  private async execute(deck: string, tab: ChatTab, round: Round, role: roles.RoleId, text: string, parent: boolean, signal: AbortSignal, receiveScript?: (notes: unknown) => void) {
     if (signal.aborted) throw Error('実行を取り消しました');
     const chosen = roles.resolveRole(role, {model: round.model, effort: round.effort}, parent ? {} : round.ai_roles, key => this.status.providerOf(key));
     const model = chosen.model!, at = model.indexOf(':'), id = model.slice(0, at) as ProviderId;
     const definition = roles.get(role), revision = roles.catalog(this.ws).roles.find(r => r.id === role)!.revision;
     const sessionKey = parent ? 'session' : role + '_session', bindingKey = parent ? 'role_binding' : role + '_binding';
-    const binding = `${role}:${model}:${revision}`, home = this.status.providers.home(id);
+    const readonly = !!receiveScript || round.talk || definition.readonly;
+    const binding = JSON.stringify([role, model, revision, !!receiveScript, writablePaths(this.ws, {deck, role, readonly})]);
+    const home = this.status.providers.home(id);
     const context = tab[sessionKey + '_context'] as {used?: number; window?: number; reset?: boolean} | undefined;
-    const reset = context?.reset || (context?.used ?? 0) >= Math.min(64000, (context?.window ?? 64000 / .7) * .7);
+    const reset = context?.reset || (context?.used ?? 0) >= (context?.window ? context.window * 0.7 : 64000);
     let session = tab[bindingKey] === binding && tab[sessionKey + '_home'] === home && !reset ? tab[sessionKey] as string | null : null;
     if (!session && tab[sessionKey] && parent) { text = this.handover(deck, tab.id) + '\n\n' + text; round.session_reset = true; }
     const agent: Agent = {id: randomUUID(), role, state: 'run', summary: '', issues: [], parent, ...chosen, prompt_revision: revision};
@@ -157,19 +173,22 @@ export class Workflow {
     try {
       const run = this.options.runner ?? ((id, ws, opts) => runNative(this.status.providers, id, ws, opts));
       const result = await run(id, this.ws, {
-        role, model: model.slice(at + 1), effort: chosen.effort, session,
-        prompt: roles.with_extra(this.ws, role, text), readonly: round.talk || definition.readonly,
-        web: definition.web, outputSchema: round.talk ? schema('theme') : undefined,
+        deck, role, model: model.slice(at + 1), effort: chosen.effort, session,
+        prompt: roles.with_extra(this.ws, role, text), readonly,
+        web: definition.web, outputSchema: receiveScript ? scriptSchema : round.talk ? schema('theme') : undefined,
         images: round.attach.filter(a => a.kind === 'image' && /\.(png|jpe?g|webp|gif)$/iu.test(a.path)).map(a => join(this.ws.asset_root(deck), a.path)),
         signal, onEvent,
       });
       await this.store.flush(); if (saveError) throw saveError;
       const value = json(result.final);
-      if (role === 'review') {
+      if (receiveScript) {
+        receiveScript(value?.notes);
+        agent.state = 'complete';
+      } else if (role === 'review') {
         if (!value || typeof value.summary !== 'string' || !Array.isArray(value.issues) || value.issues.some(i => !i || ['target', 'message', 'suggestion'].some(k => typeof i[k] !== 'string'))) throw Error('確認役の返事の形が正しくありません');
         agent.summary = value.summary; agent.issues = value.issues; agent.state = value.issues.length ? 'needs_fix' : 'complete';
       } else { agent.state = 'complete'; agent.summary = String(value?.summary ?? value?.reply ?? result.final ?? ''); }
-      if (parent) this.reply(round, result.final);
+      if (parent && !receiveScript) this.reply(round, result.final);
       return agent;
     } catch (error) {
       agent.state = signal.aborted ? 'cancelled' : 'error'; agent.error = error instanceof Error ? error.message : String(error);
@@ -194,10 +213,27 @@ export class Workflow {
 
   private async files(deck: string, round: Round, snapshot: snapshots.Snapshot) {
     const files = await snapshots.finish(this.ws, snapshot);
-    if (round.mode !== 'slides') {
-      const mine = round.mode === 'memo' ? `decks/${deck}/memo.md` : `themes/${round.theme}.css`;
+    if (round.mode !== 'slides' || round.script_base) {
+      const mine = round.script_base ? `decks/${deck}/slides.qmd` : round.mode === 'memo' ? `decks/${deck}/memo.md` : `themes/${round.theme}.css`;
       round.stray = Object.values(files).flat().filter(n => n !== mine);
       for (const key of ['added', 'modified', 'deleted', 'outside'] as const) files[key] = files[key].filter(n => n === mine);
+    }
+    for (const [filename, field] of [['memo.md','memo_diff'],['slides.qmd','slide_diff']] as const) {
+      const name = `decks/${deck}/${filename}`;
+      if (![...files.modified,...files.added,...files.deleted].includes(name)) continue;
+      const read = (path: string) => {
+        assertWorkspacePath(this.ws.root,path);
+        const info = lstatSync(path,{throwIfNoEntry:false});
+        if (!info) return '';
+        if (!info.isFile() || info.size > 512*1024) return null;
+        return readFileSync(path,'utf8');
+      };
+      try {
+        const before = read(join(snapshot.path,'files',name)), after = read(join(this.ws.root,name));
+        round[field] = before === null || after === null ? '変更内容が大きいため差分を省略しました。' : changeSummary(before,after);
+      } catch {
+        // A removed or replaced path must not turn a completed AI run into a failed run.
+      }
     }
     round.files = files;
     this.options.changed(Object.values(files).flat());
@@ -218,9 +254,36 @@ export class Workflow {
       if (snapshot) await this.files(deck, round, snapshot);
     };
     try {
+      if (typeof round.script_base === 'string') {
+        const bytes = readFileSync(this.ws.qmd(deck));
+        if (hash(bytes) !== round.script_base) throw new RunConflict('スライドが変わりました。最新の内容で再送信してください。');
+        const source = decodeDeckBytes(bytes);
+        if (source.diagnostics.length) throw Error('原稿の文字コードまたは改行を確認してください。');
+        const targets = scriptTargets(source.source);
+        if (targets.length) {
+          const request = await prompt(this.ws, deck, round.mode, round.items, round.attach)
+            + '\n[発表原稿] 完成したスライドと下書きを読み、指定ページで実際に話す原稿を用意する。図は着目点と読み取り方を示し、段階表示に合わせて段落を分ける。持ち時間・口調の指定に従い、資料にない事実は補わない。'
+            + '\nファイルはアプリが保存する。各ページの番号 page と発話本文 text を notes 配列に入れ、JSON で返す。対象ページ：'
+            + JSON.stringify(targets.map(({page, title}) => ({page, title})));
+          let next: string | undefined;
+          await this.execute(deck, tab, round, 'chat', request, true, signal, notes => { next = applyScript(source.source, targets, notes); });
+          if (signal.aborted || next === undefined) throw Error('原稿の作成を中止しました。');
+          const beforeWrite = await snapshots.take(this.ws, deck);
+          try {
+            await this.options.saveScript(deck, round.script_base, next, signal);
+          } catch (error) {
+            await rm(beforeWrite.path, {recursive: true, force: true});
+            throw error;
+          }
+          snapshot = beforeWrite; round.snapshot = basename(snapshot.path);
+        }
+        round.summary = targets.length ? `${targets.length}ページの発表メモに原稿を保存しました。` : '発表メモが空欄のページはありません。';
+        round.results = [{key: 'deck', label: '発表全体', ok: true, text: round.summary}];
+        return;
+      }
       if (!round.talk) { snapshot = await snapshots.take(this.ws, deck); round.snapshot = basename(snapshot.path); }
       if (!round.talk && round.mode !== 'memo') before = new Set((await this.options.check(deck, round.mode)).errors.map(issueKey));
-      let text = prompt(this.ws, deck, round.mode, round.items, round.attach, round.talk);
+      let text = await prompt(this.ws, deck, round.mode, round.items, round.attach, round.talk);
       if (!round.talk && round.ai_roles.consult?.enabled) text += `\n[相談役] 迷ったときは slide-studio consult --tab ${tab.id} "質問" で相談できる。要点と読むべきファイルのパスを質問に含める。相談役はファイルを変えない。`;
       if (round.handover) text = round.handover + '\n\n' + text;
       if (!round.review_only) await this.execute(deck, tab, round, roles.MODES[round.mode], text, true, signal);
@@ -296,7 +359,7 @@ export class Workflow {
     if (round.restored) throw Error('すでに戻しました');
     if (!round.snapshot) throw Error('この送信の控えがありません');
     const snapshot = snapshots.find(this.ws, deck, round.snapshot);
-    const only = round.mode === 'memo' ? new Set([`decks/${deck}/memo.md`]) : round.mode === 'theme' ? new Set([`themes/${round.theme}.css`]) : null;
+    const only = round.script_base ? new Set([`decks/${deck}/slides.qmd`]) : round.mode === 'memo' ? new Set([`decks/${deck}/memo.md`]) : round.mode === 'theme' ? new Set([`themes/${round.theme}.css`]) : null;
     return {round, snapshot, only, keep: new Set(round.user_edits ?? [])};
   }
   restorePreview(deck: string, id: string) {

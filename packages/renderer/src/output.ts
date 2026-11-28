@@ -1,7 +1,6 @@
-import { randomUUID } from "node:crypto";
-import { lstat, mkdir, open, rename, rm, unlink } from "node:fs/promises";
-import type { FileHandle } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+export { atomicWriteFile } from "../../core/src/atomic.js";
+import { lstat, mkdir, rm } from "node:fs/promises";
+import { dirname } from "node:path";
 
 export class OutputError extends Error {
   constructor(message: string) {
@@ -49,37 +48,5 @@ export class OwnedOutputDirectory {
     if (!this.#created) return;
     await rm(this.path, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     this.#created = false;
-  }
-}
-
-/** Write a sibling temporary file, flush it, then rename over the destination. */
-export async function atomicWriteFile(
-  filePath: string,
-  data: string | Uint8Array,
-): Promise<void> {
-  const directory = dirname(filePath);
-  const temporary = join(directory, `.${basename(filePath)}.${process.pid}.${randomUUID()}.tmp`);
-  let handle: FileHandle | undefined;
-  try {
-    handle = await open(temporary, "wx", 0o644);
-    await handle.writeFile(data);
-    await handle.sync();
-    await handle.close();
-    handle = undefined;
-    await rename(temporary, filePath);
-  } catch (error) {
-    if (handle) {
-      try {
-        await handle.close();
-      } catch {
-        // The original failure is more useful.
-      }
-    }
-    try {
-      await unlink(temporary);
-    } catch {
-      // The temporary file may not exist.
-    }
-    throw error;
   }
 }

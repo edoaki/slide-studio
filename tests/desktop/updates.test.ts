@@ -1,75 +1,54 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { EventEmitter } from 'node:events';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { DesktopUpdates } from '../../apps/desktop/updates.js';
+import { DesktopUpdates, isNewerRelease } from '../../apps/desktop/updates.js';
+const release = (tag = 'v0.2.0') => ({ tag_name: tag, draft: false, prerelease: false, assets: [{ name: `Slide-Studio-${tag}-mac-arm64.dmg` }] });
+const request = (body: unknown, status = 200): typeof fetch => async () => new Response(JSON.stringify(body), { status });
 
-class Driver extends EventEmitter {
-  autoDownload = true;
-  autoInstallOnAppQuit = true;
-  downloads = 0;
-  installs: unknown[] = [];
-  failure = false;
-  async checkForUpdates() {
-    if (this.failure) throw new Error('offline');
-    this.emit('update-available', { version: '0.2.0' });
+test('compares numeric stable versions and rejects prereleases and malformed tags', () => {
+  assert.equal(isNewerRelease('v0.10.0', '0.9.0'), true);
+  for (const tag of ['v0.1.0', 'v0.0.9', 'v0.2.0-beta.1', 'latest', 'v00.2.0']) assert.equal(isNewerRelease(tag, '0.1.0'), false);
+});
+test('finds a public release without downloading or installing', async () => {
+  const urls: string[] = [];
+  const updates = new DesktopUpdates('0.1.0', async (url, options) => {
+    urls.push(String(url)); assert.ok(options?.signal);
+    return request(release())(url, options);
+  });
+  const state = await updates.check();
+  assert.equal(state.phase, 'available'); assert.equal(state.availableVersion, '0.2.0');
+  assert.deepEqual(urls, ['https://api.github.com/repos/edoaki/slide-studio/releases/latest']);
+});
+test('handles no published release and releases without installers', async () => {
+  for (const fetcher of [request({}, 404), request({ ...release(), assets: [] })]) {
+    assert.equal((await new DesktopUpdates('0.1.0', fetcher).check()).phase, 'unpublished');
   }
-  async downloadUpdate() { this.downloads++; this.emit('download-progress', { percent: 50 }); this.emit('update-downloaded'); }
-  quitAndInstall(...args: unknown[]) { this.installs.push(args); }
-}
-async function setup(t: test.TestContext) {
-  const dir = await mkdtemp(join(tmpdir(), 'studio-updates-'));
-  t.after(() => rm(dir, { recursive: true, force: true }));
-  const driver = new Driver(), path = join(dir, 'updates.json');
-  const updates = new DesktopUpdates(driver, path, '0.1.0');
-  await updates.initialize();
-  return { updates, driver, path };
-}
-test('unchecked updates only notify; explicit download still requires explicit install', async t => {
-  const { updates, driver } = await setup(t);
-  await updates.setAutomatic(false);
-  assert.equal(driver.autoDownload, false); assert.equal(driver.autoInstallOnAppQuit, false);
-  await updates.check(); assert.equal(updates.snapshot().phase, 'available'); assert.equal(driver.downloads, 0);
-  assert.equal(updates.installOnQuit(true), false);
-  await updates.download(); assert.equal(updates.snapshot().phase, 'ready');
-  assert.equal(updates.installOnQuit(false), false);
-  assert.equal(updates.installOnQuit(true), true); assert.deepEqual(driver.installs, [[false, true]]);
 });
-test('automatic updates default to on and apply downloaded updates only on quit', async t => {
-  const { updates, driver, path } = await setup(t);
-  assert.equal(updates.snapshot().automatic, true);
+test('same and older releases never prompt a downgrade', async () => {
+  for (const tag of ['v0.1.0', 'v0.0.9']) assert.equal((await new DesktopUpdates('0.1.0', request(release(tag))).check()).phase, 'current');
+});
+test('errors retain a known update; successful rechecks clear stale notices', async () => {
+  let response = request(release());
+  const updates = new DesktopUpdates('0.1.0', (...args) => response(...args));
   await updates.check();
-  assert.equal(driver.downloads, 1); assert.equal(driver.installs.length, 0);
-  const restored = new DesktopUpdates(new Driver(), path, '0.1.0'); await restored.initialize();
-  assert.equal(restored.snapshot().automatic, true);
-  assert.equal(updates.installOnQuit(false), true); assert.deepEqual(driver.installs, [[true, false]]);
+  response = request({}, 403);
+  assert.equal((await updates.check()).phase, 'error');
+  assert.equal(updates.snapshot().availableVersion, '0.2.0');
+  response = request(release('v0.1.0'));
+  assert.equal((await updates.check()).phase, 'current');
+  assert.equal(updates.snapshot().availableVersion, undefined);
 });
-test('unchecking during download prevents automatic installation', async t => {
-  const { updates, driver } = await setup(t);
-  let complete!: () => void;
-  driver.downloadUpdate = () => new Promise<void>(resolve => { complete = () => { driver.emit('update-downloaded'); resolve(); }; });
-  await updates.setAutomatic(true);
-  const checking = updates.check(); await new Promise(resolve => setImmediate(resolve));
-  assert.equal(updates.snapshot().phase, 'downloading');
-  await updates.setAutomatic(false); complete(); await checking;
-  assert.equal(updates.installOnQuit(false), false); assert.equal(updates.canInstall(), true);
+test('drafts, prereleases, and malformed responses are not advertised', async () => {
+  for (const body of [{ ...release(), draft: true }, { ...release(), prerelease: true }, {}, null]) {
+    assert.equal((await new DesktopUpdates('0.1.0', request(body)).check()).phase, 'error');
+  }
 });
-test('network failures are retryable and concurrent checks are ignored', async t => {
-  const { updates, driver } = await setup(t);
-  await updates.setAutomatic(false);
-  driver.failure = true; await updates.check(); assert.equal(updates.snapshot().phase, 'error');
-  driver.failure = false; await Promise.all([updates.check(), updates.check()]);
-  assert.equal(updates.snapshot().phase, 'available'); assert.equal(updates.snapshot().error, undefined);
-});
-test('preference writes preserve last requested value; development builds stay disabled', async t => {
-  const { path } = await setup(t);
-  const updates = new DesktopUpdates(undefined, path, '0.1.0');
-  await Promise.all([updates.setAutomatic(true), updates.setAutomatic(false)]);
-  assert.equal(JSON.parse(await readFile(path, 'utf8')).automatic, false);
-  const restored = new DesktopUpdates(new Driver(), path, '0.1.0');
-  await restored.initialize();
-  assert.equal(restored.snapshot().automatic, false);
-  await updates.check(); await updates.download(); assert.equal(updates.snapshot().phase, 'disabled');
+test('launch checks only once and concurrent checks do not duplicate requests', async t => {
+  let calls = 0, complete!: (response: Response) => void;
+  const updates = new DesktopUpdates('0.1.0', () => { calls++; return new Promise(resolve => { complete = resolve; }); });
+  t.after(() => updates.stop());
+  updates.start(); updates.start(); await updates.check();
+  assert.equal(calls, 1);
+  complete(new Response(JSON.stringify(release())));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(updates.snapshot().phase, 'available');
 });

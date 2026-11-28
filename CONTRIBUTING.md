@@ -68,12 +68,11 @@ npm run update:app
 - **フロントエンド構成**：GUI は素の JavaScript（ES module）を維持し、UI 文言（日本語）は `packages/web/strings.js` に集約する。
 - **安全な書き込み**：ファイル書き込みは一時ファイルからの atomic rename を使う（描画処理では `atomicWriteFile`）。
 - **UI テキスト**：画面上の説明は端的に保ち、仕組みの説明はドキュメントに書く。
+- **選択欄**：OS 標準の `<select>` は使わず、`packages/web/custom-select.js` の `<studio-select>` を使う（`tests/desktop/no-native-select.test.ts` で検査）。
 
 ## リリース手順
 
-公開リリースは `.github/workflows/desktop-release.yml` と `scripts/electron-builder.config.cjs`（`SLIDE_STUDIO_RELEASE=1`）で行います。
-
-1. リポジトリの Actions Secrets に署名・公証用の認証情報（`CSC_LINK`、`CSC_KEY_PASSWORD`、`WIN_CSC_LINK`、`WIN_CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`）を設定する。
-2. `package.json` と `package-lock.json` のバージョンを更新し、一致する `vX.Y.Z` タグを push する。
-3. ワークフローが macOS（arm64／x64）と Windows（x64）の署名済みインストーラーおよび `electron-updater` メタデータ（`latest-mac.yml`、`latest.yml`）を GitHub の Draft Release に生成する。
-4. アップグレード動作を確認したうえで Draft Release を公開する。
+1. `package.json` と `package-lock.json` のバージョンをそろえ、検証済みのコミットに `vX.Y.Z` タグを付けて push します。
+2. [リリースワークフロー](.github/workflows/desktop-release.yml) が macOS（Apple Silicon／Intel）と Windows（x64）のインストーラーをビルドします。各ファイルの SHA-256 を検証してから、3 つの配布物と `SHA256SUMS` を GitHub Releases の下書きにまとめます。
+3. リリース本文に変更内容とインストール手順を記載し、下書きを公開します。
+4. [公開サイトのリポジトリ](https://github.com/edoaki/slide-studio-web)で、ダウンロードリンクを公開したタグのファイルに合わせます。公開サイトから各ファイルを取得できることを確認してください。

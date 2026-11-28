@@ -2,6 +2,7 @@ import { readFileSync, statSync } from "node:fs";
 import { basename, dirname, extname } from "node:path";
 import * as cheerio from "cheerio";
 import type { Diagnostic } from "../../contracts/src/desktop.js";
+import { BUNDLE_CSP } from "./bundle-policy.js";
 import { CoreError } from "./errors.js";
 import { resolveAssetInside } from "./paths.js";
 
@@ -188,6 +189,7 @@ class Bundler {
       throw new CoreError("INVALID_INPUT", "embedded document nesting is too deep");
     }
     const $ = cheerio.load(html);
+    if (depth === 0) $("head").prepend($("<meta>").attr("http-equiv","Content-Security-Policy").attr("content",BUNDLE_CSP));
 
     $("script[src]").each((_index, element) => {
       const node = $(element);

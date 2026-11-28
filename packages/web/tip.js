@@ -1,6 +1,8 @@
 // ボタンの説明（ツールチップ）。ボタンには文字を書かず、カーソルを合わせたとき（キーボードで移ったとき）に
 // data-tip の操作名と data-keys のキー（空白区切り、1つずつ囲む）を下に出す。画面全体で1つだけ置く。
 // 押せるものはすべて説明を出す：title はこのツールチップに移し、どちらも無ければ押せるものの aria-label を出す。
+import { keyLabel } from './strings.js';
+
 const DELAY = 300;
 const PRESS = 'button, a[href], [role=button], [role=tab], [role=slider], [role=separator], summary, select, input[type=checkbox], input[type=radio]';
 let el = null, timer = 0, owner = null;
@@ -24,8 +26,9 @@ const nameOf = t => t.dataset.tip || t.getAttribute('aria-label');
 function show(t) {
   if (document.documentElement.dataset.tooltips === 'false') return;
   if (!el) { el = document.createElement('div'); el.className = 'tip'; el.setAttribute('role', 'tooltip'); document.body.append(el); }
-  const name = Object.assign(document.createElement('span'), { className: 'tip-name', textContent: nameOf(t) });
-  const keys = (t.dataset.keys || '').split(' ').filter(Boolean).map(k => Object.assign(document.createElement('kbd'), { textContent: k }));
+  // キーの表記は OS に合わせる（Mac 以外は ⌘→Ctrl など）
+  const name = Object.assign(document.createElement('span'), { className: 'tip-name', textContent: keyLabel(nameOf(t)) });
+  const keys = keyLabel(t.dataset.keys || '').split(' ').filter(Boolean).map(k => Object.assign(document.createElement('kbd'), { textContent: k }));
   el.replaceChildren(name, ...keys.length ? [Object.assign(document.createElement('span'), { className: 'tip-keys' })] : []);
   el.querySelector('.tip-keys')?.append(...keys);
   // 下に出す。入らなければ上に出し、左右は画面の中に収める
@@ -57,7 +60,7 @@ document.addEventListener('focusout', hide);
 document.addEventListener('pointerdown', hide, true);
 addEventListener('blur', hide);
 
-// ボタンに説明を付ける。keys は '⌘ B' のように空白で区切る
+// ボタンに説明を付ける。keys は '⌘ B' のように空白で区切る（表示するときに OS の表記へ直す）
 export function tip(node, name, keys = '') {
   node.dataset.tip = name; node.setAttribute('aria-label', name); delete node.dataset.tipFromTitle;
   if (keys) node.dataset.keys = keys; else delete node.dataset.keys;

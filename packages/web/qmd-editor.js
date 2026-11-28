@@ -5,7 +5,7 @@ import { esc } from './api.js';
 import { svg } from './icons.js';
 import { S } from './strings.js';
 import { captureScroll, restoreScroll } from './scroll-anchor.js';
-import { qmdScan, pageHeads } from './qmd-scan.js';
+import { qmdScan, pageHeads, lineOffsets, lineAt, countAtMost } from './qmd-scan.js';
 export { qmdScan, pageHeads } from './qmd-scan.js';
 
 const DIV_RE = /^(\s*)(:{3,})(\s*)(.*?)(\s*)$/;
@@ -15,8 +15,6 @@ export function frontEnd(text) {
   return m ? m[0].length : 0;
 }
 const qLayer = d => d <= 1 ? 'var(--l1)' : d === 2 ? 'var(--l2)' : 'var(--l3)';
-const lineEnd = (lines, i) => lines.slice(0, i + 1).reduce((n, l) => n + l.length + 1, 0) - 1;
-const lineStart = (lines, i) => lines.slice(0, i).reduce((n, l) => n + l.length + 1, 0);
 
 const qData = (k, v) => ` data-q="${esc(k)}"${v != null ? ` data-v="${esc(v)}"` : ''}`;
 function qAttrHTML(s, lc) {
@@ -119,10 +117,15 @@ export class QmdEditor {
     });
     this.ta.addEventListener('compositionstart', () => { const ta = this.ta; this.before = { value: ta.value, s: ta.selectionStart, end: ta.selectionEnd }; });
     this.ta.addEventListener('compositionend', () => { if (this.frontChanged(this.before)) this.restore(this.before); });
-    for (const ev of ['keyup', 'click', 'focus', 'blur']) this.ta.addEventListener(ev, () => { this.highlight(); this.caret(); });
+    // 文字・カーソル・フォーカスが前回描いたときと同じなら描き直さない（変わるものは各所で highlight() を呼ぶ）
+    for (const ev of ['keyup', 'click', 'focus', 'blur']) this.ta.addEventListener(ev, () => { if (!this.drawnNow()) this.highlight(); this.caret(); });
     document.addEventListener('selectionchange', () => { if (document.activeElement === this.ta) this.caret(); });
   }
 
+  drawnNow() {
+    const d = this.drawn, ta = this.ta;
+    return !!d && d.value === ta.value && d.start === ta.selectionStart && d.end === ta.selectionEnd && d.focused === (document.activeElement === ta);
+  }
   frontChanged(before) {
     const lock = before && frontEnd(before.value);
     return !!lock && (frontEnd(this.ta.value) !== lock || this.ta.value.slice(0, lock) !== before.value.slice(0, lock));
@@ -145,10 +148,10 @@ export class QmdEditor {
     const folded = new Set(this.foldedHeads());
     const pos = caret ?? this.caretOffset();
     this.ta.value = text; this.folds = [];
-    const allLines = text.split('\n'), allHeads = pageHeads(allLines);
+    const allLines = text.split('\n'), allHeads = pageHeads(allLines), allStarts = lineOffsets(allLines);
     const ranges = frontEnd(text) ? [{ start: 0, end: frontEnd(text) }] : [];
     allHeads.forEach((h, i) => {
-      if (h.generated || /\{[^}]*\.cover(?:[\s}])/.test(allLines[h.line])) ranges.push({ start: lineStart(allLines, h.line), end: allHeads[i + 1] ? lineStart(allLines, allHeads[i + 1].line) : text.length });
+      if (h.generated || /\{[^}]*\.cover(?:[\s}])/.test(allLines[h.line])) ranges.push({ start: allStarts[h.line], end: allHeads[i + 1] ? allStarts[allHeads[i + 1].line] : text.length });
     });
     const merged = [];
     for (const r of ranges) {
@@ -162,7 +165,7 @@ export class QmdEditor {
       this.folds.push({ at: r.start, body: text.slice(r.start, r.end), managed: true });
     }
     this.prev = this.ta.value;
-    const lines = this.ta.value.split('\n'), heads = pageHeads(lines);
+    const { lines, heads } = this.disp();
     for (let k = heads.length - 1; k >= 0; k--) if (folded.has(lines[heads[k].line])) this.toggle(k, false);
     this.setCaretOffset(Math.min(pos, text.length), false);
     this.highlight();
@@ -178,9 +181,31 @@ export class QmdEditor {
     });
   }
   foldedHeads() {
-    const lines = this.ta.value.split('\n');
-    return pageHeads(lines).filter(h => this.folds.some(f => !f.managed && f.at === lineEnd(lines, h.line))).map(h => lines[h.line]);
+    const d = this.disp(), ats = new Set(this.folds.filter(f => !f.managed).map(f => f.at));
+    return d.heads.filter(h => ats.has(d.starts[h.line + 1] - 1)).map(h => d.lines[h.line]);
   }
+  // 表示中の文字列の行・行の先頭位置・::: の対応・見出し。同じ文字列なら読み直さない（カーソル移動で全文を解析しない）
+  disp() {
+    const value = this.ta.value;
+    if (this.dispCache?.value !== value) {
+      const lines = value.split('\n'), scan = qmdScan(lines);
+      this.dispCache = { value, lines, starts: lineOffsets(lines), scan, heads: pageHeads(lines, scan), unclosed: null };
+    }
+    return this.dispCache;
+  }
+  // 原文（畳んだ本文を戻した文字列）の行の先頭位置と見出しの行。表示中の文字列と畳み方が同じなら作り直さない
+  full() {
+    const c = this.fullCache, value = this.ta.value, folds = this.folds;
+    const same = c && c.value === value && c.folds.length === folds.length
+      && folds.every((f, i) => c.folds[i].f === f && c.folds[i].at === f.at && c.folds[i].body === f.body);
+    if (!same) {
+      const lines = this.text().split('\n');
+      this.fullCache = { value, folds: folds.map(f => ({ f, at: f.at, body: f.body })), starts: lineOffsets(lines), headLines: pageHeads(lines).map(h => h.line) };
+    }
+    return this.fullCache;
+  }
+  // 表示中の i 行目が属するページ（繰り返すときは d・f を一度だけ求めて渡す）
+  pageOfLine(i, d = this.disp(), f = this.full()) { return this.pageAtOffset(this.toFull(d.starts[i]), f); }
   // 表示中の文字位置 ⇄ 原文の文字位置
   toFull(pos) { let x = pos; for (const f of this.folds) if (f.at < pos || (f.managed && f.at === pos)) x += f.body.length; return x; }
   toDisp(pos) {
@@ -211,20 +236,17 @@ export class QmdEditor {
 
   // ------------------------------------------------------------ ページ
   heads() { return pageHeads(this.text().split('\n')); }
-  pageAtOffset(pos) {
-    const full = this.text(), lines = full.split('\n'), heads = pageHeads(lines);
-    const line = full.slice(0, pos).split('\n').length - 1;
-    return Math.max(0, heads.filter(h => h.line <= line).length - 1);
+  pageAtOffset(pos, { starts, headLines } = this.full()) {
+    return Math.max(0, countAtMost(headLines, lineAt(starts, pos)) - 1);
   }
   caret() {
-    const p = this.pageAtOffset(this.caretOffset());
-    const pos = this.caretOffset();
+    const pos = this.caretOffset(), p = this.pageAtOffset(pos);
     if (p !== this.page || pos !== this.lastPos) { this.lastPos = pos; this.page = p; this.onCaret(p, pos); this.highlight(); }
   }
   // ページの見出しの行を、スクロールの一番上に出す（カーソルは動かさない）
   revealPage(k, scroller) {
     this.page = k;
-    const lines = this.ta.value.split('\n'), h = pageHeads(lines).find(h => this.pageAtOffset(this.toFull(lineStart(lines, h.line))) === k);
+    const d = this.disp(), f = this.full(), h = d.heads.find(h => this.pageOfLine(h.line, d, f) === k);
     this.highlight();
     if (!h) return;
     const el = this.pre.children[h.line];
@@ -232,12 +254,11 @@ export class QmdEditor {
   }
   // ページの見出しの行の要素（表示切り替えで位置を合わせるのに使う）
   headEl(k) {
-    const lines = this.ta.value.split('\n');
-    const h = pageHeads(lines).find(h => this.pageAtOffset(this.toFull(lineStart(lines, h.line))) === k);
+    const d = this.disp(), f = this.full(), h = d.heads.find(h => this.pageOfLine(h.line, d, f) === k);
     return h ? this.pre.children[h.line] : null;
   }
   revealOffset(pos, scroller) {
-    const d = this.toDisp(pos), line = this.ta.value.slice(0, d).split('\n').length - 1;
+    const line = lineAt(this.disp().starts, this.toDisp(pos));
     const el = this.pre.children[line];
     if (el && scroller) {
       const top = el.offsetTop, view = scroller.clientHeight;
@@ -247,9 +268,9 @@ export class QmdEditor {
 
   // ------------------------------------------------------------ 折りたたみ（mock の RF）
   toggle(k, render = true) {
-    const ta = this.ta, v = ta.value, lines = v.split('\n'), heads = pageHeads(lines);
+    const ta = this.ta, v = ta.value, { lines, heads, starts } = this.disp();
     const h = heads[k]?.line; if (h == null) return;
-    const at = lineEnd(lines, h), open = this.folds.find(f => !f.managed && f.at === at);
+    const at = starts[h + 1] - 1, open = this.folds.find(f => !f.managed && f.at === at);
     let a = ta.selectionStart, b = ta.selectionEnd;
     if (open) {
       this.folds = this.folds.filter(f => f !== open);
@@ -260,7 +281,7 @@ export class QmdEditor {
       let e = (heads[k + 1]?.line ?? lines.length) - 1;
       while (e > h && !lines[e].trim()) e--;
       if (e === h) return;
-      const end = lineEnd(lines, e), body = v.slice(at, end);
+      const end = starts[e + 1] - 1, body = v.slice(at, end);
       for (const f of this.folds) if (f.at > at) f.at -= body.length;
       const fix = x => x <= at ? x : x < end ? at : x - body.length;
       a = fix(a); b = fix(b);
@@ -274,12 +295,12 @@ export class QmdEditor {
   unfoldAt(pos) {
     // 原文の pos を含む畳んだ本文を開く
     for (;;) {
-      const lines = this.ta.value.split('\n'), heads = pageHeads(lines);
+      const { heads, starts } = this.disp();
       let shift = 0, hit = -1;
       const sorted = [...this.folds].sort((a, b) => a.at - b.at);
       for (const f of sorted) {
         const at = f.at + shift;
-        if (!f.managed && pos > at && pos <= at + f.body.length) { hit = heads.findIndex(h => lineEnd(lines, h.line) === f.at); break; }
+        if (!f.managed && pos > at && pos <= at + f.body.length) { hit = heads.findIndex(h => starts[h.line + 1] - 1 === f.at); break; }
         shift += f.body.length;
       }
       if (hit < 0) return;
@@ -288,21 +309,21 @@ export class QmdEditor {
   }
   // 開いているページの数（本文の無いページは畳めないので数えない）
   openPages() {
-    const lines = this.ta.value.split('\n'), heads = pageHeads(lines), ats = new Set(this.folds.map(f => f.at));
+    const { lines, heads, starts } = this.disp(), ats = new Set(this.folds.map(f => f.at));
     return heads.filter((h, k) => {
-      if (ats.has(lineEnd(lines, h.line))) return false;
+      if (ats.has(starts[h.line + 1] - 1)) return false;
       let e = (heads[k + 1]?.line ?? lines.length) - 1;
       while (e > h.line && !lines[e].trim()) e--;
       return e > h.line;
     }).length;
   }
   foldAll(others) {
-    const n = pageHeads(this.ta.value.split('\n')).length;
+    const n = this.disp().heads.length;
     for (let k = n - 1; k >= 0; k--) {
-      const lines = this.ta.value.split('\n'), h = pageHeads(lines)[k];
+      const { heads, starts } = this.disp(), h = heads[k];
       if (!h) continue;
-      const folded = this.folds.some(f => !f.managed && f.at === lineEnd(lines, h.line));
-      if (folded !== (others && this.pageAtOffset(this.toFull(lineStart(lines, h.line))) !== this.page)) this.toggle(k, false);
+      const folded = this.folds.some(f => !f.managed && f.at === starts[h.line + 1] - 1);
+      if (folded !== (others && this.pageOfLine(h.line) !== this.page)) this.toggle(k, false);
     }
     this.highlight();
   }
@@ -321,27 +342,25 @@ export class QmdEditor {
 
   // ------------------------------------------------------------ 色分け
   highlight() {
-    const ta = this.ta, lines = ta.value.split('\n');
-    const scan = qmdScan(lines), { divs, kind } = scan;
-    const heads = pageHeads(lines, scan), headAt = new Map(heads.map((h, k) => [h.line, { ...h, k }]));
+    const ta = this.ta, d0 = this.disp(), { lines, starts, scan, heads } = d0, { divs, kind } = scan;
+    const headAt = new Map(heads.map((h, k) => [h.line, { ...h, k }]));
     const focused = document.activeElement === ta;
-    const caretLine = ta.value.slice(0, ta.selectionStart).split('\n').length - 1;
+    const caretLine = lineAt(starts, ta.selectionStart);
     const end = d => d.close ?? lines.length - 1;
     const cur = focused ? divs.filter(d => d.depth && caretLine >= d.open && caretLine <= end(d)).pop() : null;
     const pair = focused ? divs.find(d => d.open === caretLine || d.close === caretLine) : null;
     // 閉じていない囲み（見出しのような行より前で閉じていないもの）
-    const fixes = this.unclosed(lines, divs).filter(f => !(focused && caretLine >= f.from && caretLine < f.end));
+    d0.unclosed ??= this.unclosed(lines, divs);
+    const fixes = d0.unclosed.filter(f => !(focused && caretLine >= f.from && caretLine < f.end));
+    // 解析結果は同じ文字列のあいだ使い回すので、警告の印は毎回付け直す
+    for (const d of divs) d.warn = false;
     for (const f of fixes) for (const d of f.divs) d.warn = true;
-    const foldLines = new Set(this.folds.map(f => lines.slice(0, lines.length).findIndex((l, i) => lineEnd(lines, i) === f.at)));
+    const foldLines = new Set(this.folds.map(f => { const i = lineAt(starts, f.at); return starts[i + 1] - 1 === f.at ? i : -1; }));
     let mark = null;
-    if (this.mark) {
-      const a = this.toDisp(this.mark.start), b = this.toDisp(this.mark.end);
-      mark = { a: ta.value.slice(0, a).split('\n').length - 1, b: ta.value.slice(0, b).split('\n').length - 1, color: this.mark.color };
-    }
-    const rawFrom = this.rawOnlyFrom != null ? this.toDisp(this.rawOnlyFrom) : null;
-    const rawLine = rawFrom != null ? ta.value.slice(0, rawFrom).split('\n').length - 1 : Infinity;
+    if (this.mark) mark = { a: lineAt(starts, this.toDisp(this.mark.start)), b: lineAt(starts, this.toDisp(this.mark.end)), color: this.mark.color };
+    const rawLine = this.rawOnlyFrom != null ? lineAt(starts, this.toDisp(this.rawOnlyFrom)) : Infinity;
     let seen = false;
-    const frontLines = ta.value.slice(0, frontEnd(ta.value)).split('\n').length - 1;
+    const frontLines = lineAt(starts, frontEnd(ta.value));
     this.pre.innerHTML = lines.map((l, i) => {
       const h = headAt.get(i);
       const cls = ['l'];
@@ -359,7 +378,8 @@ export class QmdEditor {
       return `<span class="${cls.join(' ')}"${bg ? ` style="--hc:${bg}"` : ''}>${lineHTML(l, kind[i], p, isHead, this.ctx) || ''}${fold}</span>`;
     }).join('');
     ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px';
-    this.foldButtons(lines, heads, fixes);
+    this.foldButtons(heads, starts, fixes);
+    this.drawn = { value: ta.value, start: ta.selectionStart, end: ta.selectionEnd, focused };
     this.onFold();
   }
   unclosed(lines, divs) {
@@ -378,21 +398,21 @@ export class QmdEditor {
     return out;
   }
   closeDivs(f) {
-    const lines = this.ta.value.split('\n'), pos = this.toFull(lineEnd(lines, f.at));
+    const { lines, starts } = this.disp(), pos = this.toFull(starts[f.at + 1] - 1);
     const text = [...f.divs].sort((x, y) => y.open - x.open).map(d => '\n' + lines[d.open].match(DIV_RE)[2]).join('');
     this.replaceRange(pos, pos, text);
   }
-  foldButtons(lines, heads, fixes) {
-    const box = this.foldBox, els = this.pre.children;
+  foldButtons(heads, starts, fixes) {
+    const box = this.foldBox, els = this.pre.children, d = this.disp(), full = this.full();
     const ats = new Set(this.folds.map(f => f.at));
     box.textContent = '';
     heads.forEach((h, k) => {
       const el = els[h.line]; if (!el) return;
-      const folded = ats.has(lineEnd(lines, h.line));
+      const folded = ats.has(starts[h.line + 1] - 1), page = this.pageOfLine(h.line, d, full);
       const row = document.createElement('div');
-      row.className = 'rf-row' + (folded ? ' folded' : '') + (this.pageAtOffset(this.toFull(lineStart(lines, h.line))) === this.page ? ' cur' : '');
+      row.className = 'rf-row' + (folded ? ' folded' : '') + (page === this.page ? ' cur' : '');
       row.style.top = (el.offsetTop + (el.offsetHeight - 18) / 2) + 'px';
-      const num = document.createElement('span'); num.className = 'rf-num'; num.textContent = this.pageAtOffset(this.toFull(lineStart(lines, h.line))) + 1;
+      const num = document.createElement('span'); num.className = 'rf-num'; num.textContent = page + 1;
       const b = document.createElement('button'); b.type = 'button'; b.className = 'rf-chev';
       b.innerHTML = svg(folded ? 'chevR' : 'chevD');
       b.title = folded ? S.unfoldPage : S.foldPage;
@@ -414,5 +434,3 @@ export class QmdEditor {
     }
   }
 }
-
-export { lineStart, lineEnd };

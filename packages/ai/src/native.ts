@@ -1,14 +1,16 @@
+import { mkdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { Workspace } from '../../core/src/workspace.js';
 import { readAsset } from '../../core/src/assets.js';
-import type { RoleId } from '../../core/src/ai-roles.js';
+import { get as roleDefinition, type RoleId } from '../../core/src/ai-roles.js';
 import { Providers,assertCallable,type ProviderId } from './providers.js';
 import { execute } from './process.js';
 import { runCodex } from './codex-run.js';
 import type { JsonObject } from './app-server.js';
 import { codexLimits, claudeLimits, type Limits } from './limits.js';
 export interface RunEvent {session?:string;step?:{id:string|null;kind:string;text:string;exit?:number};usage?:{used:number|null;window:number|null};limits?:Limits;final?:unknown}
-export interface NativeOptions {role:RoleId;outputSchema?:JsonObject|null;prompt:string;model:string;effort?:string|null;session?:string|null;images?:string[];readonly:boolean;web:boolean;signal?:AbortSignal;onEvent:(event:RunEvent)=>void}
+export interface NativeOptions {deck:string;role:RoleId;outputSchema?:JsonObject|null;prompt:string;model:string;effort?:string|null;session?:string|null;images?:string[];readonly:boolean;web:boolean;signal?:AbortSignal;onEvent:(event:RunEvent)=>void}
 const object=(value:unknown):value is JsonObject=>!!value&&typeof value==='object'&&!Array.isArray(value);
 export function schema(role:RoleId):JsonObject|null{
  const chat=JSON.parse(readAsset('ai','schema.json'));const questions=chat.properties.questions;
@@ -18,14 +20,29 @@ export function schema(role:RoleId):JsonObject|null{
  if(role==='draft')return {type:'object',additionalProperties:false,properties:{reply:{type:'string'},slides:{type:'string'},rebuild:{type:'boolean'},questions},required:['reply','slides','rebuild','questions']};return null;
 }
 function toml(value:unknown):string{if(object(value))return '{'+Object.entries(value).map(([k,v])=>JSON.stringify(k)+' = '+toml(v)).join(', ')+'}';return JSON.stringify(value);}
+export function writablePaths(ws: Workspace, {deck, role, readonly}: Pick<NativeOptions, 'deck' | 'role' | 'readonly'>): string[] {
+ if (readonly) return [];
+ if (role === 'theme') return [join(ws.themes, ws.deck_theme(deck) + '.css')];
+ if (role === 'draft') return [ws.memo(deck)];
+ // The main chat can do every job itself, including the shared themes; other roles keep one file.
+ return [ws.deck_dir(deck), ws.topic_dir(ws.deck_shelf(deck)), ws.themes, join(ws.state, 'requests')];
+}
 export function nativeArgs(id:ProviderId,ws:Workspace,o:NativeOptions){
  assertCallable(id);
+ const writable = writablePaths(ws, o);
  const protectedPaths=['snapshots','chat'].map(name=>join(ws.state,name)),output=o.outputSchema===undefined?schema(o.role):o.outputSchema;
- if(id==='codex'){const config:JsonObject={web_search:o.web?'live':'disabled'};if(!o.readonly)Object.assign(config,{default_permissions:'slide-studio','permissions.slide-studio.extends':':workspace','permissions.slide-studio.filesystem':Object.fromEntries(protectedPaths.map(p=>[p,'read']))});return ['app-server','--listen','stdio://',...Object.entries(config).flatMap(([key,value])=>['-c',`${key}=${toml(value)}`])];}
+ if(id==='codex'){const config:JsonObject={web_search:o.web?'live':'disabled',projects:{[ws.root]:{trust_level:'untrusted'}},project_root_markers:[]};if(!o.readonly)Object.assign(config,{default_permissions:'slide-studio','permissions.slide-studio.extends':':read-only','permissions.slide-studio.filesystem':Object.fromEntries(writable.map(p=>[p,'write']))});return ['app-server','--listen','stdio://',...Object.entries(config).flatMap(([key,value])=>['-c',`${key}=${toml(value)}`])];}
  if(id==='claude'){
-  const settings={sandbox:{enabled:true,autoAllowBashIfSandboxed:true,allowUnsandboxedCommands:false,filesystem:{denyWrite:o.readonly?[ws.root]:protectedPaths}},permissions:{deny:(o.readonly?[ws.root]:protectedPaths).map(p=>`Edit(/${p}/**)`)}};
-  const args=['-p','--output-format','stream-json','--verbose','--permission-mode',o.readonly?'default':'acceptEdits','--setting-sources','project','--settings',JSON.stringify(settings),'--model',o.model];
-  if(o.web)args.push('--allowedTools','WebSearch,WebFetch');const denied=[...(o.readonly?['Edit','Write','NotebookEdit']:[]),...(!o.web?['WebSearch','WebFetch']:[])];if(denied.length)args.push('--disallowedTools',denied.join(','));if(o.effort)args.push('--effort',o.effort);if(o.session)args.push('--resume',o.session);if(output)args.push('--json-schema',JSON.stringify(output));return [...args,'--',o.prompt];
+  // The app supplies permissions. Project settings may contain executable hooks or helpers.
+  const rulePath=(path:string)=>'/'+path.replaceAll('\\','/').replace(/^([A-Za-z]):/,(_,drive:string)=>'/'+drive.toLowerCase()).replace(/[\[\]*?!]/gu,'\\$&');
+  const directoryScope=o.role==='chat';
+  const settings={disableAllHooks:true,sandbox:{enabled:true,autoAllowBashIfSandboxed:true,allowUnsandboxedCommands:false,
+    filesystem:{allowWrite:writable,denyWrite:o.readonly?[ws.root]:protectedPaths}},
+    permissions:{allow:[`Read(${rulePath(ws.root)}/**)`,...writable.map(p=>`Edit(${rulePath(p)}${directoryScope?'/**':''})`)]}};
+  const args=['-p','--output-format','stream-json','--verbose','--permission-mode','default','--setting-sources','user','--strict-mcp-config','--settings',JSON.stringify(settings),'--model',o.model];
+  const skill=roleDefinition(o.role).skill;
+  args.push('--append-system-prompt', `保管フォルダは ${ws.root} です。依頼に含まれる相対パスはこのフォルダを基準にしてください。AGENTS.md を参照してください。${skill ? ' 作業前に .claude/skills/'+skill+'/SKILL.md を参照してください。' : ''}`);
+  if(o.web)args.push('--allowedTools','WebSearch,WebFetch');const denied=[...(o.readonly?['Edit','Write','NotebookEdit']:[]),...(!o.web?['WebSearch','WebFetch']:[])];if(denied.length)args.push('--disallowedTools',denied.join(','));if(o.effort)args.push('--effort',o.effort);if(o.session)args.push('--resume',o.session);if(output)args.push('--json-schema',JSON.stringify(output));return args;
  }
  throw Error('未対応の AI です');
 }
@@ -45,7 +62,10 @@ export async function runNative(providers:Providers,id:ProviderId,ws:Workspace,o
   }});o.onEvent({final:result.final});return result;
  }
  let final:unknown=null,session=o.session??null,resultSeen=false,failure:string|null=null;
- const result=await execute(executable,args,{cwd:ws.root,env,signal:o.signal,timeoutMs:2*60*60*1000,capture:false,onLine:line=>{
+ // Bash can always write its cwd. Keep it outside the workspace and stable for resume.
+ const cwd=join(providers.storage,'workdirs',createHash('sha256').update(ws.root).digest('hex'));
+ await mkdir(cwd,{recursive:true,mode:0o700});
+ const result=await execute(executable,args,{cwd,env,signal:o.signal,timeoutMs:2*60*60*1000,input:o.prompt,capture:false,onLine:line=>{
   const ev:unknown=JSON.parse(line);if(!object(ev))throw Error('AI の通知形式が正しくありません');
   const sid=id==='claude'?ev.session_id:ev.conversation_id;if(typeof sid==='string'){session=sid;o.onEvent({session});}
   if(id==='claude'){

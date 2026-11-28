@@ -1,20 +1,33 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { chmod, copyFile, mkdir, mkdtemp, open, readdir, rename, rm, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { extract } from 'tar';
 import { atomicWriteFile } from '../../core/src/atomic.js';
+import { isInsideRoot } from '../../core/src/paths.js';
 import { execute } from './process.js';
 import { Providers, NAMES, type ProviderId } from './providers.js';
 
 export interface Release {version: string; url: string; algorithm: 'sha256' | 'sha512'; digest: string; size?: number; archive: boolean}
-interface State {current: string | null; previous: string | null; latest: string | null; checked: number; auto: boolean; skip: string | null; error: string | null}
-const initial: State = {current: null, previous: null, latest: null, checked: 0, auto: true, skip: null, error: null};
+// checked: last successful latest-version check (any caller). autoAttempted: last idle auto-update attempt,
+// so manual checks and downloads never postpone the daily automatic update.
+interface State {current: string | null; previous: string | null; latest: string | null; checked: number; autoAttempted: number; auto: boolean; skip: string | null; error: string | null}
+const initial: State = {current: null, previous: null, latest: null, checked: 0, autoAttempted: 0, auto: true, skip: null, error: null};
+const DAY = 86400, RETRY = 3600;
 const VERSION = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/u;
 const LIMIT = 1024 * 1024 * 1024;
 const CLAUDE = 'https://downloads.claude.ai/claude-code-releases';
 const AGY = 'https://antigravity-cli-auto-updater-974169037036.us-central1.run.app';
 type Fetch = typeof fetch;
+/** Semantic version order: numeric core, then a release sorts after its prereleases; build metadata is ignored. */
+export function compareVersions(a: string, b: string) {
+  const parse = (v: string) => { const [core = '', pre = ''] = v.replace(/\+.*$/su, '').split(/-(.*)/su); return {core: core.split('.').map(Number), pre}; };
+  const x = parse(a), y = parse(b);
+  for (let i = 0; i < Math.max(x.core.length, y.core.length); i++) { const d = (x.core[i] ?? 0) - (y.core[i] ?? 0); if (d) return Math.sign(d); }
+  if (x.pre === y.pre) return 0;
+  if (!x.pre || !y.pre) return x.pre ? -1 : 1;
+  return Math.sign(x.pre.localeCompare(y.pre, undefined, {numeric: true}));
+}
 function validVersion(value: unknown): string {
   if (typeof value !== 'string' || !VERSION.test(value)) throw Error('配布版の番号が正しくありません');
   return value;
@@ -71,7 +84,7 @@ export class Runtime {
   state(): State {
     try {
       const value = JSON.parse(readFileSync(join(this.root, 'state.json'), 'utf8'));
-      return {...initial, ...value, current: typeof value.current === 'string' && VERSION.test(value.current) ? value.current : null, previous: typeof value.previous === 'string' && VERSION.test(value.previous) ? value.previous : null};
+      return {...initial, ...value, autoAttempted: Number.isFinite(value.autoAttempted) ? value.autoAttempted : 0, current: typeof value.current === 'string' && VERSION.test(value.current) ? value.current : null, previous: typeof value.previous === 'string' && VERSION.test(value.previous) ? value.previous : null};
     } catch { return {...initial}; }
   }
   private save(values: Partial<State>) {
@@ -95,9 +108,9 @@ export class Runtime {
     return result;
   }
   async info(refresh = false, signal?: AbortSignal) {
-    const saved = this.state(), binary = this.providers.binary(this.id), managed = !!binary?.startsWith(this.root + '/');
-    const version = binary ? managed ? binary.slice(this.root.length + 1).split('/')[0]! : await this.installedVersion(binary, refresh, signal) : null;
-    return {id: this.id, name: NAMES[this.id], version, terminal: !!binary && !managed, fixed: this.overridden, latest: saved.latest, update: !!saved.latest && (!saved.current || saved.latest.localeCompare(saved.current, undefined, {numeric: true}) > 0), previous: saved.previous, auto: saved.auto, busy: this.busy, progress: this.progress, error: saved.error};
+    const saved = this.state(), binary = this.providers.binary(this.id), managed = !!binary && isInsideRoot(this.root, binary);
+    const version = binary ? managed ? relative(this.root, binary).split(sep)[0]! : await this.installedVersion(binary, refresh, signal) : null;
+    return {id: this.id, name: NAMES[this.id], version, terminal: !!binary && !managed, fixed: this.overridden, latest: saved.latest, update: !!saved.latest && (!version || compareVersions(saved.latest, version) > 0), previous: saved.previous, auto: saved.auto, busy: this.busy, progress: this.progress, error: saved.error};
   }
   async setAuto(auto: boolean) { if (this.overridden) throw Error('実行ファイルが指定されています'); await this.save({auto}); }
   async rollback() {
@@ -112,16 +125,37 @@ export class Runtime {
     if (this.overridden) return Promise.reject(Error('AI の実行ファイルが指定されていません'));
     return this.update(true, signal);
   }
-  update(force = false, signal?: AbortSignal): Promise<string> {
+  update(force = false, signal?: AbortSignal, release?: Release): Promise<string> {
     if (this.overridden) return Promise.reject(Error('実行ファイルが指定されています'));
     if (this.pending) return this.pending;
-    this.pending = this.perform(force, signal).finally(() => { this.pending = null; this.progress = null; });
+    this.pending = this.perform(force, signal, release).finally(() => { this.pending = null; this.progress = null; });
     return this.pending;
   }
-  private async perform(force: boolean, signal?: AbortSignal) {
-    const release = await this.check(signal), saved = this.state();
+  /**
+   * Idle automatic update, at most once a day per AI (failures retry after an hour).
+   * A managed runtime updates in place. A terminal CLI is never modified: when it is older than the
+   * latest release, the managed runtime is installed and preferred from then on. Never downgrades,
+   * honours a rolled-back version, and never touches an executable fixed by SLIDE_STUDIO_<ID>.
+   * Returns true when the executable in use changed.
+   */
+  async automatic(signal?: AbortSignal, now = Date.now() / 1000): Promise<boolean> {
+    const saved = this.state();
+    if (this.overridden || this.busy || !saved.auto || now >= saved.autoAttempted && now - saved.autoAttempted < DAY) return false;
+    const binary = this.providers.binary(this.id);
+    // Nothing installed yet: the first download is the user's choice.
+    if (!binary) return false;
+    await this.save({autoAttempted: now});
+    try {
+      if (isInsideRoot(this.root, binary)) return await this.update(false, signal) !== binary;
+      const [release, version] = await Promise.all([this.check(signal), this.installedVersion(binary, true, signal)]);
+      if (!version || release.version === saved.skip || compareVersions(release.version, version) <= 0) return false;
+      return await this.update(false, signal, release) !== binary;
+    } catch (error) { await this.save({autoAttempted: now - DAY + RETRY}); throw error; }
+  }
+  private async perform(force: boolean, signal?: AbortSignal, checked?: Release) {
+    const release = checked ?? await this.check(signal), saved = this.state();
     const old = saved.current ? join(this.root, saved.current, pathFor(this.id)) : null;
-    if (old && existsSync(old) && (release.version === saved.current || !force && (release.version === saved.skip || release.version.localeCompare(saved.current!, undefined, {numeric:true}) < 0))) return old;
+    if (old && existsSync(old) && (release.version === saved.current || !force && (release.version === saved.skip || compareVersions(release.version, saved.current!) < 0))) return old;
     const previous = saved.previous === release.version ? join(this.root, release.version, pathFor(this.id)) : null;
     if (previous && existsSync(previous)) {
       if (this.options.accept) await this.options.accept(previous);

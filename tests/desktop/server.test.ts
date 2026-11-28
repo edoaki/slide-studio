@@ -6,9 +6,9 @@ import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { load as loadHtml } from "cheerio";
 import type {
-  LegacyFeatureHandler,
-  LegacyRenderText,
-  LegacyRendered,
+  FeatureHandler,
+  RenderText,
+  RenderedDeck,
 } from "../../packages/contracts/src/server.js";
 import { reset_cover_positions } from "../../apps/server/themes.js";
 import { parse } from "../../packages/core/src/source.js";
@@ -17,9 +17,9 @@ import { Workspace } from "../../packages/core/src/workspace.js";
 import { Providers, type ProviderStatus } from "../../packages/ai/src/providers.js";
 import type { Runner } from "../../packages/ai/src/workflow.js";
 import {
-  startLegacyHost,
-  type LegacyHost,
-  type LegacyWorkspace,
+  startStudioHost,
+  type StudioHost,
+  type HostWorkspace,
 } from "../../apps/server/index.js";
 
 interface ResponseValue {
@@ -92,7 +92,7 @@ function request(
 }
 
 function adminRequest(
-  host: LegacyHost,
+  host: StudioHost,
   path: string,
   options: RequestOptions = {},
 ): Promise<ResponseValue> {
@@ -122,7 +122,7 @@ async function createWorkspace(t: TestContext): Promise<Workspace> {
   return Workspace.open(root);
 }
 
-function renderedFrom(text: string): LegacyRendered {
+function renderedFrom(text: string): RenderedDeck {
   const html = text.includes("hostile-preview")
     ? "<script src=\"/prefix-before-html.js\"></script>"
       + "<html lang=\"en\"><script src=\"/prefix-before-head.js\"></script>"
@@ -145,7 +145,7 @@ function renderedFrom(text: string): LegacyRendered {
 }
 
 interface HostFixture {
-  host: LegacyHost;
+  host: StudioHost;
   workspace: Workspace;
   uiDirectory: string;
 }
@@ -153,13 +153,13 @@ interface HostFixture {
 async function launch(
   t: TestContext,
   overrides: {
-    featureHandlers?: LegacyFeatureHandler[];
+    featureHandlers?: FeatureHandler[];
     onShutdown?: () => void | Promise<void>;
     openPath?: (path: string) => Promise<void>;
     watch?: boolean;
     keepAliveMs?: number;
-    renderText?: LegacyRenderText;
-    selectWorkspace?: () => LegacyWorkspace | null | Promise<LegacyWorkspace | null>;
+    renderText?: RenderText;
+    selectWorkspace?: () => HostWorkspace | null | Promise<HostWorkspace | null>;
     maxBodyBytes?: number;
     maxSourceBodyBytes?: number;
     maxUploadBodyBytes?: number;
@@ -170,7 +170,7 @@ async function launch(
 ): Promise<HostFixture> {
   const workspace = await createWorkspace(t);
   const uiDirectory = await createUi(t);
-  const host = await startLegacyHost({
+  const host = await startStudioHost({
     workspace,
     uiDirectory,
     pandocPath: "/bin/pandoc",
@@ -193,7 +193,7 @@ async function launch(
   return { host, workspace, uiDirectory };
 }
 
-function sseConnect(host: LegacyHost): Promise<{
+function sseConnect(host: StudioHost): Promise<{
   chunks: () => string;
   ended: Promise<void>;
   destroy: () => void;
@@ -439,7 +439,7 @@ test("reads normalized source, previews on the content origin, and preserves CRL
 
 test("dispatches feature routes before the generic POST action and never fakes success", async (t) => {
   const calls: string[] = [];
-  const handler: LegacyFeatureHandler = async (req) => {
+  const handler: FeatureHandler = async (req) => {
     calls.push(`${req.method} ${req.pathname}`);
     if (req.pathname !== "/api/deck/deck-1/library") return null;
     return { status: 200, body: { url: "/files/deck.png", seen: req.body } };
@@ -479,9 +479,8 @@ test("dispatches feature routes before the generic POST action and never fakes s
   });
   assert.equal(check.status, 501);
   assert.equal((check.json as { feature: string }).feature, "check");
-  assert.equal(host.handoff.status, "in_progress");
-  assert.ok(host.handoff.implemented.includes("library"));
-  assert.ok(host.handoff.implemented.includes("ai"));
+  assert.ok(host.implemented.includes("library"));
+  assert.ok(host.implemented.includes("ai"));
   assert.ok(host.pending.includes("checks"));
 });
 
@@ -515,7 +514,7 @@ test("close drains accepted writes before listeners and onShutdown", async (t) =
   });
   let started = false;
   let shutdowns = 0;
-  const handler: LegacyFeatureHandler = async (req) => {
+  const handler: FeatureHandler = async (req) => {
     if (req.pathname !== "/api/math") return null;
     started = true;
     await gate;
@@ -545,7 +544,6 @@ test("close drains accepted writes before listeners and onShutdown", async (t) =
   assert.equal(response.status, 200);
   await closing;
   assert.equal(shutdowns, 1);
-  assert.equal(host.handoff.status, "in_progress");
 });
 
 test("memo and style keep the legacy conflict fields", async (t) => {
@@ -670,7 +668,7 @@ test("refuses a workspace switch while another request or render is in flight", 
   });
   let started = false;
   let selections = 0;
-  const handler: LegacyFeatureHandler = async (req) => {
+  const handler: FeatureHandler = async (req) => {
     if (req.pathname !== "/api/math") return null;
     started = true;
     await gate;
@@ -769,7 +767,7 @@ test("rejects invalid UTF-8 memo content without overwriting bytes", async (t) =
 
 test("rewrites only URL fields and sandboxes active feature bytes", async (t) => {
   let seenHeaders: Record<string, string | undefined> = {};
-  const handler: LegacyFeatureHandler = async (req) => {
+  const handler: FeatureHandler = async (req) => {
     if (req.pathname === "/api/deck/deck-1/library") {
       return {
         status: 200,
@@ -823,7 +821,7 @@ test("rewrites only URL fields and sandboxes active feature bytes", async (t) =>
 });
 
 test("a synchronous renderer throw does not leak render queue slots", async (t) => {
-  const renderText: LegacyRenderText = (_workspace, _deck, text) => {
+  const renderText: RenderText = (_workspace, _deck, text) => {
     if (text.includes("boom")) throw new Error("boom");
     return Promise.resolve(renderedFrom(text));
   };
@@ -844,7 +842,7 @@ test("a synchronous renderer throw does not leak render queue slots", async (t) 
 });
 
 test("edit preview keeps the last good render while present mode fails", async (t) => {
-  const renderText: LegacyRenderText = (_workspace, _deck, text) => {
+  const renderText: RenderText = (_workspace, _deck, text) => {
     if (text.includes("broken")) throw new Error("broken source");
     return Promise.resolve(renderedFrom(text));
   };
@@ -876,7 +874,7 @@ test("edit preview keeps the last good render while present mode fails", async (
 });
 
 test("accepts large uploads and a larger source PUT than the JSON limit", async (t) => {
-  const handler: LegacyFeatureHandler = async (req) => {
+  const handler: FeatureHandler = async (req) => {
     if (req.pathname !== "/api/deck/deck-1/library") return null;
     return { status: 200, body: { received: req.bytes.byteLength } };
   };
@@ -907,7 +905,7 @@ test("accepts large uploads and a larger source PUT than the JSON limit", async 
 
 test("matches legacy route precedence for wrong methods", async (t) => {
   const calls: string[] = [];
-  const handler: LegacyFeatureHandler = async (req) => {
+  const handler: FeatureHandler = async (req) => {
     calls.push(`${req.method} ${req.pathname}`);
     if (req.pathname !== "/api/deck/deck-1/library") return null;
     return { status: 200, body: { ok: true } };
@@ -966,7 +964,7 @@ test('theme API preserves original create, edit, conflict, undo, select and dele
 
 test('serves the complete original UI import graph and editing stylesheet', async t => {
   const workspace = await createWorkspace(t);
-  const host = await startLegacyHost({workspace, uiDirectory:join(process.cwd(),'dist/packages/web'),pandocPath:'/bin/pandoc',watch:false,renderText:async (_ws,_deck,text)=>renderedFrom(text)});
+  const host = await startStudioHost({workspace, uiDirectory:join(process.cwd(),'dist/packages/web'),pandocPath:'/bin/pandoc',watch:false,renderText:async (_ws,_deck,text)=>renderedFrom(text)});
   t.after(()=>host.close());
   const pending = ['/web/app.js','/web/location.js'];
   const visited = new Set<string>();
@@ -1025,12 +1023,68 @@ test('materials API uploads binary files, opens locally, moves, deletes and rest
   assert.equal((await adminRequest(host,'/api/deck/missing/materials')).status,404);
 });
 
-test('original chat API sends a memo, guards its edits, reviews, and restores the snapshot', async t => {
-  class FixtureProviders extends Providers {
-    override async detectAll(): Promise<ProviderStatus[]> {
-      return [{id:'codex',name:'Fixture',ok:true,reason:'',message:'',default:'test',models:[{id:'test',name:'Fixture',efforts:['medium'],effort:'medium',context:100000}]}];
-    }
+class FixtureProviders extends Providers {
+  override async detectAll(): Promise<ProviderStatus[]> {
+    return [{id:'codex',name:'Fixture',ok:true,reason:'',message:'',default:'test',models:[{id:'test',name:'Fixture',efforts:['medium'],effort:'medium',context:100000}]}];
   }
+}
+
+for (const target of ['deck', 'first', 'theme']) {
+  test(`AI lock on ${target} returns 423 for edits within its scope`, async t => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const {host, workspace} = await launch(t, {
+      aiProviders: new FixtureProviders(join(tmpdir(), 'unused-fixture-ai')),
+      aiRunner: async () => { await gate; return {final: {summary: '完了', issues: []}}; },
+    });
+    workspace.new_deck('talk', 'topic');
+    const path = workspace.qmd('talk');
+    const source = '---\ntitle: Talk\ntopic: topic\ntheme: default\n---\n\n## One {#first}\n\nAlpha\n\n## Two {#second}\n\nBeta\n';
+    await writeFile(path, source);
+    const chat = '/api/deck/talk/chat';
+    const mode = target === 'theme' ? 'theme' : 'slides';
+    const initial = await adminRequest(host, chat);
+    assert.equal(initial.status, 200, initial.text);
+    const {tabs} = initial.json as {tabs: {id: string; mode: string}[]};
+    const tab = tabs.find(tab => tab.mode === mode)!;
+    const base = mode === 'theme' ? sha256(await readFile(join(workspace.themes, 'default.css'))) : sha256(source);
+    const save = (text: string) => adminRequest(host, '/api/deck/talk/source', {
+      method: 'PUT', json: {base: sha256(source), base_text: source, text},
+    });
+    try {
+      const sent = await adminRequest(host, `${chat}/tabs/${tab.id}/send`, {
+        method: 'POST', json: {base, items: [{key: target, text: '編集してください'}]},
+      });
+      assert.equal(sent.status, 200, sent.text);
+      if (mode === 'theme') {
+        const result = await adminRequest(host, '/api/themes/default', {method: 'PUT', json: {base, css: 'body {}'}});
+        assert.equal(result.status, 423, result.text);
+        return;
+      }
+      const expected = target === 'first' ? true : undefined;
+      const change = source.replace('Alpha', 'Edited');
+      const blocked = await save(change);
+      assert.equal(blocked.status, 423, blocked.text);
+      assert.equal((blocked.json as {partial?: boolean}).partial, expected);
+      assert.equal(await readFile(path, 'utf8'), source);
+      const external = source.replace('Alpha', 'External');
+      await writeFile(path, external);
+      const stale = await save(change);
+      assert.equal(stale.status, 423, stale.text);
+      assert.equal((stale.json as {partial?: boolean}).partial, expected);
+      if (target === 'first') {
+        const allowed = await save(source.replace('Beta', 'Edited'));
+        assert.equal(allowed.status, 200, allowed.text);
+        assert.equal(await readFile(path, 'utf8'), external.replace('Beta', 'Edited'));
+      }
+    } finally {
+      release();
+      await host.close();
+    }
+  });
+}
+
+test('original chat API sends a memo, guards its edits, reviews, and restores the snapshot', async t => {
   let entered!: () => void, release!: () => void;
   const started = new Promise<void>(resolve => { entered = resolve; });
   const gate = new Promise<void>(resolve => { release = resolve; });
@@ -1058,11 +1112,11 @@ test('original chat API sends a memo, guards its edits, reviews, and restores th
   await started;
   try {
     const locked=await adminRequest(host,'/api/deck/deck-1/memo',{method:'PUT',json:{base:sha256(''),text:'競合する編集'}});
-    assert.equal(locked.status,409);
+    assert.equal(locked.status,423);
     const manage=await adminRequest(host,'/api/home/manage',{method:'POST',json:{action:'delete',deck:'deck-1'}});
     assert.equal(manage.status,409);
   } finally { release(); }
-  let completed: {rounds:Array<{id:string;state:string;handoff?:{pending:boolean}}>}|undefined;
+  let completed: {rounds:Array<{id:string;state:string;handoff?:{pending:boolean};memo_diff?:string}>}|undefined;
   for(let attempt=0;attempt<100;attempt++) {
     completed=(await adminRequest(host,base)).json as typeof completed;
     if(completed!.rounds[0]?.state==='done')break;
@@ -1070,6 +1124,7 @@ test('original chat API sends a memo, guards its edits, reviews, and restores th
   }
   assert.equal(completed!.rounds[0]?.state,'done');
   assert.equal(completed!.rounds[0]?.handoff?.pending,true);
+  assert.match(completed!.rounds[0]!.memo_diff!, /\+# 作成した下書き/u);
   const preview=await adminRequest(host,`${base}/rounds/${rid}/restore`);
   assert.equal(preview.status,200,preview.text);
   assert.deepEqual((preview.json as {files:string[]}).files,['decks/deck-1/memo.md']);
@@ -1094,23 +1149,38 @@ test('home trash API lists all kinds, restores persistently and rejects collisio
  assert.deepEqual((await adminRequest(host,'/api/home/trash')).json,{items:[]});
 });
 
-test('rehearsal records persist privately without changing source or rendering slides', async t => {
-  let renders=0;
-  const {host,workspace}=await launch(t,{renderText:async (_ws,_deck,text)=>{renders++;return renderedFrom(text);}});
+
+test('old rehearsal records stay private and the rehearsal API is gone', async t => {
+  const {host,workspace}=await launch(t);
   workspace.new_deck('deck-1','topic');
-  const source=await readFile(workspace.qmd('deck-1'));
-  const path='/api/deck/deck-1/rehearsals';
-  const first={version:1,date:'2026-11-18T00:00:00Z',elapsed:3000,pages:[{id:'one',title:'本文',number:1,ms:3000,visited:true}]};
-  assert.deepEqual((await adminRequest(host,path)).json,{previous:null});
-  assert.equal((await request(host.adminOrigin,path,{method:'PUT',json:first})).status,401);
-  const saved=await adminRequest(host,path,{method:'PUT',json:first});assert.equal(saved.status,200);assert.deepEqual(saved.json,{previous:null});
-  assert.deepEqual(JSON.parse(await readFile(join(workspace.deck_dir('deck-1'),'rehearsals.json'),'utf8')),first);
-  assert.deepEqual((await adminRequest(host,path)).json,{previous:first});
-  const second={...first,elapsed:2000,pages:[{...first.pages[0],ms:2000}]};
-  assert.deepEqual((await adminRequest(host,path,{method:'PUT',json:second})).json,{previous:first});
-  assert.equal((await adminRequest(host,path,{method:'PUT',json:{...second,elapsed:-1}})).status,400);
-  assert.deepEqual((await adminRequest(host,path)).json,{previous:second});
+  await writeFile(join(workspace.deck_dir('deck-1'),'rehearsals.json'),'{}\n');
   assert.equal((await request(host.contentOrigin,'/files/decks/deck-1/rehearsals.json')).status,404);
-  assert.equal((await adminRequest(host,'/api/deck/missing/rehearsals')).status,404);
-  assert.deepEqual(await readFile(workspace.qmd('deck-1')),source);assert.equal(renders,0);
+  assert.notEqual((await adminRequest(host,'/api/deck/deck-1/rehearsals')).status,200);
+});
+
+test('workspace watcher reconnects after an error and cancels retries on shutdown', async t => {
+  const {default: fs} = await import('node:fs');
+  const {syncBuiltinESMExports} = await import('node:module');
+  const original = fs.watch;
+  const watchers: import('node:fs').FSWatcher[] = [];
+  const hook = t.mock.method(fs, 'watch', (...args: Parameters<typeof original>) => {
+    const watcher = original(...args);
+    watchers.push(watcher);
+    return watcher;
+  });
+  syncBuiltinESMExports();
+  try {
+    const {host} = await launch(t, {watch:true});
+    const first = watchers.at(-1)!;
+    first.emit('error', Error('fixture watcher interruption'));
+    await waitUntil(() => watchers.at(-1) !== first);
+    const count = watchers.length;
+    watchers.at(-1)!.emit('error', Error('fixture close during retry'));
+    await host.close();
+    await new Promise(resolve => setTimeout(resolve, 550));
+    assert.equal(watchers.length,count);
+  } finally {
+    hook.mock.restore();
+    syncBuiltinESMExports();
+  }
 });

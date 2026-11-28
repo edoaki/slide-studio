@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { open, readFile, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { isInsideRoot } from "../../packages/core/src/paths.js";
-import type { LegacyWorkspace, PreviewCapability } from "./host-types.js";
+import type { HostWorkspace, PreviewCapability } from "./host-types.js";
 import {
   contentCsp,
   contentTypeFor,
@@ -20,16 +20,16 @@ export interface ContentHandlerDeps {
   uiDirectory: string;
   getAdminOrigin: () => string;
   getContentOrigin: () => string;
-  getWorkspace: () => LegacyWorkspace;
+  getWorkspace: () => HostWorkspace;
   hostMatches: (request: IncomingMessage, origin: string) => boolean;
   touchCapability: (code: string) => PreviewCapability | undefined;
-  readThemeCss: (ws: LegacyWorkspace, name: string) => Promise<Buffer | null>;
+  readThemeCss: (ws: HostWorkspace, name: string) => Promise<Buffer | null>;
 }
 
 async function handleContentStatic(
   request: IncomingMessage,
   response: ServerResponse,
-  ws: LegacyWorkspace,
+  ws: HostWorkspace,
   pathname: string,
   rangeHeader: string | undefined,
   adminOrigin: string,

@@ -156,7 +156,7 @@ local function apply_table_style(t, style)
     local specs = {}
     for i, spec in ipairs(t.colspecs) do
       specs[i] = {spec[1]}
-      add_style(first.cells[i], 'width:' .. cols[i] .. 'px')
+      add_style(first.cells[i], 'width:' .. (100 * tonumber(cols[i]) / total) .. '%')
     end
     t.colspecs = specs
     add_style(t, 'width:' .. total .. 'px;table-layout:fixed;overflow-wrap:anywhere')

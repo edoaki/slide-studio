@@ -535,7 +535,7 @@ export function with_arxiv_venue(text: string): string {
   return output;
 }
 
-export interface LegacyBibliographyEntry {
+export interface BibliographyEntry {
   key: string;
   type: string;
   fields: Record<string, string>;
@@ -547,14 +547,14 @@ export interface LegacyBibliographyEntry {
 }
 
 /** Entries for the bibliography screen. Unreadable files yield `[]`. */
-export function listing(path: string): LegacyBibliographyEntry[] {
+export function listing(path: string): BibliographyEntry[] {
   let text: string;
   try {
     text = readFileSync(path, "utf8");
   } catch {
     return [];
   }
-  const output: LegacyBibliographyEntry[] = [];
+  const output: BibliographyEntry[] = [];
   for (const [key, raw] of entries(text)) {
     if (key === null || key.startsWith("@string:")) continue;
     const found: Record<string, string> = {};

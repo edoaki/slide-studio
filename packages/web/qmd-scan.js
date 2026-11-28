@@ -64,3 +64,28 @@ export function pageHeads(lines, scan = qmdScan(lines), offset = 0) {
   return heads;
 }
 
+
+// 各行の先頭の文字位置（最後に全体の長さ＋1 を足す）。行の末尾は starts[i + 1] - 1
+export function lineOffsets(lines) {
+  const starts = new Array(lines.length + 1);
+  let at = 0;
+  for (let i = 0; i < lines.length; i++) { starts[i] = at; at += lines[i].length + 1; }
+  starts[lines.length] = at;
+  return starts;
+}
+// 文字位置 pos を含む行の番号（text.slice(0, pos).split('\n').length - 1 と同じ）を二分探索で求める
+export function lineAt(starts, pos) {
+  let lo = 0, hi = starts.length - 2;
+  if (hi < 0) return 0;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (starts[mid] <= pos) lo = mid; else hi = mid - 1;
+  }
+  return lo;
+}
+// 昇順の数の並び xs のうち、x 以下のものの数
+export function countAtMost(xs, x) {
+  let lo = 0, hi = xs.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (xs[mid] <= x) lo = mid + 1; else hi = mid; }
+  return lo;
+}

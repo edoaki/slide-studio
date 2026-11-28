@@ -5,7 +5,7 @@ import { S } from './strings.js';
 import { tip } from './tip.js';
 
 export function makeLayoutLint(ctx) {
-  let issues = [], off = null, sign = '';
+  let pages = [], issues = [], off = null, sign = '';
   const badge = document.createElement('button');
   badge.type = 'button'; badge.className = 'ibtn lint-badge'; badge.hidden = true;
   ctx.root.querySelector('#barExtra').before(badge);
@@ -16,24 +16,24 @@ export function makeLayoutLint(ctx) {
   function mark(strip = ctx.root.querySelector('#pagestrip')) {
     strip.querySelectorAll('button').forEach(b => {
       b.querySelector('.mark')?.remove();
-      if (issues.some(x => x.slide === Number(b.dataset.index))) b.append(Object.assign(document.createElement('span'), { className: 'mark warning' }));
+      if (pages.includes(Number(b.dataset.index))) b.append(Object.assign(document.createElement('span'), { className: 'mark warning' }));
     });
   }
   function showBadge() {
-    badge.hidden = !issues.length;
-    if (!issues.length) return;
-    badge.innerHTML = `${svg('warn')}<span class="n">${issues.length}</span>`;
-    tip(badge, S.lint.badge(issues.length));
+    badge.hidden = !pages.length;
+    if (!pages.length) return;
+    badge.innerHTML = `${svg('warn')}<span class="n">${pages.length}</span>`;
+    tip(badge, S.lint.badge(pages.length));
   }
   function update(list) {
     issues = list;
+    pages = [...new Set(issues.map(x => x.slide))].sort((a, b) => a - b);
     mark(); showBadge();
     // 選んでいるブロックの問題が変わったときだけツールバーを作り直す（説明を出している最中に消さない）
     const s = signOf();
     if (s !== sign) { sign = s; ctx.blocks?.redraw(); }
   }
   badge.onclick = () => {
-    const pages = [...new Set(issues.map(x => x.slide))].sort((a, b) => a - b);
     const next = pages.find(i => i > ctx.preview.index) ?? pages[0];
     if (next != null) ctx.preview.go(next, 0);
   };

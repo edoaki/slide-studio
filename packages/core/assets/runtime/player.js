@@ -1,5 +1,7 @@
 /* Slide Studio のプレイヤー。元：quarto-html shared/player.js。設計書 §7.3。
    ↑↓ ページ、←→ step（端で隣のページ）、←→ 長押しで最初・最後の step、一覧（o）・全画面・#ページ/step。
+   発表中はプレゼンターリモコンのキーも受ける：PageDown/PageUp は ↑↓ と同じページ送り。
+   クリックは左右の端で戻る・進む（端にカーソルを合わせると「前へ」「次へ」を出す）。端の長押しで最初・最後の step。
    deck.go(i, step) は Promise を返し、そのページの図の settled・フォント・画像の decode を待って解決する。
    data-step は「段」の番号。段は小さい順に出し、図のある段は図の step を最後まで送ってから次の段へ進む
    （step はページの中の通し番号。空いた番号は飛ばす）。 */
@@ -247,19 +249,10 @@ function paint(animate = false) {
 }
 const presenting = !window.__slideStudioFrameAgentStarted || window.__slideStudioPresent;
 const availableSlides = () => slides.map((slide,i) => i).filter(i => !presenting || document.body.classList.contains('export') || !slides[i].classList.contains('studio-skip'));
-let blackout = false, pageInput = '';
-const blackoutScreen = document.createElement('div');
-blackoutScreen.id = 'studio-blackout'; blackoutScreen.hidden = true;
-blackoutScreen.style.cssText = 'position:fixed;inset:0;background:#000;z-index:2147483646';
-blackoutScreen.onclick = () => setBlackout(false);
+let pageInput = '';
 const pageEntry = document.createElement('output'); pageEntry.id = 'studio-page-entry'; pageEntry.hidden = true;
 pageEntry.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 20px;background:#111;color:white;font:32px monospace;z-index:2147483647';
-pageEntry.setAttribute('aria-live','polite'); document.body.append(blackoutScreen,pageEntry);
-function setBlackout(value) {
-  if (blackout === !!value) return;
-  blackout = !!value; blackoutScreen.hidden = !blackout;
-  dispatchEvent(new CustomEvent('deckchange', {detail:{index,step,maxStep:maxStep()}}));
-}
+pageEntry.setAttribute('aria-live','polite'); document.body.append(pageEntry);
 function inputPage(value) {
   pageInput = value; pageEntry.textContent = value; pageEntry.hidden = !value;
   dispatchEvent(new CustomEvent('deckchange', {detail:{index,step,maxStep:maxStep()}}));
@@ -434,7 +427,7 @@ for (const f of document.querySelectorAll('#stage iframe')) {
   connect(); f.addEventListener('load', connect);
 }
 addEventListener('keydown', e => {
-  if (window.__slideStudioKeysOff || e.target.closest?.('input,textarea,select,[contenteditable="true"]')) return;
+  if (window.__slideStudioKeysOff || e.target.isContentEditable || e.target.closest?.('input,textarea,select,[contenteditable="true"]')) return;
   if (overview && !overview.hidden) {
     if (e.key === 'Escape' || (e.key === 'o' && !e.metaKey && !e.ctrlKey && !e.altKey)) close();
     if (e.key === 'Tab') { const items = [...overview.querySelectorAll('button')]; if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1).focus(); } else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0].focus(); } }
@@ -442,14 +435,14 @@ addEventListener('keydown', e => {
   }
   if (e.target.closest?.('button,a') && (e.key === ' ' || e.key === 'Enter' && !pageInput)) return;
   if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
-  if (/^[0-9]$/.test(e.key) || ['Enter','Backspace'].includes(e.key) && pageInput || e.key.toLowerCase() === 'b') {
+  if (/^[0-9]$/.test(e.key) || ['Enter','Backspace'].includes(e.key) && pageInput) {
     e.preventDefault(); if (e.repeat) return;
     if (/^[0-9]$/.test(e.key)) inputPage((pageInput + e.key).slice(-6));
     else if (e.key === 'Backspace') inputPage(pageInput.slice(0,-1));
     else if (e.key === 'Enter') {
       const target = Number(pageInput) - 1; inputPage('');
-      if (target >= 0 && target < slides.length && availableSlides().includes(target) && (!pageFilter || pageFilter.includes(target))) { setBlackout(false); go(target); }
-    } else { inputPage(''); setBlackout(!blackout); }
+      if (target >= 0 && target < slides.length && availableSlides().includes(target) && (!pageFilter || pageFilter.includes(target))) go(target);
+    }
     return;
   }
   if (pageInput && e.key === 'Escape') { e.preventDefault(); inputPage(''); return; }
@@ -458,20 +451,105 @@ addEventListener('keydown', e => {
     e.preventDefault(); if (held) return; held = e.key; long = false;
     timer = setTimeout(() => { long = true; jump(e.key === 'ArrowRight' ? 1 : -1); }, 450); return;
   }
+  // リモコンのキーは押しっぱなしの繰り返しで送りすぎないよう、繰り返しを無視する。
+  // 編集画面のプレビューでは PageDown/PageUp を文字入力側に残すため、発表中だけ受ける。
+  const remote = presenting && ['PageDown', 'PageUp'].includes(e.key);
+  if (remote) e.preventDefault();
   if (e.repeat) return;
   if (['ArrowDown', 'ArrowUp', ' ', 'Escape', 'o', 'f'].includes(e.key)) e.preventDefault();
   if (e.key === 'ArrowDown') go(index + 1);
   if (e.key === 'ArrowUp') go(index - 1);
   if (e.key === ' ') move(1);
+  if (remote && e.key === 'PageDown') go(index + 1);
+  if (remote && e.key === 'PageUp') go(index - 1);
   if ((e.key === 'Escape' || e.key === 'o') && overview) menu();
   if (e.key === 'f') fullscreen();
 });
 addEventListener('keyup', e => { if (e.key === held) { if (!long) move(e.key === 'ArrowRight' ? 1 : -1); cancel(); } });
 addEventListener('blur', cancel); document.addEventListener('visibilitychange', cancel);
-stage.addEventListener('click', e => {
-  if (window.__slideStudioClickOff || e.target.closest('a,button,input') || (overview && !overview.hidden)) return;
-  const r = stage.getBoundingClientRect(); move(e.clientX - r.left < r.width * .3 ? -1 : 1);
+// クリックでの移動。左端 15% で戻り、右端で進む。中央は通常の発表では進み、発表者ビューの現在のスライド（edgeClicks）では
+// ポインターで指すときの誤操作を防ぐため動かない。その代わり発表者ビューでは進む範囲を右端 30% に広げる。
+// 押してから 4px 以上動かした操作（ドラッグ・文字の選択）は送らない。端を長押しすると、そのページの最初・最後の step へ移る。
+const EDGE = .15, EDGE_NEXT_ONLY = .3, CLICK_SLOP = 4, HOLD = 450;
+let edgesOnly = false, pressed = null, hintAt = 0;
+const edgeWidth = dir => dir > 0 && edgesOnly ? EDGE_NEXT_ONLY : EDGE;
+const clickDirection = (x, edges = edgesOnly) => !(x >= 0 && x <= 1) ? 0 : x < edgeWidth(-1) ? -1 : x > 1 - edgeWidth(1) ? 1 : edges ? 0 : 1;
+const reachable = () => availableSlides().filter(k => !pageFilter || pageFilter.includes(k));
+const canMove = dir => dir < 0 ? step > 0 || reachable().some(k => k < index) : dir > 0 && (step < maxStep() || reachable().some(k => k > index));
+const clicksOff = () => window.__slideStudioClickOff || document.body.classList.contains('export') || (overview && !overview.hidden);
+// 長押しで送る先が残っているか（段階のあるページだけ）
+const canHold = dir => maxStep() > 0 && (dir < 0 ? step > 0 : step < maxStep());
+const hasSteps = () => maxStep() > 0;
+const releaseHold = () => { if (pressed) clearTimeout(pressed.timer); };
+stage.addEventListener('pointerdown', e => {
+  releaseHold(); pressed = null;
+  if (!e.isPrimary || e.button !== 0) return;
+  pressed = { x: e.clientX, y: e.clientY, held: false };
+  const r = stage.getBoundingClientRect(), dir = clicksOff() || e.target.closest('a,button,input') ? 0 : clickDirection((e.clientX - r.left) / r.width, true);
+  if (dir && canHold(dir)) { const press = pressed; press.timer = setTimeout(() => { press.held = true; jump(dir); }, HOLD); }
 });
+stage.addEventListener('pointermove', e => { if (pressed && Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) > CLICK_SLOP) releaseHold(); });
+for (const type of ['pointerup', 'pointercancel', 'pointerleave']) stage.addEventListener(type, releaseHold);
+stage.addEventListener('click', e => {
+  const start = pressed; pressed = null; releaseHold();
+  if (clicksOff() || e.target.closest('a,button,input')) return;
+  if (!start || start.held || Math.hypot(e.clientX - start.x, e.clientY - start.y) > CLICK_SLOP) return;
+  const r = stage.getBoundingClientRect(), dir = clickDirection((e.clientX - r.left) / r.width);
+  if (dir) move(dir);
+});
+// 端にカーソルを合わせたときだけ「前へ」「次へ」を控えめに出す（押せる場所を示す）。←→ はキーの形で文字の下に添え、キーでも動くことを示す。
+// 表示はスライドの内容を隠しにくいよう、できるだけ端に寄せる
+// 段階のあるページでは、その下に長押し（クリック・キーとも）で移る先も添える
+const navHints = [[-1, 'prev', '前へ', '←', '長押しで最初へ'], [1, 'next', '次へ', '→', '長押しで最後へ']].map(([dir, id, label, arrow, holdLabel]) => {
+  const band = document.createElement('div'); band.id = `studio-nav-${id}`; band.setAttribute('aria-hidden', 'true');
+  band.style.cssText = `position:fixed;z-index:4;display:flex;align-items:center;justify-content:${dir < 0 ? 'flex-start' : 'flex-end'};pointer-events:none;opacity:0;transition:opacity .15s;background:linear-gradient(to ${dir < 0 ? 'right' : 'left'},#00000017,#0000)`;
+  const chip = document.createElement('span');
+  chip.style.cssText = 'display:inline-flex;flex-direction:column;align-items:center;gap:.2em;margin:0 .2em;padding:.35em .5em;border-radius:.9em;background:#1c1c1ad9;color:#fff;font:600 1em/1.2 system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;white-space:nowrap;box-shadow:0 1px 4px #0003';
+  const main = document.createElement('span'); main.style.cssText = 'display:inline-flex;flex-direction:column;align-items:center;gap:.25em';
+  const mark = document.createElement('kbd'); mark.textContent = arrow;
+  mark.style.cssText = 'display:inline-grid;place-items:center;min-width:1.5em;height:1.45em;box-sizing:border-box;padding:0 .25em;border:1px solid #ffffff8c;border-bottom-width:2px;border-radius:.3em;background:#ffffff1a;font:600 .85em/1 system-ui,-apple-system,sans-serif'
+  const text = document.createElement('span'); text.textContent = label;
+  main.append(text, mark);
+  const hold = document.createElement('span'); hold.textContent = holdLabel; hold.style.cssText = 'font-size:.75em;font-weight:500;opacity:.8'; hold.hidden = true;
+  chip.append(main, hold); band.append(chip); document.body.append(band);
+  return { dir, band, text, hold };
+});
+// 長押しの説明は、そのページに段階があるときに出す
+const paintHold = () => { for (const h of navHints) h.hold.hidden = h.text.hidden || !hasSteps(); };
+function showHint(dir) {
+  if (dir === hintAt) return;
+  if (dir) {
+    const r = stage.getBoundingClientRect();
+    for (const h of navHints) {
+      const width = r.width * edgeWidth(h.dir);
+      Object.assign(h.band.style, { top: `${r.top}px`, height: `${r.height}px`, width: `${width}px`, left: `${h.dir < 0 ? r.left : r.right - width}px`, fontSize: `${Math.max(11, Math.min(16, r.width * .011))}px` });
+      h.text.hidden = width < 72; // 狭い枠では矢印だけ
+    }
+    paintHold();
+  }
+  navHints.forEach(h => { h.band.style.opacity = h.dir === dir ? '1' : '0'; });
+  // カーソルの形は、端に入ったとき・出たときだけ変える（編集画面などが付けた指定を上書きしない）
+  if (dir || hintAt) stage.style.cursor = dir ? 'pointer' : '';
+  hintAt = dir;
+}
+addEventListener('pointermove', e => {
+  if (e.pointerType === 'touch') return;
+  const r = stage.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  const off = clicksOff() || !(y >= 0 && y <= 1) || e.target.closest?.('a,button,input,#toolbar');
+  const dir = off ? 0 : clickDirection(x, true);
+  showHint(dir && canMove(dir) ? dir : 0);
+}, { passive: true });
+addEventListener('pointerout', e => { if (!e.relatedTarget) showHint(0); });
+addEventListener('blur', () => showHint(0));
+addEventListener('deckchange', () => { if (hintAt && !canMove(hintAt)) showHint(0); else if (hintAt) paintHold(); });
+// 発表者ビューの現在のスライドは送る・指すための面なので、文字の選択やリンクなどスライドの要素の操作は受けない
+const edgeStyle = document.createElement('style');
+edgeStyle.textContent = '#stage{-webkit-user-select:none;user-select:none}#stage *{pointer-events:none!important;-webkit-user-select:none!important;user-select:none!important}';
+function edgeClicks(on) {
+  edgesOnly = !!on; showHint(0);
+  if (edgesOnly) document.head.append(edgeStyle); else edgeStyle.remove();
+  if (edgesOnly) getSelection()?.removeAllRanges();
+}
 // 図の中で押したキーは図の runtime が親へ送る
 addEventListener('message', e => {
   const d = e.data; if (!d || d.channel !== 'slide-studio-figure') return;
@@ -491,7 +569,7 @@ function stageNumber(k, i = index) {
   const next = t.stages.find(s => s >= k);
   return (next == null ? t.count : t.start.get(next)) + 1;
 }
-window.deck = { setBlackout, get blackout() { return blackout; }, get pageInput() { return pageInput; }, go, pageWheel, setFilter, move, jump, maxStep, pdfMarks, pdfSteps, stageAt, stageNumber, goStage, settle, slides, resize, get index() { return index; }, get step() { return step; }, get count() { return slides.length; } };
+window.deck = { edgeClicks, get pageInput() { return pageInput; }, go, pageWheel, setFilter, move, jump, maxStep, pdfMarks, pdfSteps, stageAt, stageNumber, goStage, settle, slides, resize, get index() { return index; }, get step() { return step; }, get count() { return slides.length; } };
 addEventListener('resize', resize); resize();
 // 整数の viewport 寸法が変わらない、小数だけのリサイズも追従する。
 if (window.__slideStudioFill && window.frameElement) new ResizeObserver(resize).observe(window.frameElement);
@@ -501,7 +579,7 @@ const domReady = document.readyState === 'loading'
   ? new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true })) : Promise.resolve();
 domReady.then(() => {
   const m = location.hash.match(/^#(\d+)(?:\/(\d+))?$/);
-  return go(m ? Number(m[1]) - 1 : 0);
+  return go(m ? Number(m[1]) - 1 : 0, m?.[2] ? Number(m[2]) : 0);
 }).then(() => {
   window.deckReady = true; dispatchEvent(new Event('deckready'));
   // 親 iframe の load は全ページの図を待つため、表示可能になった時点でも知らせる。

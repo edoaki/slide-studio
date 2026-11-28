@@ -9,6 +9,7 @@ import { mountHome } from './home.js';
 import { mountAgents } from './agents.js';
 import { mountEditor } from './editor.js';
 import './tip.js';
+import { installModalFocus } from './modal-focus.js';
 
 let unmount = null;
 let leaving = null;
@@ -73,5 +74,6 @@ document.addEventListener('click', e => {
   if (a && !e.metaKey && !e.ctrlKey) { e.preventDefault(); navigate(a.getAttribute('href')); }
 });
 installSettings();
+installModalFocus();
 await loadPreferences().catch(e => toast(e.message));
 route();

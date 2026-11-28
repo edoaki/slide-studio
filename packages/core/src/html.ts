@@ -12,13 +12,13 @@ class HtmlTokens extends Tokenizer {
     super({...options, xmlMode:false}, callbacks);
   }
 }
-class LegacyParser extends Parser {
+class HtmlParser extends Parser {
   protected override isVoidElement(name:string):boolean { return VOID.has(name); }
 }
 
 export function legacyHtml(html:string) {
   const handler=new DomHandler();
-  new LegacyParser(handler, {
+  new HtmlParser(handler, {
     xmlMode:true, lowerCaseTags:true, lowerCaseAttributeNames:true,
     decodeEntities:true, Tokenizer:HtmlTokens,
   }).end(html);
