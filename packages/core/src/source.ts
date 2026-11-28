@@ -464,7 +464,7 @@ function allBlank(lines: SourceLines, start: number, end: number): boolean {
 }
 
 const FRONT_MATTER = new RegExp(
-  String.raw`^---[ \t]*\n(.*?\n)?(?:---|\.\.\.)[ \t]*(\n|${END})`,
+  String.raw`^---[ \t]*\r?\n(.*?\n)?(?:---|\.\.\.)[ \t]*(\r?\n|${END})`,
   "su",
 );
 

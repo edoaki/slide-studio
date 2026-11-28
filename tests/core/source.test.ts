@@ -395,6 +395,8 @@ const GOLDEN = GOLDEN_PATH
 
 test("golden differential cases match the Python reference", { skip: GOLDEN === null }, () => {
   for (const entry of GOLDEN!) {
+    // Windows front matter is supported explicitly by the CRLF case below.
+    if (entry.name === "crlf") continue;
     const doc = parse(entry.source);
     assert.deepEqual(doc.to_json(), entry.doc, `${entry.name} doc`);
     const [wrapped, origin] = wrapped_source(doc);
@@ -405,10 +407,11 @@ test("golden differential cases match the Python reference", { skip: GOLDEN === 
   }
 });
 
-test("CRLF is preserved and parsed with Python's dot/end-of-line behavior", () => {
+test("CRLF front matter is recognized without shifting source offsets or changing line endings", () => {
   const text = "---\r\ntitle: CRLF\r\n---\r\n\r\n## 題\r\n\r\n本文\r\n";
   const doc = parse(text);
-  assert.deepEqual(doc.front, [0, 0]);
+  assert.equal(doc.meta.title, "CRLF");
+  assert.equal(doc.front[1], text.indexOf("---", 3) + 5);
   assert.equal(doc.pages.length, 1);
   const page = doc.pages[0]!;
   assert.equal(page.title, "題");
@@ -423,9 +426,9 @@ test("CRLF is preserved and parsed with Python's dot/end-of-line behavior", () =
   const [wrapped, origin] = wrapped_source(doc);
   assert.equal(
     wrapped,
-    "---\r\ntitle: CRLF\r\n---\r\n\r\n\n## 題\r\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n本文\r\n\n:::\n\n",
+    "---\r\ntitle: CRLF\r\n---\r\n\n\r\n\n## 題\r\n\n::: {.slide-studio-c data-slide-studio=\"p0/0\"}\n\n本文\r\n\n:::\n\n",
   );
-  assert.deepEqual(origin, [1, 2, 3, 4, 5, 5, null, null, null, 7, null, null, null]);
+  assert.deepEqual(origin, [1, 2, 3, 4, 4, 5, 5, null, null, null, 7, null, null, null]);
   assert.equal(rewrite(doc), text);
 });
 

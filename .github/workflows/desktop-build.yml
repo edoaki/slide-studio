@@ -89,11 +89,14 @@ jobs:
           $install = Start-Process -FilePath $installer -ArgumentList "/S", "/D=$target" -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw "Installer exited with $($install.ExitCode)" }
           $env:SLIDE_STUDIO_ELECTRON_HOME = Join-Path $env:RUNNER_TEMP studio-profile
-          $workspace = Join-Path $env:RUNNER_TEMP studio-workspace
-          $app = Start-Process "$target/Slide Studio.exe" -ArgumentList "--studio-browser", "--no-browser", "--root", $workspace, "--port", "0" -PassThru
+          $stderr = Join-Path $env:RUNNER_TEMP studio-stderr.log
+          $app = Start-Process "$target/Slide Studio.exe" -ArgumentList "--studio-browser", "--no-browser", "--port", "0" -RedirectStandardError $stderr -PassThru
           try {
             $bootstrap = Join-Path $env:SLIDE_STUDIO_ELECTRON_HOME browser-connection.html
-            for ($i = 0; $i -lt 60 -and !(Test-Path $bootstrap); $i++) { Start-Sleep -Seconds 1 }
+            for ($i = 0; $i -lt 60 -and !(Test-Path $bootstrap); $i++) {
+              if ($app.HasExited) { throw "App exited with $($app.ExitCode): $(Get-Content $stderr -Raw)" }
+              Start-Sleep -Seconds 1
+            }
             $url = [regex]::Match((Get-Content $bootstrap -Raw -ErrorAction Stop), 'href="([^"]+)"').Groups[1].Value
             if ((Invoke-WebRequest -Uri $url).StatusCode -ne 200) { throw "Editor did not start" }
           } finally { if (!$app.HasExited) { Stop-Process -Id $app.Id } }
